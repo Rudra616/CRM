@@ -2,6 +2,9 @@ import db from "../config/db";
 import bcrypt from "bcrypt";
 import { Role } from "../types/role";
 import { RegisterUserDTO, User,UpdateProfileDTO,UpdateAdminDTO } from "../types/user";
+import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
+
 
 // REGISTER USER
 export const registerUserService = async (data: RegisterUserDTO): Promise<User> => {
@@ -138,7 +141,7 @@ export const getProfileService = async (userId: number): Promise<User | null> =>
 export const getUserByIdService = async (id: number, roleId: number): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-"SELECT id, username, firstname, lastname, phone, email, gender FROM users WHERE id = ? AND role_id = ?",
+      "SELECT id, username, firstname, lastname, phone, email, gender FROM users WHERE id = ? AND role_id = ?",
       [id, roleId]
     );
     return rows.length > 0 ? (rows[0] as User) : null;
@@ -385,5 +388,83 @@ export const updateAdminProfileService = async (adminId: number, data: UpdateAdm
   } catch (err: any) {
     console.error("updateAdminProfileService error:", err.message);
     throw new Error(err.message || "Failed to update admin profile");
+  }
+};
+
+
+
+// send resetpassword
+export const sendResetPasswordEmailService = async (email: string): Promise<string> => {
+  try {
+    if (!email) throw new Error("Email is required");
+
+    const [rows]: any = await db.query("SELECT id FROM users WHERE email = ?", [email]);
+    if (rows.length === 0) {
+      throw new Error("Email not registered");
+    }
+
+    const userId = rows[0].id;
+
+    if (!process.env.JWT_SECRET || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.SMTP_HOST || !process.env.SMTP_PORT || !process.env.FRONTEND_URL) {
+      throw new Error("Email server or JWT configuration is missing in environment variables");
+    }
+
+    // Generate token valid for 15 min
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET as string, { expiresIn: "15m" });
+
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    // Setup transporter
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    // Send email
+    await transporter.sendMail({
+      from: `"My App" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Reset Password",
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. Link expires in 15 minutes.</p>`,
+    });
+
+    return token;
+  } catch (err: any) {
+    console.error("sendResetPasswordEmailService error:", err.message);
+    throw new Error(err.message || "Failed to send reset password email");
+  }
+};
+
+export const resetPasswordService = async (token: string, newPassword: string) => {
+  try {
+    if (!token || !newPassword) throw new Error("Token and new password are required");
+
+    if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set in environment variables");
+
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET as string);
+    const userId = decoded.id;
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    const [result]: any = await db.query("UPDATE users SET password = ? WHERE id = ?", [hash, userId]);
+
+    if (result.affectedRows === 0) {
+      throw new Error("User not found or password not updated");
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error("resetPasswordService error:", err.message);
+
+    if (err.name === "TokenExpiredError") {
+      throw new Error("Reset token has expired. Please request a new one.");
+    } else if (err.name === "JsonWebTokenError") {
+      throw new Error("Invalid reset token.");
+    }
+
+    throw new Error(err.message || "Failed to reset password");
   }
 };

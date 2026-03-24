@@ -42,7 +42,7 @@ const Register: React.FC = () => {
     phone: "",
     password: "",
     confirmPassword: "",
-    gender: "other", // ✅ default
+    gender: "" as Gender, // forces user to pick
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,7 +57,10 @@ const Register: React.FC = () => {
 
     const validationResults = validateRegister(form);
     const hasErrors = Object.values(validationResults).some((r) => !r.valid);
-    if (hasErrors) { setErrorsFromValidation(validationResults); return; }
+    if (hasErrors) {
+      setErrorsFromValidation(validationResults);
+      return;
+    }
 
     try {
       if (isCreateSubadmin) {
@@ -73,11 +76,15 @@ const Register: React.FC = () => {
 
         showSuccess("Subadmin created successfully");
         setForm({
-          username: "", firstname: "", lastname: "",
-          email: "", phone: "", password: "", confirmPassword: "",
+          username: "",
+          firstname: "",
+          lastname: "",
+          email: "",
+          phone: "",
+          password: "",
+          confirmPassword: "",
           gender: "other",
         });
-
       } else {
         const response = await registerApi({
           username: form.username,
@@ -111,17 +118,23 @@ const Register: React.FC = () => {
       showError(
         isCreateSubadmin
           ? (msg ?? "Failed to create subadmin")
-          : (msg ?? "Registration failed")
+          : (msg ?? "Registration failed"),
       );
     }
   };
 
-  const wrapperStyle = isCreateSubadmin ? {} : { minHeight: "100vh", alignItems: "center" };
+const wrapperStyle = isCreateSubadmin
+  ? { paddingBottom: "2rem" }
+  : { minHeight: "100vh", alignItems: "center", paddingBottom: "2rem" };
 
-  return (
-    <div className="container mt-5 mx-auto d-flex justify-content-center" style={wrapperStyle}>
+return (
+  <div
+    className="container my-5 mx-auto d-flex justify-content-center"
+    style={wrapperStyle}
+  >
+
       <div
-        className="card border-primary shadow-sm mx-auto"
+        className="card shadow-sm mx-auto"
         style={{ borderWidth: 2, maxWidth: 450, width: "100%" }}
       >
         <div className="card-body p-4">
@@ -129,7 +142,6 @@ const Register: React.FC = () => {
             {isCreateSubadmin ? "Create Subadmin" : "Register"}
           </h3>
           <form onSubmit={handleSubmit}>
-
             {/* Username */}
             <div className="mb-3">
               <label className="form-label">Username *</label>
@@ -143,7 +155,11 @@ const Register: React.FC = () => {
                 minLength={3}
                 maxLength={50}
               />
-              {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
+              {errors.username && (
+                <div className="invalid-feedback d-block">
+                  {errors.username}
+                </div>
+              )}
             </div>
 
             {/* First Name */}
@@ -154,13 +170,20 @@ const Register: React.FC = () => {
                 name="firstname"
                 value={form.firstname}
                 onChange={(e) => {
-                  setForm((prev) => ({ ...prev, firstname: e.target.value.replace(/[^A-Za-z]/g, "") }));
+                  setForm((prev) => ({
+                    ...prev,
+                    firstname: e.target.value.replace(/[^A-Za-z]/g, ""),
+                  }));
                   clearFieldError("firstname");
                 }}
                 placeholder="Letters only"
                 maxLength={50}
               />
-              {errors.firstname && <div className="invalid-feedback d-block">{errors.firstname}</div>}
+              {errors.firstname && (
+                <div className="invalid-feedback d-block">
+                  {errors.firstname}
+                </div>
+              )}
             </div>
 
             {/* Last Name */}
@@ -171,13 +194,20 @@ const Register: React.FC = () => {
                 name="lastname"
                 value={form.lastname}
                 onChange={(e) => {
-                  setForm((prev) => ({ ...prev, lastname: e.target.value.replace(/[^A-Za-z]/g, "") }));
+                  setForm((prev) => ({
+                    ...prev,
+                    lastname: e.target.value.replace(/[^A-Za-z]/g, ""),
+                  }));
                   clearFieldError("lastname");
                 }}
                 placeholder="Letters only"
                 maxLength={50}
               />
-              {errors.lastname && <div className="invalid-feedback d-block">{errors.lastname}</div>}
+              {errors.lastname && (
+                <div className="invalid-feedback d-block">
+                  {errors.lastname}
+                </div>
+              )}
             </div>
 
             {/* Email */}
@@ -192,7 +222,9 @@ const Register: React.FC = () => {
                 onChange={handleChange}
                 maxLength={50}
               />
-              {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
+              {errors.email && (
+                <div className="invalid-feedback d-block">{errors.email}</div>
+              )}
             </div>
 
             {/* Phone */}
@@ -203,31 +235,45 @@ const Register: React.FC = () => {
                 name="phone"
                 value={form.phone}
                 onChange={(e) => {
-                  setForm((prev) => ({ ...prev, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) }));
+                  setForm((prev) => ({
+                    ...prev,
+                    phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10),
+                  }));
                   clearFieldError("phone");
                 }}
                 placeholder="10 digits only"
                 maxLength={10}
               />
-              {errors.phone && <div className="invalid-feedback d-block">{errors.phone}</div>}
+              {errors.phone && (
+                <div className="invalid-feedback d-block">{errors.phone}</div>
+              )}
             </div>
 
             {/* ✅ GENDER DROPDOWN */}
             <div className="mb-3">
               <label className="form-label">Gender</label>
               <select
-                className="form-select"
+                className={`form-select ${errors.gender ? "is-invalid" : ""}`}
                 value={form.gender}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, gender: e.target.value as Gender }))
-                }
+                onChange={(e) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    gender: e.target.value as Gender,
+                  }));
+                  clearFieldError("gender"); // ✅ clears error on change
+                }}
               >
+                <option value="">----- Select -----</option>{" "}
+                {/* ✅ required prompt */}
                 {GENDER_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
               </select>
+              {errors.gender && (
+                <div className="invalid-feedback d-block">{errors.gender}</div>
+              )}
             </div>
 
             {/* Password */}
@@ -243,7 +289,11 @@ const Register: React.FC = () => {
                 minLength={8}
                 maxLength={256}
               />
-              {errors.password && <div className="invalid-feedback d-block">{errors.password}</div>}
+              {errors.password && (
+                <div className="invalid-feedback d-block">
+                  {errors.password}
+                </div>
+              )}
             </div>
 
             {/* Confirm Password */}
@@ -260,7 +310,9 @@ const Register: React.FC = () => {
                 maxLength={256}
               />
               {errors.confirmPassword && (
-                <div className="invalid-feedback d-block">{errors.confirmPassword}</div>
+                <div className="invalid-feedback d-block">
+                  {errors.confirmPassword}
+                </div>
               )}
             </div>
 
@@ -269,7 +321,10 @@ const Register: React.FC = () => {
             </button>
 
             {isCreateSubadmin ? (
-              <Link to="/admin/subadmins" className="btn btn-outline-secondary w-100">
+              <Link
+                to="/admin/subadmins"
+                className="btn btn-outline-secondary w-100"
+              >
                 Back to Subadmins
               </Link>
             ) : (

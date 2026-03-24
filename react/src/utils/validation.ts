@@ -49,16 +49,16 @@ export const validateRegister = (data: {
   lastname: string;
   email: string;
   phone: string;
+  gender: string; 
 }): { [key: string]: ValidationResult } => {
-  const { username, password, confirmPassword, firstname, lastname, email, phone } = data;
-  
+  const { username, password, confirmPassword, firstname, lastname, email, phone, gender } = data;
   const errors: { [key: string]: ValidationResult } = {};
 
   if (!username?.trim()) errors.username = { valid: false, message: "Username is required" };
   else if (username.trim().length < LIMITS.USERNAME_MIN) errors.username = { valid: false, message: `Username must be at least ${LIMITS.USERNAME_MIN} characters` };
   else if (username.trim().length > LIMITS.USERNAME_MAX) errors.username = { valid: false, message: `Username must be at most ${LIMITS.USERNAME_MAX} characters` };
   else if (!usernameRegex.test(username.trim())) errors.username = { valid: false, message: "Username must contain only letters and numbers" };
-  
+
   if (!firstname?.trim()) errors.firstname = { valid: false, message: "Firstname is required" };
   else if (firstname.trim().length > LIMITS.NAME_MAX) errors.firstname = { valid: false, message: `Firstname must be at most ${LIMITS.NAME_MAX} characters` };
   else if (!nameRegex.test(firstname.trim())) errors.firstname = { valid: false, message: "Firstname must contain only letters" };
@@ -73,13 +73,17 @@ export const validateRegister = (data: {
 
   if (!phone?.trim()) errors.phone = { valid: false, message: "Phone is required" };
   else if (!DIGITS_10_REGEX.test(phone.replace(/\D/g, ""))) errors.phone = { valid: false, message: `Phone must be exactly ${LIMITS.PHONE_LEN} digits` };
-
+  if (!gender?.trim()) {
+    errors.gender = { valid: false, message: "Gender is required" };
+  } else if (!["male", "female", "other"].includes(gender)) {
+    errors.gender = { valid: false, message: "Invalid gender selection" };
+  }
   if (!password?.trim()) errors.password = { valid: false, message: "Password is required" };
   else if (password.length > LIMITS.PASSWORD_MAX_USER) errors.password = { valid: false, message: `Password must be at most ${LIMITS.PASSWORD_MAX_USER} characters` };
   else if (!passwordRegex.test(password)) errors.password = {
     valid: false, message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters`
   };
-  
+
   if (password !== confirmPassword) errors.confirmPassword = { valid: false, message: "Passwords do not match" };
 
   return errors;
@@ -104,8 +108,11 @@ export const validateProfileFields = (data: {
   email: string;
   phone: string;
   newPassword?: string;
+    confirmPassword?: string; 
+
+  gender?: string;
 }): Record<string, ValidationResult> => {
-  const { username, firstname, lastname, email, phone, newPassword } = data;
+  const { username, firstname, lastname, email, phone, gender, newPassword,confirmPassword } = data;
   const errors: Record<string, ValidationResult> = {};
 
   if (!username?.trim()) errors.username = { valid: false, message: "Username is required" };
@@ -127,12 +134,30 @@ export const validateProfileFields = (data: {
 
   if (!phone?.trim()) errors.phone = { valid: false, message: "Phone is required" };
   else if (!DIGITS_10_REGEX.test(phone.replace(/\D/g, ""))) errors.phone = { valid: false, message: `Phone must be exactly ${LIMITS.PHONE_LEN} digits` };
-
+  if (!gender?.trim()) {
+    errors.gender = { valid: false, message: "Gender is required" };
+  } else if (!["male", "female", "other"].includes(gender)) {
+    errors.gender = { valid: false, message: "Invalid gender selection" };
+  }
   if (newPassword && newPassword.trim().length > 0 && newPassword.length > LIMITS.PASSWORD_MAX_USER) {
     errors.newPassword = { valid: false, message: `Password must be at most ${LIMITS.PASSWORD_MAX_USER} characters` };
   } else if (newPassword && newPassword.trim().length > 0 && !passwordRegex.test(newPassword)) {
     errors.newPassword = { valid: false, message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters` };
   }
+    if (newPassword && newPassword.trim().length > 0) {
+    if (!confirmPassword || confirmPassword.trim().length === 0) {
+      errors.confirmPassword = {
+        valid: false,
+        message: "Confirm password is required",
+      };
+    } else if (newPassword !== confirmPassword) {
+      errors.confirmPassword = {
+        valid: false,
+        message: "Passwords do not match",
+      };
+    }
+  }
+
   return errors;
 };
 
@@ -192,6 +217,7 @@ export const validateEditUserFields = (data: {
   email: string;
   phone: string;
   password?: string;
+  gender?: string
 }): Record<string, ValidationResult> => {
   const base = validateProfileFields({
     username: data.username,
@@ -199,6 +225,7 @@ export const validateEditUserFields = (data: {
     lastname: data.lastname,
     email: data.email,
     phone: data.phone,
+    gender: data.gender ?? "",
   });
   if (data.password && data.password.trim().length > 0 && !passwordRegex.test(data.password)) {
     if (data.password.length > LIMITS.PASSWORD_MAX_USER) {

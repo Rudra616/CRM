@@ -14,6 +14,8 @@ import {
   adminLogin,
   getAdminProfile,
   updateAdminProfile,
+  sendResetPasswordEmail,
+  resetPassword
 } from "../controllers/authController";
 import { Role } from "../types/role";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware";
@@ -43,7 +45,7 @@ router.post(
   "/login",
   validateSchema(loginSchema),
   login
-);
+); 
 router.post("/admin/login", validateSchema(loginSchema), adminLogin);
 router.post("/logout", logout);
 router.post("/admin/logout", logout);
@@ -54,16 +56,16 @@ router.get(
   getProfile
 );// router.get("/me", verifyToken, getProfile);
 router.put("/profile", verifyToken, (req, res, next) => {
-    uploadImage.single("image")(req, res, (err: any) => {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message,
-        });
-      }
-      next();
-    });
-  },validateSchema(updateProfileSchema), updateProfile);
+  uploadImage.single("image")(req, res, (err: any) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    next();
+  });
+}, validateSchema(updateProfileSchema), updateProfile);
 
 // ADMIN PROFILE
 router.get(
@@ -128,5 +130,10 @@ router.get(
   allowRoles(Role.ADMIN, Role.SUBADMIN),
   getUsers
 );
+
+router.post("/forgot-password", sendResetPasswordEmail);
+
+// Reset password: submit new password
+router.post("/reset-password", resetPassword);
 
 export default router;

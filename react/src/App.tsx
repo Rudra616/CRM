@@ -19,6 +19,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import ServerDownOverlay from "./components/ServerDownOverlay";
 import { subscribe, checkHealth } from "./serverStatus";
 import { SidebarProvider } from "./context/SidebarContext";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 /** App - role-based routing; ToastContainer required for toast notifications */
 const App: React.FC = () => {
@@ -72,35 +74,100 @@ const App: React.FC = () => {
         <Navbar />
 
         <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/admin" element={<AdminLogin />} />
-        <Route
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/admin/dashboard" element={<ProtectedRoute roles={["admin"]} loginPath="/admin"><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/profile" element={<ProtectedRoute roles={["admin"]} loginPath="/admin"><Profile /></ProtectedRoute>} />
-          <Route path="/admin/subadmins" element={<ProtectedRoute roles={["admin"]} loginPath="/admin"><ManageSubadmin /></ProtectedRoute>} />
-          <Route path="/admin/create-subadmin" element={<ProtectedRoute roles={["admin"]} loginPath="/admin"><Register /></ProtectedRoute>} />
-          <Route path="/admin/users" element={<ProtectedRoute roles={["admin"]} loginPath="/admin"><ManageUsers /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute roles={["subadmin", "user"]}><Profile /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute roles={["subadmin"]}><ManageUsers /></ProtectedRoute>} />
-          <Route path="/user/dashboard" element={<ProtectedRoute roles={["user"]}><UserDashboard /></ProtectedRoute>} />
-          <Route path="/subadmin/dashboard" element={<ProtectedRoute roles={["subadmin"]}><SubadminDashboard /></ProtectedRoute>} />
-        </Route>
-          <Route path="*" element={<Navigate to="/login" replace />} /> 
-        <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute roles={["admin"]} loginPath="/admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/profile"
+              element={
+                <ProtectedRoute roles={["admin"]} loginPath="/admin">
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/subadmins"
+              element={
+                <ProtectedRoute roles={["admin"]} loginPath="/admin">
+                  <ManageSubadmin />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/create-subadmin"
+              element={
+                <ProtectedRoute roles={["admin"]} loginPath="/admin">
+                  <Register />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute roles={["admin"]} loginPath="/admin">
+                  <ManageUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute roles={["subadmin", "user"]}>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute roles={["subadmin"]}>
+                  <ManageUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard"
+              element={
+                <ProtectedRoute roles={["user"]}>
+                  <UserDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subadmin/dashboard"
+              element={
+                <ProtectedRoute roles={["subadmin"]}>
+                  <SubadminDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
 
         <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        closeButton
-        theme="colored"
+          position="top-right"
+          autoClose={4000}
+          closeButton
+          theme="colored"
         />
       </SidebarProvider>
     </BrowserRouter>

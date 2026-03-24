@@ -119,3 +119,10 @@ export const adminLoginApi = (
 ): Promise<ApiResponse<AdminLoginResponse>> => {
   return apiRequest<AdminLoginResponse>("POST", "/admin/login", { username, password });
 };
+
+
+export const forgotPasswordApi = (email: string) =>
+  apiRequest<null>("POST", "/forgot-password", { email });
+
+export const resetPasswordApi = (token: string, newPassword: string) =>
+  apiRequest<null>("POST", "/reset-password", { token, newPassword });

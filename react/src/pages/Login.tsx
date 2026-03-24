@@ -105,10 +105,17 @@ const Login: React.FC = () => {
     Sign In
 </button>
 
-<div className="text-center mt-3">
+<div className="text-center mt-1">
     <span>Don't have an account? </span>
     <Link to="/register">Sign Up</Link>
 </div>
+<div className="text-center">
+
+  <p>
+    <a href="/forgot-password">Forgot Password?</a>
+  </p>
+  </div>
+
             </form>
                 </div>
             </div>

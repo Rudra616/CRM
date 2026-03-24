@@ -29,12 +29,13 @@ type ProfileFormKeys =
   | "email"
   | "phone"
   | "password"
-  | "newPassword";
-
+  | "newPassword"
+  | "confirmPassword" 
+  | "gender";
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
-  { value: "male",   label: "Male"   },
+  { value: "male", label: "Male" },
   { value: "female", label: "Female" },
-  { value: "other",  label: "Other"  },
+  { value: "other", label: "Other" },
 ];
 
 const forceLogout = (role: RoleString) => {
@@ -43,11 +44,11 @@ const forceLogout = (role: RoleString) => {
 };
 
 const Profile = () => {
-  const navigate  = useNavigate();
-  const location  = useLocation();
-  const user      = AuthManager.getUser();
-  const role      = roleIdToRole(user?.role);
-  const isAdmin   = role === "admin";
+  const navigate = useNavigate();
+  const location = useLocation();
+  const user = AuthManager.getUser();
+  const role = roleIdToRole(user?.role);
+  const isAdmin = role === "admin";
 
   useEffect(() => {
     if (isAdmin && location.pathname === "/profile") {
@@ -60,14 +61,14 @@ const Profile = () => {
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } =
     useFormValidation<Record<ProfileFormKeys, string>>();
 
-  const [profile,       setProfile]       = useState<ProfileData | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
   const [userNewPassword, setUserNewPassword] = useState("");
-  const [profileImage,  setProfileImage]  = useState<File | null>(null);
-  const [gender,        setGender]        = useState<Gender>("other"); // ✅ separate gender state
-  const [loading,       setLoading]       = useState(true);
-  const [updating,      setUpdating]      = useState(false);
-
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [gender, setGender] = useState<Gender | "">("");
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+const [confirmPassword, setConfirmPassword] = useState("");
   const fetchProfile = async () => {
     try {
       if (isAdmin) {
@@ -80,24 +81,28 @@ const Profile = () => {
           const profileRole = roleIdToRole(d.role ?? d.role_id);
           setProfile({
             ...res.data,
-            role:      profileRole,
-            username:  res.data.username  ?? "",
+            role: profileRole,
+            username: res.data.username ?? "",
             firstname: res.data.firstname ?? "",
-            lastname:  res.data.lastname  ?? "",
-            email:     res.data.email     ?? "",
-            phone:     res.data.phone     ?? "",
+            lastname: res.data.lastname ?? "",
+            email: res.data.email ?? "",
+            phone: res.data.phone ?? "",
           });
           setGender((res.data.gender as Gender) ?? "other"); // ✅ seed gender from API
         }
       }
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || "Failed to load profile");
+      showError(
+        (err as { message?: string })?.message || "Failed to load profile",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchProfile(); }, [isAdmin]);
+  useEffect(() => {
+    fetchProfile();
+  }, [isAdmin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile) return;
@@ -106,7 +111,10 @@ const Profile = () => {
     if (name === "firstname" || name === "lastname") {
       setProfile({ ...profile, [name]: value.replace(/[^A-Za-z]/g, "") });
     } else if (name === "phone") {
-      setProfile({ ...profile, [name]: value.replace(/[^0-9]/g, "").slice(0, 10) });
+      setProfile({
+        ...profile,
+        [name]: value.replace(/[^0-9]/g, "").slice(0, 10),
+      });
     } else {
       setProfile({ ...profile, [name]: value });
     }
@@ -116,10 +124,11 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const validation = validateProfileImage(file);
-if (!validation.valid) { 
-    showError(validation.message ?? "Invalid image"); 
-    return; 
-}    setProfileImage(file);
+    if (!validation.valid) {
+      showError(validation.message ?? "Invalid image");
+      return;
+    }
+    setProfileImage(file);
     e.target.value = "";
   };
 
@@ -138,23 +147,29 @@ if (!validation.valid) {
     if (isAdmin) {
       const payload = {
         username: String(profile.username ?? "").trim(),
-        email:    String(profile.email    ?? "").trim(),
+        email: String(profile.email ?? "").trim(),
         password: adminPassword.trim() || undefined,
       };
       const fieldResults = validateAdminProfileFields(payload);
       const hasError = Object.values(fieldResults).some((r) => !r.valid);
-      if (hasError) { setErrorsFromValidation(fieldResults); return; }
+      if (hasError) {
+        setErrorsFromValidation(fieldResults);
+        return;
+      }
 
       setUpdating(true);
       try {
-        const res = await updateAdminProfileWithImageApi(payload, profileImage ?? undefined);
+        const res = await updateAdminProfileWithImageApi(
+          payload,
+          profileImage ?? undefined,
+        );
         if (res.data) {
           setProfile({ ...profile, ...res.data });
           AuthManager.setUser({
-            id:       res.data.id,
+            id: res.data.id,
             username: res.data.username,
-            email:    res.data.email,
-            role:     "admin",
+            email: res.data.email,
+            role: "admin",
           });
         }
         showSuccess("Profile updated successfully");
@@ -174,33 +189,43 @@ if (!validation.valid) {
 
     // ── USER / SUBADMIN ────────────────────────────────────────────────────
     const payload = {
-      username:    String(profile.username            ?? "").trim(),
-      firstname:   String((profile as User).firstname ?? "").trim(),
-      lastname:    String((profile as User).lastname  ?? "").trim(),
-      email:       String(profile.email               ?? "").trim(),
-      phone:       String((profile as User).phone     ?? "").replace(/\D/g, "").slice(0, 10),
-      gender,                                                          // ✅ include gender
+      username: String(profile.username ?? "").trim(),
+      firstname: String((profile as User).firstname ?? "").trim(),
+      lastname: String((profile as User).lastname ?? "").trim(),
+      email: String(profile.email ?? "").trim(),
+      phone: String((profile as User).phone ?? "")
+        .replace(/\D/g, "")
+        .slice(0, 10),
+      gender: (gender || undefined) as Gender | undefined,
       newPassword: userNewPassword.trim() || undefined,
+        confirmPassword: confirmPassword.trim() || undefined, // ✅ add this
+
     };
     const fieldResults = validateProfileFields(payload);
     const hasError = Object.values(fieldResults).some((r) => !r.valid);
-    if (hasError) { setErrorsFromValidation(fieldResults); return; }
+    if (hasError) {
+      setErrorsFromValidation(fieldResults);
+      return;
+    }
 
     setUpdating(true);
     try {
-      const res = await updateProfileWithImageApi(payload, profileImage ?? undefined);
+      const res = await updateProfileWithImageApi(
+        payload,
+        profileImage ?? undefined,
+      );
       if (res.data) {
         const d = res.data as User & { role_id?: number };
         const userRole = roleIdToRole(d.role ?? d.role_id);
         setProfile({ ...profile, ...res.data, role: userRole });
         setGender((res.data.gender as Gender) ?? gender); // ✅ sync gender from response
         AuthManager.setUser({
-          id:        (res.data as User).id as number,
-          username:  res.data.username,
-          role:      userRole,
+          id: (res.data as User).id as number,
+          username: res.data.username,
+          role: userRole,
           firstname: res.data.firstname,
-          lastname:  res.data.lastname,
-          email:     res.data.email,
+          lastname: res.data.lastname,
+          email: res.data.email,
         });
       }
       showSuccess("Profile updated successfully");
@@ -232,10 +257,24 @@ if (!validation.valid) {
           <img
             src={URL.createObjectURL(profileImage)}
             alt="Preview"
-            onClick={() => window.open(URL.createObjectURL(profileImage), "_blank")}
-            style={{ width: 100, height: 100, objectFit: "cover", borderRadius: "50%", cursor: "pointer" }}
+            onClick={() =>
+              window.open(URL.createObjectURL(profileImage), "_blank")
+            }
+            style={{
+              width: 100,
+              height: 100,
+              objectFit: "cover",
+              borderRadius: "50%",
+              cursor: "pointer",
+            }}
           />
-          <button type="button" style={styles.profileImageButton} onClick={() => fileInputRef.current?.click()}>+</button>
+          <button
+            type="button"
+            style={styles.profileImageButton}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            +
+          </button>
         </div>
       ) : imageUrl ? (
         <div className="position-relative">
@@ -243,36 +282,66 @@ if (!validation.valid) {
             src={imageUrl}
             alt="Profile"
             onClick={() => window.open(imageUrl, "_blank")}
-            style={{ width: 100, height: 100, objectFit: "cover", borderRadius: "50%", cursor: "pointer" }}
+            style={{
+              width: 100,
+              height: 100,
+              objectFit: "cover",
+              borderRadius: "50%",
+              cursor: "pointer",
+            }}
           />
-          <button type="button" style={styles.profileImageButton} onClick={() => fileInputRef.current?.click()}>+</button>
+          <button
+            type="button"
+            style={styles.profileImageButton}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            +
+          </button>
         </div>
       ) : (
         <div className="position-relative">
           <div
             onClick={() => fileInputRef.current?.click()}
             style={{
-              width: 100, height: 100, borderRadius: "50%",
-              backgroundColor: "#f0f0f0", display: "flex",
-              alignItems: "center", justifyContent: "center",
-              cursor: "pointer", fontSize: "40px",
-              color: "#999", border: "2px solid #7e7e7e",
+              width: 100,
+              height: 100,
+              borderRadius: "50%",
+              backgroundColor: "#f0f0f0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: "40px",
+              color: "#999",
+              border: "2px solid #7e7e7e",
             }}
-          >👤</div>
-          <button type="button" style={styles.profileImageButton} onClick={() => fileInputRef.current?.click()}>+</button>
+          >
+            👤
+          </div>
+          <button
+            type="button"
+            style={styles.profileImageButton}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            +
+          </button>
         </div>
       )}
     </div>
   );
 
-  if (loading)   return <div className="container mt-4">Loading...</div>;
-  if (!profile)  return <div className="container mt-4">Unable to load profile.</div>;
+  if (loading) return <div className="container mt-4">Loading...</div>;
+  if (!profile)
+    return <div className="container mt-4">Unable to load profile.</div>;
 
   // ── ADMIN FORM ─────────────────────────────────────────────────────────────
   if (isAdmin) {
     return (
       <div className="container mt-4 mx-auto" style={{ maxWidth: "500px" }}>
-        <div className="card shadow-sm mx-auto" style={{ borderWidth: 2, maxWidth: 400, width: "100%" }}>
+        <div
+          className="card shadow-sm mx-auto"
+          style={{ borderWidth: 2, maxWidth: 400, width: "100%" }}
+        >
           <div className="card-body p-4">
             <h3 className="mb-4 text-primary">Admin Profile</h3>
             <form onSubmit={handleUpdate}>
@@ -286,7 +355,11 @@ if (!validation.valid) {
                   onChange={handleChange}
                   placeholder="Min 3 characters"
                 />
-                {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
+                {errors.username && (
+                  <div className="invalid-feedback d-block">
+                    {errors.username}
+                  </div>
+                )}
               </div>
               <div className="mb-2">
                 <label className="form-label">Email *</label>
@@ -298,7 +371,9 @@ if (!validation.valid) {
                   onChange={handleChange}
                   placeholder="valid@email.com"
                 />
-                {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
+                {errors.email && (
+                  <div className="invalid-feedback d-block">{errors.email}</div>
+                )}
               </div>
               <div className="mb-3">
                 <label className="form-label">New Password (optional)</label>
@@ -306,12 +381,41 @@ if (!validation.valid) {
                   className={`form-control ${errors.password ? "is-invalid" : ""}`}
                   type="password"
                   value={adminPassword}
-                  onChange={(e) => { setAdminPassword(e.target.value); clearFieldError("password"); }}
+                  onChange={(e) => {
+                    setAdminPassword(e.target.value);
+                    clearFieldError("password");
+                  }}
                   placeholder="Leave blank to keep current"
                 />
-                {errors.password && <div className="invalid-feedback d-block">{errors.password}</div>}
+                {errors.password && (
+                  <div className="invalid-feedback d-block">
+                    {errors.password}
+                  </div>
+                )}
               </div>
-              <button type="submit" className="btn btn-primary" disabled={updating}>
+              <div className="mb-3">
+  <label className="form-label">Confirm Password</label>
+  <input
+    className={`form-control ${errors.confirmPassword ? "is-invalid" : ""}`}
+    type="password"
+    value={confirmPassword}
+    onChange={(e) => {
+      setConfirmPassword(e.target.value);
+      clearFieldError("confirmPassword");
+    }}
+    placeholder="Re-enter new password"
+  />
+  {errors.confirmPassword && (
+    <div className="invalid-feedback d-block">
+      {errors.confirmPassword}
+    </div>
+  )}
+</div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={updating}
+              >
                 {updating ? "Updating..." : "Update Profile"}
               </button>
             </form>
@@ -339,7 +443,11 @@ if (!validation.valid) {
                 onChange={handleChange}
                 placeholder="Min 3 characters"
               />
-              {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
+              {errors.username && (
+                <div className="invalid-feedback d-block">
+                  {errors.username}
+                </div>
+              )}
             </div>
 
             <div className="mb-2">
@@ -351,7 +459,11 @@ if (!validation.valid) {
                 onChange={handleChange}
                 placeholder="Letters only"
               />
-              {errors.firstname && <div className="invalid-feedback d-block">{errors.firstname}</div>}
+              {errors.firstname && (
+                <div className="invalid-feedback d-block">
+                  {errors.firstname}
+                </div>
+              )}
             </div>
 
             <div className="mb-2">
@@ -363,7 +475,11 @@ if (!validation.valid) {
                 onChange={handleChange}
                 placeholder="Letters only"
               />
-              {errors.lastname && <div className="invalid-feedback d-block">{errors.lastname}</div>}
+              {errors.lastname && (
+                <div className="invalid-feedback d-block">
+                  {errors.lastname}
+                </div>
+              )}
             </div>
 
             <div className="mb-2">
@@ -376,7 +492,9 @@ if (!validation.valid) {
                 onChange={handleChange}
                 placeholder="valid@email.com"
               />
-              {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
+              {errors.email && (
+                <div className="invalid-feedback d-block">{errors.email}</div>
+              )}
             </div>
 
             <div className="mb-2">
@@ -389,23 +507,35 @@ if (!validation.valid) {
                 placeholder="10 digits only"
                 maxLength={10}
               />
-              {errors.phone && <div className="invalid-feedback d-block">{errors.phone}</div>}
+              {errors.phone && (
+                <div className="invalid-feedback d-block">{errors.phone}</div>
+              )}
             </div>
 
-            {/* ✅ GENDER DROPDOWN */}
             <div className="mb-2">
-              <label className="form-label">Gender</label>
+              <label className="form-label">Gender *</label>
+
               <select
-                className="form-select"
+                className={`form-select ${errors.gender ? "is-invalid" : ""}`}
                 value={gender}
-                onChange={(e) => setGender(e.target.value as Gender)}
+                onChange={(e) => {
+                  setGender(e.target.value as Gender);
+                  clearFieldError("gender"); // ✅ clear error when user selects
+                }}
               >
+                <option value="">----- Select -----</option>
+
                 {GENDER_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
               </select>
+
+              {/* ✅ THIS IS MISSING */}
+              {errors.gender && (
+                <div className="invalid-feedback d-block">{errors.gender}</div>
+              )}
             </div>
 
             <div className="mb-3">
@@ -414,13 +544,41 @@ if (!validation.valid) {
                 className={`form-control ${errors.newPassword ? "is-invalid" : ""}`}
                 type="password"
                 value={userNewPassword}
-                onChange={(e) => { setUserNewPassword(e.target.value); clearFieldError("newPassword"); }}
+                onChange={(e) => {
+                  setUserNewPassword(e.target.value);
+                  clearFieldError("newPassword");
+                }}
                 placeholder="Leave blank to keep current password"
               />
-              {errors.newPassword && <div className="invalid-feedback d-block">{errors.newPassword}</div>}
+              {errors.newPassword && (
+                <div className="invalid-feedback d-block">
+                  {errors.newPassword}
+                </div>
+              )}
             </div>
-
-            <button type="submit" className="btn btn-primary" disabled={updating}>
+<div className="mb-3">
+  <label className="form-label">Confirm Password</label>
+  <input
+    className={`form-control ${errors.confirmPassword ? "is-invalid" : ""}`}
+    type="password"
+    value={confirmPassword}
+    onChange={(e) => {
+      setConfirmPassword(e.target.value);
+      clearFieldError("confirmPassword");
+    }}
+    placeholder="Re-enter new password"
+  />
+  {errors.confirmPassword && (
+    <div className="invalid-feedback d-block">
+      {errors.confirmPassword}
+    </div>
+  )}
+</div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={updating}
+            >
               {updating ? "Updating..." : "Update Profile"}
             </button>
           </form>
@@ -434,20 +592,20 @@ export default Profile;
 
 const styles: Record<string, React.CSSProperties> = {
   profileImageButton: {
-    position:        "absolute",
-    bottom:          0,
-    right:           0,
-    width:           "30px",
-    height:          "30px",
-    borderRadius:    "50%",
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: "30px",
+    height: "30px",
+    borderRadius: "50%",
     backgroundColor: "orange",
-    color:           "white",
-    fontSize:        "20px",
-    display:         "flex",
-    justifyContent:  "center",
-    alignItems:      "center",
-    border:          "none",
-    padding:         0,
-    cursor:          "pointer",
+    color: "white",
+    fontSize: "20px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
   },
 };

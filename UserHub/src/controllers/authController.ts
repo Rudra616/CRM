@@ -18,6 +18,8 @@ import {
   getAdminProfileService,
   logoutUserService,
   logoutAdminService,
+  sendResetPasswordEmailService,
+  resetPasswordService
 } from "../services/userService";
 import { AuthRequest } from "../types/AuthRequest";
 import { storeUserTokenService } from "../services/userService";
@@ -296,5 +298,31 @@ export const updateAdminProfile: RequestHandler = async (req, res) => {
     return successResponse(res, "Admin profile updated", admin, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 409);
+  }
+};
+
+
+
+// Send password reset email
+export const sendResetPasswordEmail = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const token = await sendResetPasswordEmailService(email);
+
+    return successResponse(res, "Password reset email sent", { token }, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 400);
+  }
+};
+
+// Reset password
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    await resetPasswordService(token, newPassword);
+
+    return successResponse(res, "Password reset successfully", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 400);
   }
 };

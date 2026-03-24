@@ -21,8 +21,6 @@ const LIMITS = {
   PHONE_LEN: 10,
 };
 
-// ─── shared field definitions ────────────────────────────────────────────────
-
 const usernameField = Joi.string()
   .min(LIMITS.USERNAME_MIN)
   .max(LIMITS.USERNAME_MAX)
@@ -80,7 +78,6 @@ const emailUserField = Joi.string()
     "string.empty": "Email is required",
   });
 
-// gender optional (register / create-subadmin / profile update)
 const genderOptional = Joi.string()
   .valid(...genderOptions)
   .optional()
@@ -88,7 +85,6 @@ const genderOptional = Joi.string()
     "any.only": `Gender must be one of: ${genderOptions.join(", ")}`,
   });
 
-// gender required (update-subadmin by admin)  ✅
 const genderRequired = Joi.string()
   .valid(...genderOptions)
   .required()
@@ -98,7 +94,6 @@ const genderRequired = Joi.string()
     "any.required": "Gender is required",
   });
 
-// ─── REGISTER USER ───────────────────────────────────────────────────────────
 export const registerSchema = Joi.object({
   username: usernameField,
   password: Joi.string()
@@ -117,10 +112,10 @@ export const registerSchema = Joi.object({
   lastname: lastnameField,
   phone: phoneField,
   email: emailUserField,
-  gender: genderOptional, // optional on register
+  gender: genderOptional, 
 });
 
-// ─── LOGIN ───────────────────────────────────────────────────────────────────
+
 export const loginSchema = Joi.object({
   username: Joi.string().required().messages({
     "string.empty": "Username is required",
@@ -130,18 +125,14 @@ export const loginSchema = Joi.object({
   }),
 });
 
-// ─── SUBADMIN (create) ───────────────────────────────────────────────────────
-export const subadminSchema = registerSchema; // same rules → gender optional
-
-// ─── UPDATE USER / SUBADMIN (by admin) ───────────────────────────────────────
-// gender is REQUIRED here so the admin must explicitly set it
+export const subadminSchema = registerSchema; 
 export const updateUserSchema = Joi.object({
   username: usernameField,
   firstname: firstnameField,
   lastname: lastnameField,
   phone: phoneField,
   email: emailUserField,
-  gender: genderRequired, // ✅ required — admin must supply gender
+  gender: genderRequired, 
   password: Joi.string()
     .allow("", null)
     .optional()
@@ -156,14 +147,13 @@ export const updateUserSchema = Joi.object({
     }),
 });
 
-// ─── PROFILE UPDATE (by user themselves) ─────────────────────────────────────
 export const updateProfileSchema = Joi.object({
   username: usernameField,
   firstname: firstnameField,
   lastname: lastnameField,
   phone: phoneField,
   email: emailUserField,
-  gender: genderOptional, // optional — user may or may not change it
+  gender: genderOptional, 
   newPassword: Joi.string()
     .allow("", null)
     .optional()
@@ -176,10 +166,8 @@ export const updateProfileSchema = Joi.object({
       "string.pattern.base":
         "Password must contain uppercase, lowercase, number and symbol (@$!%*?&)",
     }),
-}).options({ allowUnknown: true }); // allow multipart form-data fields
+}).options({ allowUnknown: true }); 
 
-// ─── ADMIN PROFILE UPDATE ────────────────────────────────────────────────────
-// Admin table has no gender column — no gender field here
 export const updateAdminSchema = Joi.object({
   username: usernameField,
   email: Joi.string()
@@ -205,4 +193,4 @@ export const updateAdminSchema = Joi.object({
       "string.pattern.base":
         "Password must contain uppercase, lowercase, number and symbol (@$!%*?&)",
     }),
-}).options({ allowUnknown: true }); // allow multipart form-data fields
+}).options({ allowUnknown: true });
