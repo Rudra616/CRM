@@ -1,11 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  type ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 
 interface SidebarContextValue {
   sidebarOpen: boolean;
@@ -25,23 +18,21 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= MOBILE_BREAKPOINT);
 
-  // detect screen size - close sidebar when switching to mobile
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= MOBILE_BREAKPOINT;
       setIsMobile(mobile);
       if (mobile) setSidebarOpen(false);
     };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // toggle behavior
   const toggleSidebar = useCallback(() => {
     if (isMobile) {
-      setSidebarOpen((prev) => !prev);
+      setSidebarOpen(prev => !prev);
     } else {
-      setCollapsed((prev) => !prev);
+      setCollapsed(prev => !prev);
     }
   }, [isMobile]);
 
@@ -63,6 +54,6 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
 
 export const useSidebar = () => {
   const ctx = useContext(SidebarContext);
-  if (!ctx) throw new Error("useSidebar must be used within SidebarProvider");
+  if (!ctx) throw new Error('useSidebar must be used within SidebarProvider');
   return ctx;
 };
