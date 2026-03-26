@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
-import { errorResponse } from "../utils/apiResponse";
-
+import { errorResponse } from "../common/utils/apiResponse";
 export const validateSchema = (schema: Joi.ObjectSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const { error, value } = schema.validate(req.body || {}, {
@@ -9,8 +8,7 @@ export const validateSchema = (schema: Joi.ObjectSchema) => {
       allowUnknown: true,
     });
     if (error) {
-      const msg = error.details?.[0]?.message || "Validation failed";
-      return errorResponse(res, msg, 400);
+      return errorResponse(res, error.details?.[0]?.message || "Validation failed", 400);
     }
     req.body = value;
     next();

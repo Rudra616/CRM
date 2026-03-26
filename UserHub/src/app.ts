@@ -1,28 +1,28 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import authRoutes from "./routes/authRoutes";
 import path from "path";
+import userRoutes  from "./modules/user/user.routes";
+import adminRoutes from "./modules/admin/admin.routes";
 
 dotenv.config();
+
 const app = express();
 
 app.use(cors());
-
-// safer parsing
 app.use(express.json({ strict: false }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
 app.use((req, res, next) => {
-  console.log(req.method, req.url);
+  console.log("HEADERS:", req.headers["content-type"]);
+  console.log("BODY:", req.body);
   next();
 });
 
-app.use("/api", authRoutes);
+app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
+
+app.use("/api/admin", adminRoutes);
+app.use("/api",       userRoutes);
 
 export default app;
-
-
-
-
-
