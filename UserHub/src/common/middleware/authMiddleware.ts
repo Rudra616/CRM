@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import { AuthRequest } from "../types/AuthRequest";
 import { verifyToken } from "../helpers/common.helper";
-import { findUserToken, findAdminToken } from "../services/token.service";
+import { findUserToken,findAdminToken } from "../../modules/token.service";
 
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authReq = req as AuthRequest;
