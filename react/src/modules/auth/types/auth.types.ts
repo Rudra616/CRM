@@ -1,4 +1,4 @@
-import { User, Admin } from '../../../shared/types/common.types';
+import type { User, Admin } from '../../../shared/types/common.types';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -7,12 +7,10 @@ export interface ApiResponse<T> {
 }
 
 export interface LoginResponse {
-  token: string;
   user: User;
 }
 
 export interface AdminLoginResponse {
-  token: string;
   admin: Admin;
 }
 

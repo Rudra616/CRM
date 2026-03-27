@@ -18,6 +18,7 @@ import {
   deleteUserByIdAndRole,
 } from "./user.service";
 import { upsertUserToken, removeUserToken } from "../token.service";
+import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 
@@ -33,10 +34,18 @@ export const registerUser = async (req: Request, res: Response) => {
 
     const token = signToken({ id: insertId, role: Role.USER });
     await upsertUserToken(insertId, username, Role.USER, token);
+    setAuthCookie(res, token); // 🔥 ADD THIS
 
     return successResponse(res, "User registered successfully", {
-      token,
-      user: { id: insertId, username, firstname, lastname, email, gender, role: roleLabel(Role.USER) },
+      user: {
+        id: insertId,
+        username,
+        firstname,
+        lastname,
+        email,
+        gender,
+        role: roleLabel(Role.USER),
+      },
     }, 201);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
@@ -58,8 +67,9 @@ export const loginUser = async (req: Request, res: Response) => {
     const token = signToken({ id: user.id, role: user.role_id });
     await upsertUserToken(user.id, user.username, user.role_id, token);
 
+    setAuthCookie(res, token); // 🔥 IMPORTANT
+
     return successResponse(res, "Login successful", {
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -78,7 +88,7 @@ export const loginUser = async (req: Request, res: Response) => {
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
 export const logoutUser = async (req: Request, res: Response) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const token = req.cookies.token; // 🔥 CHANGED
   if (token) {
     try {
       await removeUserToken(token);
@@ -86,6 +96,9 @@ export const logoutUser = async (req: Request, res: Response) => {
       // token may already be removed — ignore
     }
   }
+  clearAuthCookie(res); // 🔥 IMPORTANT
+  clearSessionCookies(res);
+
   return successResponse(res, "Logged out", null, 200);
 };
 

@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { loginApi } from '../api/auth.api';
+import { loginApi, adminLoginApi } from '../api/auth.api';
 import { validateLoginFields } from '../../../shared/utils/validation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import { showError, showSuccess } from '../../../shared/utils/toast';
 import { colors } from '../../../theme/colors';
+import type { Admin, User } from '../../../shared/types/common.types';
 
 const Login = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const isAdminRoute = location.pathname === '/admin';
+  const isAdminRoute =
+    location.pathname === '/admin' || location.pathname === '/admin/login';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } = useFormValidation();
@@ -37,8 +39,16 @@ const Login = () => {
         return;
       }
 
-      const { token, user: apiUser } = response.data;
-      login(token, apiUser);
+      const apiUser = isAdminRoute
+        ? (response.data as { admin?: Admin }).admin
+        : (response.data as { user?: User }).user;
+
+      if (!apiUser) {
+        showError(response.message || 'Login failed');
+        return;
+      }
+
+      login(apiUser);
 
       showSuccess('Login successful');
       if (apiUser.role === 'admin') navigate('/admin/dashboard', { replace: true });
@@ -55,7 +65,7 @@ const Login = () => {
       <div className="card shadow-sm" style={{ borderWidth: 2, maxWidth: 400, width: '100%' }}>
         <div className="card-body p-4">
           <h3 className="mb-4" style={{ color: colors.primary }}>
-            {isAdminRoute ? 'Admin Sign In' : 'Sign In'}
+            {isAdminRoute ? 'Admin Login' : 'Sign In'}
           </h3>
           <form onSubmit={handleSubmit}>
             <div className="mb-3">

@@ -25,9 +25,8 @@ export const ProtectedRoute = ({
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  const role = typeof user.role === 'number'
-    ? roleIdToRole(user.role)
-    : user.role;
+const role = user.role;
+
 
   if (roles.length > 0 && !roles.includes(role)) {
     return (

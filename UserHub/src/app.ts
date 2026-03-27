@@ -4,16 +4,20 @@ import dotenv from "dotenv";
 import path from "path";
 import userRoutes  from "./modules/user/user.routes";
 import adminRoutes from "./modules/admin/admin.routes";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173", // your React
+  credentials: true
+}));
 app.use(express.json({ strict: false }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-
+app.use(cookieParser());
 app.use((req, res, next) => {
   console.log("HEADERS:", req.headers["content-type"]);
   console.log("BODY:", req.body);

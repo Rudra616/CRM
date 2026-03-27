@@ -1,10 +1,8 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
-import { roleIdToRole } from '../utils/roleUtils';
-import { logoutApi, logoutAdminApi } from '../../modules/auth/api/auth.api'
+import { logoutAdminApi } from '../../modules/auth/api/auth.api';
 import { colors } from '../../theme/colors';
 
 const DASHBOARD_PATHS = ['/admin', '/subadmin', '/user', '/profile', '/users'];
@@ -17,27 +15,9 @@ const Navbar = () => {
   const location = useLocation();
   const { toggleSidebar, sidebarOpen } = useSidebar();
   const { user, isAuthenticated, logout } = useAuth();
-  const [isLoggedIn, setIsLoggedIn] = useState(isAuthenticated);
 
-  useEffect(() => {
-    setIsLoggedIn(isAuthenticated);
-  }, [isAuthenticated, location.pathname]);
+  const role = user?.role;
 
-  const handleLogout = async () => {
-    const role = roleIdToRole(user?.role);
-    try {
-      if (role === 'admin') await logoutAdminApi();
-      else await logoutApi();
-    } catch {
-      // ignore
-    } finally {
-      logout();
-      navigate(role === 'admin' ? '/admin' : '/login');
-    }
-  };
-
-  const showSidebarToggle = isLoggedIn && isDashboardRoute(location.pathname);
-  const role = roleIdToRole(user?.role);
   const homePath = !user
     ? '/'
     : role === 'admin'
@@ -45,6 +25,20 @@ const Navbar = () => {
       : role === 'subadmin'
         ? '/subadmin/dashboard'
         : '/user/dashboard';
+
+  const handleLogout = async () => {
+    try {
+      if (role === 'admin') await logoutAdminApi();
+      // logoutApi is already called inside context's logout()
+    } catch {
+      // ignore
+    } finally {
+      await logout();
+      navigate(role === 'admin' ? '/admin/login' : '/login');
+    }
+  };
+
+  const showSidebarToggle = isAuthenticated && isDashboardRoute(location.pathname);
 
   return (
     <nav
@@ -79,14 +73,10 @@ const Navbar = () => {
       </div>
 
       <div>
-        {!isLoggedIn ? (
+        {!isAuthenticated ? (
           <>
-            <Link className="btn btn-outline-light btn-sm me-2" to="/login">
-              Login
-            </Link>
-            <Link className="btn btn-outline-light btn-sm me-2" to="/register">
-              Register
-            </Link>
+            <Link className="btn btn-outline-light btn-sm me-2" to="/login">Login</Link>
+            <Link className="btn btn-outline-light btn-sm me-2" to="/register">Register</Link>
           </>
         ) : (
           <button className="btn btn-danger btn-sm" onClick={handleLogout}>

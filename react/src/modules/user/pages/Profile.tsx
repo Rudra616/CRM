@@ -42,7 +42,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const role = roleIdToRole(user?.role);
+  const role = user?.role;
   const isAdmin = role === 'admin';
 
   useEffect(() => {
@@ -60,6 +60,7 @@ const Profile = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [userNewPassword, setUserNewPassword] = useState('');
   const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
   const [gender, setGender] = useState<Gender | ''>('');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -131,6 +132,11 @@ const Profile = () => {
       ? profile.image_url
       : `${API_BASE}${profile.image_url}`
     : null;
+
+  // If image URL changes after an update, allow re-loading.
+  useEffect(() => {
+    setImageFailed(false);
+  }, [profile?.image_url]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,12 +265,13 @@ const Profile = () => {
             +
           </button>
         </div>
-      ) : imageUrl ? (
+      ) : imageUrl && !imageFailed ? (
         <div className="position-relative">
           <img
             src={imageUrl}
             alt="Profile"
             onClick={() => window.open(imageUrl, '_blank')}
+            onError={() => setImageFailed(true)}
             style={{
               width: 100,
               height: 100,

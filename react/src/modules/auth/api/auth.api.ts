@@ -1,11 +1,24 @@
 import { apiRequest } from '../../../shared/api/apiWrapper';
-import type { LoginResponse, ApiResponse, RegisterRequest, CreateSubadminRequest } from '../types/auth.types';
+import type {
+  LoginResponse,
+  AdminLoginResponse,
+  ApiResponse,
+  RegisterRequest,
+  CreateSubadminRequest,
+} from '../types/auth.types';
 
 export const loginApi = (
   username: string,
   password: string
 ): Promise<ApiResponse<LoginResponse>> => {
   return apiRequest<LoginResponse>('POST', '/login', { username, password });
+};
+
+export const adminLoginApi = (
+  username: string,
+  password: string
+): Promise<ApiResponse<AdminLoginResponse>> => {
+  return apiRequest<AdminLoginResponse>('POST', '/admin/login', { username, password });
 };
 
 export const logoutApi = (): Promise<ApiResponse<null>> => {

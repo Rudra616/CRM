@@ -24,7 +24,8 @@ export const AppRoutes = () => (
   <Routes>
     {/* Public routes */}
     <Route path="/login" element={<Login />} />
-    <Route path="/admin" element={<Login />} />          {/* unified login */}
+    <Route path="/admin" element={<Login />} />
+    <Route path="/admin/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
     <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/reset-password" element={<ResetPassword />} />

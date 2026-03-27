@@ -19,6 +19,7 @@ import {
   deleteUserByIdAndRole,
 } from "../user/user.service";
 import { upsertAdminToken, removeAdminToken } from "../token.service";
+import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
 
 // ─── Admin Login ──────────────────────────────────────────────────────────────
 
@@ -34,10 +35,15 @@ export const adminLogin = async (req: Request, res: Response) => {
 
     const token = signToken({ id: admin.id, role: "admin" });
     await upsertAdminToken(admin.id, admin.username, token);
+    setAuthCookie(res, token);
 
     return successResponse(res, "Admin login successful", {
-      token,
-      admin: { id: admin.id, username: admin.username, email: admin.email, role: "admin" },
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: "admin",
+      },
     }, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
@@ -47,14 +53,18 @@ export const adminLogin = async (req: Request, res: Response) => {
 // ─── Admin Logout ─────────────────────────────────────────────────────────────
 
 export const adminLogout = async (req: Request, res: Response) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const token = req.cookies.token;
+
   if (token) {
     try {
       await removeAdminToken(token);
-    } catch {
-      // token may already be removed — ignore
-    }
+    } catch {}
   }
+
+  // 🔥 CLEAR COOKIE USING HELPER
+  clearAuthCookie(res);
+  clearSessionCookies(res);
+
   return successResponse(res, "Logged out", null, 200);
 };
 

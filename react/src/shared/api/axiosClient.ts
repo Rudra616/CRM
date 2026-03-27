@@ -1,27 +1,23 @@
 import axios from 'axios';
 import { notifyServerDown } from '../utils/serverStatus';
-import { roleIdToRole } from '../utils/roleUtils';
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3000/api'),
   timeout: 10000,
+  withCredentials: true, // 🔥 MUST FOR COOKIES
   headers: {
     'Content-Type': 'application/json',
   },
 });
-
 axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
   if (config.data instanceof FormData) {
     delete config.headers['Content-Type'];
   }
   return config;
 });
-
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (!error.response) {
       notifyServerDown();
       return Promise.reject({
@@ -30,23 +26,30 @@ axiosClient.interceptors.response.use(
       });
     }
 
-    if (error.response.status === 401) {
+    if (error.response.status === 401 || error.response.status === 403) {
       const url = error.config?.url || '';
-      const isLoginOrRegister = url.includes('/login') || url.includes('/register');
-      const isLogout = url.includes('/logout');
-      const hadToken = !!localStorage.getItem('token');
+      const isAuthRoute = url.includes('/login') || url.includes('/register') || url.includes('/logout');
+      const isProfileBootstrap = url.includes('/profile');
+      const currentPath = window.location.pathname;
+      const isAlreadyOnPublicAuthPage =
+        currentPath === '/login' ||
+        currentPath === '/admin' ||
+        currentPath === '/admin/login' ||
+        currentPath === '/register' ||
+        currentPath === '/forgot-password' ||
+        currentPath === '/reset-password';
 
-      if (!isLoginOrRegister && !isLogout && hadToken) {
-        const user = localStorage.getItem('user');
-        let role = 'user';
-        if (user) {
-          const parsed = JSON.parse(user);
-          role = roleIdToRole(parsed.role);
+      // Force-clear stale client auth state
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+
+      // Redirect only when this is not expected bootstrap/auth traffic.
+      if (!isAuthRoute && !isProfileBootstrap && !isAlreadyOnPublicAuthPage) {
+        const target = currentPath.startsWith('/admin') ? '/admin' : '/login';
+        if (currentPath !== target) {
+          window.location.href = target;
         }
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = role === 'admin' ? '/admin' : '/login';
-        return Promise.reject(new Error('Invalid or expired token. Please login again.'));
+        return Promise.reject(new Error('Session expired. Please login again.'));
       }
     }
 

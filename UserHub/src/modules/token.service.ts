@@ -34,7 +34,7 @@ export const upsertUserToken = async (
 export const findUserToken = async (token: string): Promise<any | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT * FROM user_tokens WHERE token = ?",
+      "SELECT * FROM user_tokens WHERE token = ? AND expires_at > NOW()",
       [token]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -86,7 +86,7 @@ export const upsertAdminToken = async (
 export const findAdminToken = async (token: string): Promise<any | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT * FROM admin_tokens WHERE token = ?",
+      "SELECT * FROM admin_tokens WHERE token = ? AND expires_at > NOW()",
       [token]
     );
     return rows.length > 0 ? rows[0] : null;

@@ -1,12 +1,17 @@
+export type RoleString = 'admin' | 'subadmin' | 'user';
 
-export type RoleString = "admin" | "subadmin" | "user";
+const roleMap: Record<number, RoleString> = {
+  1: 'admin',
+  2: 'subadmin',
+  3: 'user',
+};
 
-export const roleIdToRole = (roleOrId: number | string | undefined): RoleString => {
-  if (roleOrId === "admin" || roleOrId === "subadmin" || roleOrId === "user") {
-    return roleOrId;
+export const roleIdToRole = (role: number | string | undefined): RoleString => {
+  if (typeof role === 'string' && ['admin', 'subadmin', 'user'].includes(role)) {
+    return role as RoleString;
   }
-  if (roleOrId === 1) return "admin";
-  if (roleOrId === 2) return "subadmin";
-  if (roleOrId === 3) return "user";
-  return "user";
+  if (typeof role === 'number') {
+    return roleMap[role] ?? 'user';
+  }
+  return 'user'; // safe fallback instead of undefined
 };

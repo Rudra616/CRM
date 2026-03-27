@@ -94,9 +94,9 @@ const Register: React.FC = () => {
           gender: form.gender,
         });
 
-        const { token, user } = response.data || {};
-        if (token && user) {
-          login(token, user);
+        const { user } = response.data || {};
+        if (user) {
+          login(user);
           showSuccess('User registered successfully');
           navigate('/user/dashboard', { replace: true });
         } else {
