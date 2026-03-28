@@ -18,11 +18,7 @@ app.use(express.json({ strict: false }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(cookieParser());
-app.use((req, res, next) => {
-  console.log("HEADERS:", req.headers["content-type"]);
-  console.log("BODY:", req.body);
-  next();
-});
+
 
 app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
 

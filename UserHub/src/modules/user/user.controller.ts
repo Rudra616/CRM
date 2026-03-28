@@ -16,9 +16,13 @@ import {
   updateUserById,
   updateUserPassword,
   deleteUserByIdAndRole,
+  isResetTokenUsed,
+  markResetTokenUsed,
+  deleteAllUserSessions
 } from "./user.service";
 import { upsertUserToken, removeUserToken } from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
+import { findAdminById } from "../admin/admin.service";
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 
@@ -32,7 +36,16 @@ export const registerUser = async (req: Request, res: Response) => {
     const hashedPassword = await hashPassword(password);
     const insertId = await insertUser(username, hashedPassword, firstname, lastname, phone, email, Role.USER, gender);
 
-    const token = signToken({ id: insertId, role: Role.USER });
+    const token = signToken({
+      id: insertId,
+      role: Role.USER,
+      username,
+      firstname,
+      lastname,
+      email,
+      phone,
+      gender: gender ?? undefined,
+    });
     await upsertUserToken(insertId, username, Role.USER, token);
     setAuthCookie(res, token); // 🔥 ADD THIS
 
@@ -43,6 +56,7 @@ export const registerUser = async (req: Request, res: Response) => {
         firstname,
         lastname,
         email,
+        phone,
         gender,
         role: roleLabel(Role.USER),
       },
@@ -64,10 +78,19 @@ export const loginUser = async (req: Request, res: Response) => {
     const isMatch = await comparePassword(password, user.password);
     if (!isMatch) return errorResponse(res, "Invalid password", 401);
 
-    const token = signToken({ id: user.id, role: user.role_id });
+    const token = signToken({
+      id: user.id,
+      role: user.role_id,
+      username: user.username,
+      firstname: user.firstname,
+      lastname: user.lastname,
+      email: user.email,
+      phone: user.phone ?? "",
+      gender: user.gender ?? undefined,
+    });
     await upsertUserToken(user.id, user.username, user.role_id, token);
 
-    setAuthCookie(res, token); // 🔥 IMPORTANT
+    setAuthCookie(res, token); 
 
     return successResponse(res, "Login successful", {
       user: {
@@ -100,6 +123,67 @@ export const logoutUser = async (req: Request, res: Response) => {
   clearSessionCookies(res);
 
   return successResponse(res, "Logged out", null, 200);
+};
+
+// ─── Session (claims from JWT in httpOnly cookie; client uses this instead of localStorage user) ─
+
+export const getSession: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
+  const token = req.cookies?.token as string | undefined;
+  if (!authReq.user || !token) return errorResponse(res, "Unauthorized", 401);
+
+  try {
+    const decoded = verifyToken(token) as Record<string, unknown> & { id: number };
+    const roleNum = authReq.user.role;
+
+    const uname = decoded.username;
+    if (typeof uname === "string" && uname.length > 0) {
+      return successResponse(
+        res,
+        "Session",
+        {
+          id: Number(decoded.id),
+          username: String(decoded.username),
+          firstname: String(decoded.firstname ?? ""),
+          lastname: String(decoded.lastname ?? ""),
+          email: String(decoded.email ?? ""),
+          phone: String(decoded.phone ?? ""),
+          gender: decoded.gender != null ? String(decoded.gender) : undefined,
+          role: roleLabel(roleNum),
+        },
+        200
+      );
+    }
+
+    if (roleNum === Role.ADMIN) {
+      const admin = await findAdminById(authReq.user.id);
+      if (!admin) return errorResponse(res, "Unauthorized", 401);
+      return successResponse(res, "Session", {
+        id: admin.id,
+        username: admin.username,
+        firstname: "",
+        lastname: "",
+        email: admin.email,
+        phone: "",
+        role: "admin",
+      }, 200);
+    }
+
+    const row = await findUserById(authReq.user.id);
+    if (!row) return errorResponse(res, "Unauthorized", 401);
+    return successResponse(res, "Session", {
+      id: row.id,
+      username: row.username,
+      firstname: row.firstname ?? "",
+      lastname: row.lastname ?? "",
+      email: row.email,
+      phone: row.phone ?? "",
+      gender: row.gender ?? undefined,
+      role: roleLabel(row.role_id),
+    }, 200);
+  } catch {
+    return errorResponse(res, "Unauthorized", 401);
+  }
 };
 
 // ─── Get Profile ──────────────────────────────────────────────────────────────
@@ -162,54 +246,91 @@ export const getUsers = async (req: Request, res: Response) => {
     return errorResponse(res, err.message, 500);
   }
 };
-
-// ─── Forgot / Reset Password ──────────────────────────────────────────────────
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
-    if (!req.body) {
-      return errorResponse(res, "Request body is missing", 400);
-    }
-
     const { email } = req.body;
-
-    if (!email) {
-      return errorResponse(res, "Email is required", 400);
-    }
+    if (!email)
+      return errorResponse(res, 'Email is required', 400);
 
     const user = await findUserByEmail(email);
-    if (!user) return errorResponse(res, "Email not registered", 404);
+    if (!user)
+      return errorResponse(res, 'Email not registered', 404);
 
-    const token = await sendPasswordResetEmail(user.id, email);
+    await sendPasswordResetEmail(user.id, email);
 
-    return successResponse(res, "Password reset email sent", { token }, 200);
+    return successResponse(res, 'Password reset email sent', null, 200);
   } catch (err: any) {
-    return errorResponse(res, err.message, 400);
+    return errorResponse(res, err.message, 500);
   }
 };
 
+// ─── Reset Password ───────────────────────────────────────────
 export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
     if (!token || !newPassword)
-      return errorResponse(res, "Token and new password are required", 400);
+      return errorResponse(res, 'Token and new password are required', 400);
 
+    // 1. Verify JWT signature + expiry
     let decoded: any;
     try {
       decoded = verifyToken(token);
     } catch (err: any) {
-      const msg =
-        err.name === "TokenExpiredError"
-          ? "Reset token has expired. Please request a new one."
-          : "Invalid reset token.";
+      const msg = err.name === 'TokenExpiredError'
+        ? 'Reset token has expired. Please request a new one.'
+        : 'Invalid reset token.';
       return errorResponse(res, msg, 400);
     }
 
+    // 2. Check if already used
+    const used = await isResetTokenUsed(token);
+    if (used)
+      return errorResponse(res, 'This reset link has already been used.', 400);
+
+    // 3. Update password
     const hashedPassword = await hashPassword(newPassword);
     const updated = await updateUserPassword(decoded.id, hashedPassword);
-    if (!updated) return errorResponse(res, "User not found or password not updated", 404);
+    if (!updated)
+      return errorResponse(res, 'User not found or password not updated', 404);
 
-    return successResponse(res, "Password reset successfully", null, 200);
+    // 4. Mark token used + kill all sessions (session cleanup must not fail the whole flow)
+    await markResetTokenUsed(token);
+    try {
+      await deleteAllUserSessions(decoded.id);
+    } catch (sessionErr: any) {
+      console.error('deleteAllUserSessions after reset:', sessionErr?.message);
+    }
+
+    return successResponse(res, 'Password reset successfully', null, 200);
   } catch (err: any) {
-    return errorResponse(res, err.message, 400);
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+// ─── Verify Reset Token ───────────────────────────────────────
+export const verifyResetToken = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+    if (!token)
+      return errorResponse(res, 'Token is required', 400);
+
+    // 1. Verify JWT
+    try {
+      verifyToken(token);
+    } catch (err: any) {
+      const msg = err.name === 'TokenExpiredError'
+        ? 'Reset link has expired. Please request a new one.'
+        : 'Invalid reset link.';
+      return errorResponse(res, msg, 400);
+    }
+
+    // 2. Check already used
+    const used = await isResetTokenUsed(token);
+    if (used)
+      return errorResponse(res, 'This reset link has already been used.', 400);
+
+    return successResponse(res, 'Token is valid', { valid: true }, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
   }
 };

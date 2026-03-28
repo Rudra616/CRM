@@ -1,4 +1,5 @@
 import { apiRequest } from '../../../shared/api/apiWrapper';
+import type { UserInfo } from '../../../shared/types/common.types';
 import type {
   LoginResponse,
   AdminLoginResponse,
@@ -38,7 +39,7 @@ export const registerApi = (
 export const createSubadminApi = (
   data: CreateSubadminRequest
 ): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('POST', '/admin/create-subadmin', data);
+  return apiRequest<null>('POST', '/admin/subadmins', data);
 };
 
 export const forgotPasswordApi = (email: string) =>
@@ -46,3 +47,10 @@ export const forgotPasswordApi = (email: string) =>
 
 export const resetPasswordApi = (token: string, newPassword: string) =>
   apiRequest<null>('POST', '/reset-password', { token, newPassword });
+
+export const verifyResetTokenApi = (token: string) =>
+  apiRequest<null>('POST', '/verify-reset-token', { token });
+
+export const getSessionApi = (): Promise<ApiResponse<UserInfo & { gender?: string }>> => {
+  return apiRequest<UserInfo & { gender?: string }>('GET', '/session');
+};

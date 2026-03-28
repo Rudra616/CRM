@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSubadminsApi, getUsersApi } from '../api/admin.api';
 import { showError } from '../../../shared/utils/toast';
-import { colors } from '../../../theme/colors';
+import { PageShell } from '../../../shared/components/PageShell';
+import { DashboardStatCard } from '../../../shared/components/DashboardStatCard';
 
 const AdminDashboard = () => {
   const [subadminCount, setSubadminCount] = useState(0);
@@ -29,65 +30,28 @@ const AdminDashboard = () => {
     fetch();
   }, []);
 
-  if (loading) return <p>Loading dashboard...</p>;
-
   return (
-    <>
-      <h2 className="mb-4">Admin Dashboard</h2>
+    <PageShell
+      title="Admin Dashboard"
+      subtitle="Overview of subadmins and registered users"
+      loading={loading}
+      loadingMessage="Loading dashboard…"
+    >
       <div className="row g-4">
-        {/* Subadmins Card */}
-        <div
-          className="col-sm-6 col-md-4 col-lg-3"
-          style={{ cursor: 'pointer' }}
+        <DashboardStatCard
+          title="Subadmins"
+          value={subadminCount}
+          hint="Total registered subadmins"
           onClick={() => navigate('/admin/subadmins')}
-        >
-          <div
-            className="card shadow-sm hover-shadow"
-            style={{
-              backgroundColor: colors.cardPrimaryBg,
-              borderLeft: `5px solid ${colors.primary}`,
-              transition: 'transform 0.2s',
-            }}
-          >
-            <div className="card-body d-flex flex-column align-items-start">
-              <h6 className="card-title mb-2" style={{ color: colors.primary }}>
-                Subadmins
-              </h6>
-              <span className="display-6 fw-bold" style={{ color: colors.primary }}>
-                {subadminCount}
-              </span>
-              <small className="text-muted mt-1">Total registered subadmins</small>
-            </div>
-          </div>
-        </div>
-
-        {/* Users Card */}
-        <div
-          className="col-sm-6 col-md-4 col-lg-3"
-          style={{ cursor: 'pointer' }}
+        />
+        <DashboardStatCard
+          title="Users"
+          value={userCount}
+          hint="Total registered users"
           onClick={() => navigate('/admin/users')}
-        >
-          <div
-            className="card shadow-sm hover-shadow"
-            style={{
-              backgroundColor: colors.cardPrimaryBg,
-              borderLeft: `5px solid ${colors.primary}`,
-              transition: 'transform 0.2s',
-            }}
-          >
-            <div className="card-body d-flex flex-column align-items-start">
-              <h6 className="card-title mb-2" style={{ color: colors.primary }}>
-                Users
-              </h6>
-              <span className="display-6 fw-bold" style={{ color: colors.primary }}>
-                {userCount}
-              </span>
-              <small className="text-muted mt-1">Total registered users</small>
-            </div>
-          </div>
-        </div>
+        />
       </div>
-    </>
+    </PageShell>
   );
 };
 

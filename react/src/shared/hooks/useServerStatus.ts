@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { checkHealth,subscribe } from '../utils/serverStatus';
+import { checkHealth, subscribe, subscribeRecovered } from '../utils/serverStatus';
 
 export const useServerStatus = () => {
   const [serverDown, setServerDown] = useState(false);
@@ -18,8 +18,12 @@ export const useServerStatus = () => {
   }, []);
 
   useEffect(() => {
-    const unsub = subscribe(() => setServerDown(true));
-    return unsub;
+    const unsubDown = subscribe(() => setServerDown(true));
+    const unsubUp = subscribeRecovered(() => setServerDown(false));
+    return () => {
+      unsubDown();
+      unsubUp();
+    };
   }, []);
 
   useEffect(() => {

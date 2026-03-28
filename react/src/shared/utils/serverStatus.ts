@@ -1,15 +1,26 @@
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3000/api');
 
 type Listener = () => void;
-const listeners = new Set<Listener>();
+const downListeners = new Set<Listener>();
+const upListeners = new Set<Listener>();
 
 export function notifyServerDown(): void {
-  listeners.forEach((fn) => fn());
+  downListeners.forEach((fn) => fn());
+}
+
+/** Call when any API request succeeds so a false “server down” state can clear. */
+export function notifyServerRecovered(): void {
+  upListeners.forEach((fn) => fn());
 }
 
 export function subscribe(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  downListeners.add(listener);
+  return () => downListeners.delete(listener);
+}
+
+export function subscribeRecovered(listener: Listener): () => void {
+  upListeners.add(listener);
+  return () => upListeners.delete(listener);
 }
 
 export async function checkHealth(): Promise<void> {

@@ -10,23 +10,19 @@ import Navbar from '../shared/components/Navbar';   // ← import
 const App = () => {
   const { serverDown, isChecking, attemptRecovery } = useServerStatus();
 
-  if (serverDown) {
-    return (
-      <>
-        <ServerDownOverlay onRetry={attemptRecovery} isChecking={isChecking} />
-        <ToastContainer />
-      </>
-    );
-  }
-
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <Providers>
-        <Navbar />          
-        <AppRoutes />
-      </Providers>
+    <>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Providers>
+          <Navbar />
+          <AppRoutes />
+        </Providers>
+      </BrowserRouter>
       <ToastContainer />
-    </BrowserRouter>
+      {serverDown && (
+        <ServerDownOverlay onRetry={attemptRecovery} isChecking={isChecking} />
+      )}
+    </>
   );
 };
 

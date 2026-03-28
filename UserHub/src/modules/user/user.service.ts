@@ -1,5 +1,6 @@
 import db from "../../config/db";
 import { User, RegisterUserDTO, UpdateProfileDTO } from "../../common/types/user";
+import crypto from 'crypto';  // ← Node's crypto, not Web Crypto API
 
 // ─── SELECT ───────────────────────────────────────────────────────────────────
 
@@ -188,6 +189,53 @@ export const deleteUserByIdAndRole = async (id: number, roleId: number): Promise
     return result.affectedRows > 0;
   } catch (error: any) {
     console.error("Error in deleteUserByIdAndRole:", error.message);
+    throw error;
+  }
+};
+
+
+
+// ─── INSERT ───────────────────────────────────────────────────────────────────
+
+export const markResetTokenUsed = async (token: string): Promise<void> => {
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    await db.query(
+      'INSERT INTO used_reset_tokens (token_hash) VALUES (?)',
+      [tokenHash]
+    );
+  } catch (error: any) {
+    console.error('Error in markResetTokenUsed:', error.message);
+    throw error;
+  }
+};
+
+// ─── SELECT ───────────────────────────────────────────────────────────────────
+
+export const isResetTokenUsed = async (token: string): Promise<boolean> => {
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const [rows]: any = await db.query(
+      'SELECT token_hash FROM used_reset_tokens WHERE token_hash = ?',
+      [tokenHash]
+    );
+    return rows.length > 0;
+  } catch (error: any) {
+    console.error('Error in isResetTokenUsed:', error.message);
+    throw error;
+  }
+};
+
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+
+export const deleteAllUserSessions = async (userId: number): Promise<void> => {
+  try {
+    await db.query(
+      'DELETE FROM user_sessions WHERE user_id = ?',
+      [userId]
+    );
+  } catch (error: any) {
+    console.error('Error in deleteAllUserSessions:', error.message);
     throw error;
   }
 };

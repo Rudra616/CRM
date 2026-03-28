@@ -5,8 +5,8 @@ import { validateRegister } from '../../../shared/utils/validation';
 import { showSuccess, showError } from '../../../shared/utils/toast';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import { useAuth } from '../../../context/AuthContext';
-import type { Gender } from '../../../shared/types/common.types';
-import { colors } from '../../../theme/colors';
+import type { Gender, User, UserInfo } from '../../../shared/types/common.types';
+import { AuthPageLayout, authLinkStyle } from '../../../shared/components/AuthPageLayout';
 
 type RegisterForm = {
   username: string;
@@ -18,6 +18,16 @@ type RegisterForm = {
   confirmPassword: string;
   gender: Gender;
 };
+
+const registerUserToUserInfo = (u: User): UserInfo => ({
+  id: Number(u.id),
+  username: u.username,
+  email: u.email,
+  role: u.role,
+  firstname: u.firstname ?? '',
+  lastname: u.lastname ?? '',
+  phone: u.phone ?? '',
+});
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Male' },
@@ -54,7 +64,7 @@ const Register: React.FC = () => {
     e.preventDefault();
     resetErrors();
 
-    const validationResults = validateRegister(form);
+    const validationResults = validateRegister(form, { requireConfirmPassword: true });
     const hasErrors = Object.values(validationResults).some((r) => !r.valid);
     if (hasErrors) {
       setErrorsFromValidation(validationResults);
@@ -96,7 +106,7 @@ const Register: React.FC = () => {
 
         const { user } = response.data || {};
         if (user) {
-          login(user);
+          login(registerUserToUserInfo(user as User));
           showSuccess('User registered successfully');
           navigate('/user/dashboard', { replace: true });
         } else {
@@ -110,16 +120,17 @@ const Register: React.FC = () => {
     }
   };
 
-  const wrapperStyle = isCreateSubadmin ? { paddingBottom: '2rem' } : { minHeight: '100vh', alignItems: 'center', paddingBottom: '2rem' };
-
   return (
-    <div className="container my-5 mx-auto d-flex justify-content-center" style={wrapperStyle}>
-      <div className="card shadow-sm mx-auto" style={{ borderWidth: 2, maxWidth: 450, width: '100%' }}>
-        <div className="card-body p-4">
-          <h3 className="mb-4" style={{ color: colors.primary }}>
-            {isCreateSubadmin ? 'Create Subadmin' : 'Register'}
-          </h3>
-          <form onSubmit={handleSubmit}>
+    <AuthPageLayout
+      title={isCreateSubadmin ? 'Create subadmin' : 'Create account'}
+      subtitle={
+        isCreateSubadmin
+          ? 'Add a subadmin '
+          : 'New user registration'
+      }
+      maxWidth={480}
+    >
+      <form onSubmit={handleSubmit}>
             {/* Username */}
             <div className="mb-3">
               <label className="form-label">Username *</label>
@@ -248,7 +259,6 @@ const Register: React.FC = () => {
               {errors.password && <div className="invalid-feedback d-block">{errors.password}</div>}
             </div>
 
-            {/* Confirm Password */}
             <div className="mb-4">
               <label className="form-label">Confirm Password *</label>
               <input
@@ -264,28 +274,24 @@ const Register: React.FC = () => {
               {errors.confirmPassword && <div className="invalid-feedback d-block">{errors.confirmPassword}</div>}
             </div>
 
-            <button
-              type="submit"
-              className="btn w-100 mb-2"
-              style={{ backgroundColor: colors.primary, color: '#fff' }}
-            >
-              {isCreateSubadmin ? 'Create Subadmin' : 'Sign Up'}
+            <button type="submit" className="btn btn-primary w-100 mb-2">
+              {isCreateSubadmin ? 'Create subadmin' : 'Sign up'}
             </button>
 
             {isCreateSubadmin ? (
               <Link to="/admin/subadmins" className="btn btn-outline-secondary w-100">
-                Back to Subadmins
+                Back to subadmins
               </Link>
             ) : (
-              <div className="text-center mt-3">
+              <div className="text-center mt-3 small text-muted">
                 <span>Already have an account? </span>
-                <Link to="/login">Sign In</Link>
+                <Link to="/login" style={authLinkStyle}>
+                  Sign in
+                </Link>
               </div>
             )}
           </form>
-        </div>
-      </div>
-    </div>
+    </AuthPageLayout>
   );
 };
 

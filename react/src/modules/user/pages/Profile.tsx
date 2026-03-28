@@ -7,12 +7,27 @@ import { validateProfileFields, validateAdminProfileFields } from '../../../shar
 import { validateProfileImage } from '../../../shared/utils/imageValidation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import type { User, Admin, Gender } from '../../../shared/types/common.types';
-import { roleIdToRole, type RoleString } from '../../../shared/utils/roleUtils';
+import { roleIdToRole } from '../../../shared/utils/roleUtils';
+import { PageShell } from '../../../shared/components/PageShell';
 import { colors } from '../../../theme/colors';
 
 const API_BASE = import.meta.env.DEV
   ? ''
   : import.meta.env.VITE_API_ORIGIN || 'http://localhost:3000';
+
+const profileAvatarRing = `0 0 0 3px #fff, 0 0 0 5px ${colors.primary}` as const;
+
+const profileFormPanelStyle: React.CSSProperties = {
+  maxWidth: 440,
+  marginLeft: 'auto',
+  marginRight: 'auto',
+  padding: '1.5rem',
+  backgroundColor: colors.cardPrimaryBg,
+  border: '1px solid rgba(13, 110, 253, 0.22)',
+  borderLeft: `4px solid ${colors.primary}`,
+  borderRadius: '0.5rem',
+  boxShadow: '0 0.125rem 0.35rem rgba(13, 110, 253, 0.07)',
+};
 
 type ProfileData = (User & { role?: string }) | (Admin & { role?: string });
 type ProfileFormKeys =
@@ -32,16 +47,10 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-const forceLogout = (role: RoleString) => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  window.location.href = role === 'admin' ? '/admin' : '/login';
-};
-
 const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, login } = useAuth();
   const role = user?.role;
   const isAdmin = role === 'admin';
 
@@ -169,7 +178,8 @@ const Profile = () => {
         setProfileImage(null);
         if (adminPassword.trim().length > 0) {
           showSuccess('Password changed. Please log in again.');
-          forceLogout('admin');
+          await logout();
+          window.location.href = '/admin/login';
           return;
         }
       } catch (err: unknown) {
@@ -207,24 +217,22 @@ const Profile = () => {
         setProfile({ ...profile, ...res.data, role: userRole });
         setGender((res.data.gender as Gender) ?? gender);
         // Update auth context
-        const updatedUser = {
-          id: (res.data as User).id as number,
+        login({
+          id: Number((res.data as User).id),
           username: res.data.username,
           role: userRole,
-          firstname: res.data.firstname,
-          lastname: res.data.lastname,
+          firstname: res.data.firstname ?? '',
+          lastname: res.data.lastname ?? '',
           email: res.data.email,
-        };
-        // Use context login to update? Actually we need to update localStorage too.
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        // We'll simply refresh context? For now, we can reload or use context setter.
-        // For simplicity, we can call logout and redirect if password changed.
+          phone: (res.data as User).phone ?? '',
+        });
       }
       showSuccess('Profile updated successfully');
       setProfileImage(null);
       if (userNewPassword.trim().length > 0) {
         showSuccess('Password changed. Please log in again.');
-        forceLogout(role);
+        await logout();
+        window.location.href = '/login';
         return;
       }
     } catch (err: unknown) {
@@ -255,6 +263,7 @@ const Profile = () => {
               objectFit: 'cover',
               borderRadius: '50%',
               cursor: 'pointer',
+              boxShadow: profileAvatarRing,
             }}
           />
           <button
@@ -278,6 +287,7 @@ const Profile = () => {
               objectFit: 'cover',
               borderRadius: '50%',
               cursor: 'pointer',
+              boxShadow: profileAvatarRing,
             }}
           />
           <button
@@ -296,14 +306,15 @@ const Profile = () => {
               width: 100,
               height: 100,
               borderRadius: '50%',
-              backgroundColor: '#f0f0f0',
+              backgroundColor: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               fontSize: '40px',
-              color: '#999',
-              border: '2px solid #7e7e7e',
+              color: 'rgba(13, 110, 253, 0.45)',
+              border: `2px dashed ${colors.primary}`,
+              boxShadow: profileAvatarRing,
             }}
           >
             👤
@@ -320,18 +331,24 @@ const Profile = () => {
     </div>
   );
 
-  if (loading) return <div className="container mt-4">Loading...</div>;
-  if (!profile) return <div className="container mt-4">Unable to load profile.</div>;
+  if (loading) {
+    return <PageShell title="My Profile" loading loadingMessage="Loading profile…" />;
+  }
+  if (!profile) {
+    return (
+      <PageShell title="My Profile">
+        <p className="text-muted mb-0">Unable to load profile.</p>
+      </PageShell>
+    );
+  }
 
   if (isAdmin) {
     return (
-      <div className="container mt-4 mx-auto" style={{ maxWidth: '500px' }}>
-        <div className="card shadow-sm mx-auto" style={{ borderWidth: 2, maxWidth: 400, width: '100%' }}>
-          <div className="card-body p-4">
-            <h3 className="mb-4" style={{ color: colors.primary }}>Admin Profile</h3>
-            <form onSubmit={handleUpdate}>
-              <ProfileImageBlock />
-              <div className="mb-2">
+      <PageShell title="Admin Profile" subtitle="Update your admin account">
+        <div style={profileFormPanelStyle}>
+          <form onSubmit={handleUpdate}>
+            <ProfileImageBlock />
+            <div className="mb-2">
                 <label className="form-label">Username *</label>
                 <input
                   className={`form-control ${errors.username ? 'is-invalid' : ''}`}
@@ -381,31 +398,23 @@ const Profile = () => {
                   placeholder="Re-enter new password"
                 />
                 {errors.confirmPassword && <div className="invalid-feedback d-block">{errors.confirmPassword}</div>}
-              </div>
-              <button
-                type="submit"
-                className="btn w-100"
-                style={{ backgroundColor: colors.primary, color: '#fff' }}
-                disabled={updating}
-              >
-                {updating ? 'Updating...' : 'Update Profile'}
-              </button>
-            </form>
-          </div>
+            </div>
+            <button type="submit" className="btn btn-primary w-100" disabled={updating}>
+              {updating ? 'Updating...' : 'Update Profile'}
+            </button>
+          </form>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="container mt-4 mx-auto" style={{ maxWidth: '500px' }}>
-      <div className="card shadow-sm" style={{ borderWidth: 2 }}>
-        <div className="card-body p-4">
-          <h3 className="mb-4" style={{ color: colors.primary }}>My Profile</h3>
-          <form onSubmit={handleUpdate}>
-            <ProfileImageBlock />
+    <PageShell title="My Profile" subtitle="Update your account details">
+      <div style={profileFormPanelStyle}>
+        <form onSubmit={handleUpdate}>
+          <ProfileImageBlock />
 
-            <div className="mb-2">
+          <div className="mb-2">
               <label className="form-label">Username *</label>
               <input
                 className={`form-control ${errors.username ? 'is-invalid' : ''}`}
@@ -515,18 +524,12 @@ const Profile = () => {
               />
               {errors.confirmPassword && <div className="invalid-feedback d-block">{errors.confirmPassword}</div>}
             </div>
-            <button
-              type="submit"
-              className="btn w-100"
-              style={{ backgroundColor: colors.primary, color: '#fff' }}
-              disabled={updating}
-            >
-              {updating ? 'Updating...' : 'Update Profile'}
-            </button>
-          </form>
-        </div>
+          <button type="submit" className="btn btn-primary w-100" disabled={updating}>
+            {updating ? 'Updating...' : 'Update Profile'}
+          </button>
+        </form>
       </div>
-    </div>
+    </PageShell>
   );
 };
 

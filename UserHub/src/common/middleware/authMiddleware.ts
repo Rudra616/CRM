@@ -33,7 +33,17 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     const shouldRefresh = expSec > 0 && expSec - nowSec <= 6 * 60 * 60; // <= 6 hours left
 
     if (shouldRefresh) {
-      const refreshedToken = signToken({ id: Number(decoded.id), role });
+      const d = decoded as Record<string, unknown>;
+      const refreshedToken = signToken({
+        id: Number(decoded.id),
+        role,
+        username: String(d.username ?? adminTokenRow?.username ?? userTokenRow?.username ?? ""),
+        firstname: String(d.firstname ?? ""),
+        lastname: String(d.lastname ?? ""),
+        email: String(d.email ?? ""),
+        phone: String(d.phone ?? ""),
+        gender: d.gender != null ? String(d.gender) : undefined,
+      });
       if (adminTokenRow) {
         await upsertAdminToken(Number(decoded.id), adminTokenRow.username, refreshedToken);
       } else if (userTokenRow) {

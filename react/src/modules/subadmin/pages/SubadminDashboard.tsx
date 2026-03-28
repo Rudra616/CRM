@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getUsersApi } from '../../admin/api/admin.api';
 import { showError } from '../../../shared/utils/toast';
-import { colors } from '../../../theme/colors';
+import { PageShell } from '../../../shared/components/PageShell';
+import { DashboardStatCard } from '../../../shared/components/DashboardStatCard';
 
 const SubadminDashboard: React.FC = () => {
   const [userCount, setUserCount] = useState(0);
@@ -24,31 +25,23 @@ const SubadminDashboard: React.FC = () => {
   }, []);
 
   return (
-    <>
-      <h2 className="mb-4">Subadmin Dashboard</h2>
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <div className="row g-3 mb-4">
-          <div className="col-md-4">
-            <div
-              className="card border-primary h-100"
-              style={{ borderWidth: 2, backgroundColor: colors.cardPrimaryBg }}
-            >
-              <div className="card-body">
-                <h5 className="card-title" style={{ color: colors.primary }}>
-                  Total Users
-                </h5>
-                <p className="card-text display-4 mb-0">{userCount}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+    <PageShell
+      title="Subadmin Dashboard"
+      loading={loading}
+      loadingMessage="Loading dashboard…"
+    >
+      <div className="row g-4 mb-4">
+        <DashboardStatCard
+          title="Total users"
+          value={userCount}
+          hint="Users you can manage"
+          colClass="col-sm-6 col-md-4"
+        />
+      </div>
       <Link className="btn btn-primary" to="/users">
         Manage Users
       </Link>
-    </>
+    </PageShell>
   );
 };
 

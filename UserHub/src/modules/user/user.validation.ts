@@ -83,6 +83,13 @@ export const loginSchema = Joi.object({
   password: Joi.string().required().messages({ "string.empty": "Password is required" }),
 });
 
+export const resetPasswordSchema = Joi.object({
+  token: Joi.string().required().messages({
+    "string.empty": "Token is required",
+  }),
+  newPassword: passwordField(256),
+});
+
 // Subadmin uses the same rules as register
 export const subadminSchema = registerSchema;
 

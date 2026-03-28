@@ -41,16 +41,20 @@ export const validateLoginFields = (
   return results;
 };
 
-export const validateRegister = (data: {
-  username: string;
-  password: string;
-  confirmPassword: string;
-  firstname: string;
-  lastname: string;
-  email: string;
-  phone: string;
-  gender: string; 
-}): { [key: string]: ValidationResult } => {
+export const validateRegister = (
+  data: {
+    username: string;
+    password: string;
+    confirmPassword: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    phone: string;
+    gender: string;
+  },
+  options?: { requireConfirmPassword?: boolean }
+): { [key: string]: ValidationResult } => {
+  const requireConfirm = options?.requireConfirmPassword !== false;
   const { username, password, confirmPassword, firstname, lastname, email, phone, gender } = data;
   const errors: { [key: string]: ValidationResult } = {};
 
@@ -84,8 +88,41 @@ export const validateRegister = (data: {
     valid: false, message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters`
   };
 
-  if (password !== confirmPassword) errors.confirmPassword = { valid: false, message: "Passwords do not match" };
+  if (requireConfirm) {
+    if (!confirmPassword?.trim()) {
+      errors.confirmPassword = { valid: false, message: "Please confirm your password" };
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = { valid: false, message: "Passwords do not match" };
+    }
+  }
 
+  return errors;
+};
+
+/** Same rules as register password (upper, lower, digit, symbol, 8–256 chars). */
+export const validateResetPasswordFields = (
+  newPassword: string,
+  confirmPassword: string
+): Record<string, ValidationResult> => {
+  const errors: Record<string, ValidationResult> = {};
+  if (!newPassword?.trim()) {
+    errors.newPassword = { valid: false, message: "New password is required" };
+  } else if (newPassword.length > LIMITS.PASSWORD_MAX_USER) {
+    errors.newPassword = {
+      valid: false,
+      message: `Password must be at most ${LIMITS.PASSWORD_MAX_USER} characters`,
+    };
+  } else if (!passwordRegex.test(newPassword)) {
+    errors.newPassword = {
+      valid: false,
+      message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters`,
+    };
+  }
+  if (!confirmPassword?.trim()) {
+    errors.confirmPassword = { valid: false, message: "Please confirm your password" };
+  } else if (newPassword !== confirmPassword) {
+    errors.confirmPassword = { valid: false, message: "Passwords do not match" };
+  }
   return errors;
 };
 

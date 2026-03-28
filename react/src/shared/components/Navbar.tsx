@@ -2,7 +2,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
-import { logoutAdminApi } from '../../modules/auth/api/auth.api';
 import { colors } from '../../theme/colors';
 
 const DASHBOARD_PATHS = ['/admin', '/subadmin', '/user', '/profile', '/users'];
@@ -28,12 +27,8 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      if (role === 'admin') await logoutAdminApi();
-      // logoutApi is already called inside context's logout()
-    } catch {
-      // ignore
-    } finally {
       await logout();
+    } finally {
       navigate(role === 'admin' ? '/admin/login' : '/login');
     }
   };

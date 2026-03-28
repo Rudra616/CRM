@@ -33,7 +33,15 @@ export const adminLogin = async (req: Request, res: Response) => {
     const isMatch = await comparePassword(password, admin.password);
     if (!isMatch) return errorResponse(res, "Invalid credentials", 401);
 
-    const token = signToken({ id: admin.id, role: "admin" });
+    const token = signToken({
+      id: admin.id,
+      role: Role.ADMIN,
+      username: admin.username,
+      firstname: "",
+      lastname: "",
+      email: admin.email,
+      phone: "",
+    });
     await upsertAdminToken(admin.id, admin.username, token);
     setAuthCookie(res, token);
 

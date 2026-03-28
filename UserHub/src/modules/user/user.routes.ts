@@ -2,21 +2,24 @@ import { Router } from "express";
 import { Role } from "../../common/types/role";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
-import { authenticate,allowRoles } from "../../common/middleware/authMiddleware";
+import { authenticate, allowRoles } from "../../common/middleware/authMiddleware";
 import {
   registerSchema,
   loginSchema,
   updateProfileSchema,
+  resetPasswordSchema,
 } from "./user.validation";
 import {
   registerUser,
   loginUser,
   logoutUser,
+  getSession,
   getProfile,
   updateProfile,
   getUsers,
   forgotPassword,
   resetPassword,
+  verifyResetToken
 } from "./user.controller";
 
 const router = Router();
@@ -26,7 +29,10 @@ router.post("/register",        validateSchema(registerSchema), registerUser);
 router.post("/login",           validateSchema(loginSchema),    loginUser);
 router.post("/logout",          logoutUser);
 router.post("/forgot-password", forgotPassword);
-router.post("/reset-password",  resetPassword);
+router.post("/reset-password", validateSchema(resetPasswordSchema), resetPassword);
+router.post("/verify-reset-token", verifyResetToken);
+
+router.get("/session", authenticate, getSession);
 
 // ─── Protected (user / subadmin) ──────────────────────────────────────────────
 router.get(
