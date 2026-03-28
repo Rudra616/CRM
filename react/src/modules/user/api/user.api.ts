@@ -5,7 +5,7 @@ import axiosClient from '../../../shared/api/axiosClient';
 
 export const getProfileApi = (): Promise<ApiResponse<User>> => {
   return apiRequest<User>('GET', '/profile');
-};
+};  
 
 export const updateProfileApi = (
   data: UpdateProfileRequest

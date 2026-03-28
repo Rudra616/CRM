@@ -1,7 +1,4 @@
-/**
- * Client-side auth cleanup when httpOnly cookies are invalid, removed, or tampered with.
- * Server already clears auth cookies on 401 from authenticate middleware.
- */
+
 
 const STORAGE_KEYS_TO_CLEAR = ['user', 'token', 'refreshToken'] as const;
 

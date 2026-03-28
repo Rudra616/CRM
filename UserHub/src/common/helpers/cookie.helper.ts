@@ -3,7 +3,7 @@ import { Response } from "express";
 const cookieOptions = {
   httpOnly: true,
   secure: false,
-  sameSite: "lax" as const,
+  sameSite: "lax" as const,  //Prevents CSRF attacks.
   path: "/",
   maxAge: 24 * 60 * 60 * 1000,
 };

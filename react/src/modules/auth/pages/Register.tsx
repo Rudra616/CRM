@@ -141,7 +141,7 @@ const Register: React.FC = () => {
                 placeholder="Min 3 characters"
                 value={form.username}
                 onChange={handleChange}
-                minLength={3}
+                // minLength={3}
                 maxLength={50}
               />
               {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
@@ -253,7 +253,7 @@ const Register: React.FC = () => {
                 placeholder="Uppercase, lowercase, number, symbol"
                 value={form.password}
                 onChange={handleChange}
-                minLength={8}
+                // minLength={8}
                 maxLength={256}
               />
               {errors.password && <div className="invalid-feedback d-block">{errors.password}</div>}
@@ -268,7 +268,7 @@ const Register: React.FC = () => {
                 placeholder="Must match password"
                 value={form.confirmPassword}
                 onChange={handleChange}
-                minLength={8}
+                // minLength={8}
                 maxLength={256}
               />
               {errors.confirmPassword && <div className="invalid-feedback d-block">{errors.confirmPassword}</div>}

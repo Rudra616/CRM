@@ -27,7 +27,7 @@ export const logoutApi = (): Promise<ApiResponse<null>> => {
 };
 
 export const logoutAdminApi = (): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('POST', '/admin/logout');
+  return apiRequest<null>('POST', '/admin/logout');AUTH_NAVBAR_OFFSET
 };
 
 export const registerApi = (

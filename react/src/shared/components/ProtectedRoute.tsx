@@ -20,9 +20,8 @@ export const ProtectedRoute = ({
   const signInPath =
     loginPath !== '/login' ? loginPath : getLoginRedirectUrl(location.pathname);
 
-  // Wait until session bootstrap (GET /session) finishes
   if (isLoading) {
-    return <div>Loading...</div>; // or a spinner
+    return <div>Loading...</div>; 
   }
 
   if (!isAuthenticated || !user) {
