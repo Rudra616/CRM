@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
-import { getSubadminsApi, updateSubadminApi, deleteSubadminApi } from '../api/admin.api';
+import {
+  getSubadminsApi,
+  updateSubadminApi,
+  deleteSubadminApi,
+  changeSubadminPasswordApi,
+} from '../api/admin.api';
 import { showSuccess, showError } from '../../../shared/utils/toast';
-import { EditUserModal } from '../../../shared/components/EditUserModal';
-import type { User, Gender } from '../../../shared/types/common.types';
+import { EditUserModal, type EditUserProfilePayload } from '../../../shared/components/EditUserModal';
+import type { User } from '../../../shared/types/common.types';
 import { PageShell } from '../../../shared/components/PageShell';
 import { colors } from '../../../theme/colors';
 
@@ -29,29 +34,26 @@ const ManageSubadmins = () => {
     fetchUsers();
   }, []);
 
-  const handleSave = async (data: {
-    username: string;
-    firstname: string;
-    lastname: string;
-    email: string;
-    phone: string;
-    password?: string;
-    gender: Gender;
-  }) => {
+  const handleSave = async (data: EditUserProfilePayload) => {
     if (!editUser) return;
     try {
       const res = await updateSubadminApi(editUser.id, data);
       showSuccess('Subadmin updated');
-      const { password: _pw, ...safe } = data;
       if (res.data) {
         setUsers((prev) => prev.map((u) => (u.id === editUser.id ? { ...u, ...res.data } : u)));
       } else {
-        setUsers((prev) => prev.map((u) => (u.id === editUser.id ? { ...u, ...safe } : u)));
+        setUsers((prev) => prev.map((u) => (u.id === editUser.id ? { ...u, ...data } : u)));
       }
     } catch (err: any) {
       showError(err?.response?.data?.message || err?.message || 'Update failed');
       throw err;
     }
+  };
+
+  const handleChangePassword = async (body: { newPassword: string; confirmPassword: string }) => {
+    if (!editUser) return;
+    await changeSubadminPasswordApi(editUser.id, body);
+    showSuccess('Subadmin password updated');
   };
 
   const handleDelete = async (id: string) => {
@@ -166,6 +168,7 @@ const ManageSubadmins = () => {
           title="Edit Subadmin"
           onClose={() => setEditUser(null)}
           onSave={handleSave}
+          onChangePassword={handleChangePassword}
         />
       )}
     </>

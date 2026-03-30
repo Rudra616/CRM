@@ -4,6 +4,7 @@ import { Role } from "../../common/types/role";
 import { successResponse, errorResponse } from "../../common/utils/apiResponse";
 import { hashPassword, comparePassword, signToken, verifyToken, buildImageUrl } from "../../common/helpers/common.helper";
 import { roleLabel, sendPasswordResetEmail } from "../../common/helpers/user.helper";
+import { buildStoredImagePath } from "../../config/uploads";
 import {
   findUserByUsernameOrEmail,
   findUserByUsername,
@@ -20,7 +21,7 @@ import {
   markResetTokenUsed,
   deleteAllUserSessions
 } from "./user.service";
-import { upsertUserToken, removeUserToken } from "../token.service";
+import { upsertUserToken, removeUserToken, removeAllUserTokensForUserId } from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
 import { findAdminById } from "../admin/admin.service";
 
@@ -195,6 +196,12 @@ export const getProfile: RequestHandler = async (req, res) => {
   try {
     const profile = await findUserById(authReq.user.id);
     if (!profile) return errorResponse(res, "User not found", 404);
+
+    // ✅ ADD THIS
+    if (profile.image_url) {
+      profile.image_url = buildImageUrl(req, profile.image_url);
+    }
+
     return successResponse(res, "Profile fetched", profile, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
@@ -208,7 +215,7 @@ export const updateProfile: RequestHandler = async (req, res) => {
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
 
   try {
-    const { username, firstname, lastname, phone, email, newPassword, gender } = req.body;
+    const { username, firstname, lastname, phone, email, gender } = req.body;
 
     const isDup = await checkDuplicateUsernameOrEmail(username, email, authReq.user.id);
     if (isDup) return errorResponse(res, "Username or email already exists", 409);
@@ -216,20 +223,23 @@ export const updateProfile: RequestHandler = async (req, res) => {
     // Keep existing image if no new file uploaded
     let imageUrl: string | undefined;
     if (req.file) {
-      imageUrl = buildImageUrl(req.file.filename);
+      imageUrl = buildStoredImagePath(
+        authReq.user.role,
+        authReq.user.id,
+        req.file.filename
+      );
     } else {
       const existing = await findUserById(authReq.user.id);
       imageUrl = existing?.image_url ?? undefined;
     }
 
-    const hashedPassword =
-      newPassword && newPassword.trim().length > 0
-        ? await hashPassword(newPassword)
-        : undefined;
-
-    await updateUserById(authReq.user.id, username, firstname, lastname, phone, email, imageUrl, gender, hashedPassword);
+    await updateUserById(authReq.user.id, username, firstname, lastname, phone, email, imageUrl, gender);
 
     const updated = await findUserById(authReq.user.id);
+    // ✅ ADD THIS
+if (updated?.image_url) {
+  updated.image_url = buildImageUrl(req, updated.image_url);
+}
     return successResponse(res, "Profile updated", updated, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 409);
@@ -330,6 +340,42 @@ export const verifyResetToken = async (req: Request, res: Response) => {
       return errorResponse(res, 'This reset link has already been used.', 400);
 
     return successResponse(res, 'Token is valid', { valid: true }, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+
+
+export const changePassword: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
+
+  try {
+    const { newPassword } = req.body;
+    const hashedPassword = await hashPassword(newPassword);
+    const updated = await updateUserPassword(authReq.user.id, hashedPassword);
+    if (!updated) return errorResponse(res, "Failed to update password", 400);
+
+    await removeAllUserTokensForUserId(authReq.user.id);
+    try {
+      await deleteAllUserSessions(authReq.user.id);
+    } catch (e: any) {
+      console.error("deleteAllUserSessions after change password:", e?.message);
+    }
+
+    const token = req.cookies?.token as string | undefined;
+    if (token) {
+      try {
+        await removeUserToken(token);
+      } catch {
+        /* ignore */
+      }
+    }
+    clearAuthCookie(res);
+    clearSessionCookies(res);
+
+    return successResponse(res, "Password updated. Please sign in again.", null, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }

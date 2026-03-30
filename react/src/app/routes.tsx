@@ -19,6 +19,7 @@ import SubadminDashboard from '../modules/subadmin/pages/SubadminDashboard';
 // User pages
 import UserDashboard from '../modules/user/pages/UserDashboard';
 import Profile from '../modules/user/pages/Profile';
+import ChangePassword from '../modules/user/pages/ChangePassword';
 
 export const AppRoutes = () => (
   <Routes>
@@ -37,6 +38,7 @@ export const AppRoutes = () => (
       <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><ManageUsers /></ProtectedRoute>} />
       <Route path="/admin/subadmins" element={<ProtectedRoute roles={['admin']}><ManageSubadmins /></ProtectedRoute>} />
       <Route path="/admin/profile" element={<ProtectedRoute roles={['admin']}><Profile /></ProtectedRoute>} />
+      <Route path="/admin/change-password" element={<ProtectedRoute roles={['admin']}><ChangePassword /></ProtectedRoute>} />
       <Route path="/admin/create-subadmin" element={<ProtectedRoute roles={['admin']}><Register /></ProtectedRoute>} />
 
       {/* Subadmin routes */}
@@ -46,6 +48,7 @@ export const AppRoutes = () => (
       {/* User routes */}
       <Route path="/user/dashboard" element={<ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute roles={['subadmin', 'user']}><Profile /></ProtectedRoute>} />
+      <Route path="/change-password" element={<ProtectedRoute roles={['subadmin', 'user']}><ChangePassword /></ProtectedRoute>} />
     </Route>
 
     {/* Catch-all */}

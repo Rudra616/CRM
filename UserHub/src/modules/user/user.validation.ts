@@ -103,6 +103,16 @@ export const updateUserSchema = Joi.object({
   password:  optionalPasswordField(256),
 });
 
+/** Subadmin profile update (no password — use POST .../change-password). */
+export const updateSubadminProfileSchema = Joi.object({
+  username:  usernameField,
+  firstname: firstnameField,
+  lastname:  lastnameField,
+  phone:     phoneField,
+  email:     emailField,
+  gender:    genderRequired,
+});
+
 export const updateProfileSchema = Joi.object({
   username:    usernameField,
   firstname:   firstnameField,
@@ -110,5 +120,13 @@ export const updateProfileSchema = Joi.object({
   phone:       phoneField,
   email:       emailField,
   gender:      genderOptional,
-  newPassword: optionalPasswordField(256),
 }).options({ allowUnknown: true });
+
+export const changePasswordSchema = Joi.object({
+  newPassword: passwordField(256),
+  confirmPassword: Joi.string().required().valid(Joi.ref("newPassword")).messages({
+    "any.only": "Passwords do not match",
+    "string.empty": "Please confirm your password",
+    "any.required": "Please confirm your password",
+  }),
+});

@@ -4,7 +4,15 @@ import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { colors } from '../../theme/colors';
 
-const DASHBOARD_PATHS = ['/admin', '/subadmin', '/user', '/profile', '/users'];
+const DASHBOARD_PATHS = [
+  '/admin',
+  '/subadmin',
+  '/user',
+  '/profile',
+  '/users',
+  '/change-password',
+  '/admin/change-password',
+];
 
 const isDashboardRoute = (path: string) =>
   DASHBOARD_PATHS.some((p) => path === p || path.startsWith(p + '/'));

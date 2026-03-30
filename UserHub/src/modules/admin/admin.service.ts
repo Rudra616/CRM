@@ -59,21 +59,13 @@ export const updateAdminById = async (
   adminId: number,
   username: string,
   email: string,
-  imageUrl: string | null | undefined,
-  hashedPassword?: string
+  imageUrl: string | null | undefined
 ): Promise<void> => {
   try {
-    if (hashedPassword) {
-      await db.query(
-        "UPDATE admin SET username=?, email=?, password=?, image_url=? WHERE id=?",
-        [username, email, hashedPassword, imageUrl ?? null, adminId]
-      );
-    } else {
-      await db.query(
-        "UPDATE admin SET username=?, email=?, image_url=? WHERE id=?",
-        [username, email, imageUrl ?? null, adminId]
-      );
-    }
+    await db.query(
+      "UPDATE admin SET username=?, email=?, image_url=? WHERE id=?",
+      [username, email, imageUrl ?? null, adminId]
+    );
   } catch (error: any) {
     console.error("Error in updateAdminById:", error.message);
     throw error;

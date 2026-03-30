@@ -144,12 +144,9 @@ export const validateProfileFields = (data: {
   lastname: string;
   email: string;
   phone: string;
-  newPassword?: string;
-    confirmPassword?: string; 
-
   gender?: string;
 }): Record<string, ValidationResult> => {
-  const { username, firstname, lastname, email, phone, gender, newPassword,confirmPassword } = data;
+  const { username, firstname, lastname, email, phone, gender } = data;
   const errors: Record<string, ValidationResult> = {};
 
   if (!username?.trim()) errors.username = { valid: false, message: "Username is required" };
@@ -176,24 +173,6 @@ export const validateProfileFields = (data: {
   } else if (!["male", "female", "other"].includes(gender)) {
     errors.gender = { valid: false, message: "Invalid gender selection" };
   }
-  if (newPassword && newPassword.trim().length > 0 && newPassword.length > LIMITS.PASSWORD_MAX_USER) {
-    errors.newPassword = { valid: false, message: `Password must be at most ${LIMITS.PASSWORD_MAX_USER} characters` };
-  } else if (newPassword && newPassword.trim().length > 0 && !passwordRegex.test(newPassword)) {
-    errors.newPassword = { valid: false, message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters` };
-  }
-    if (newPassword && newPassword.trim().length > 0) {
-    if (!confirmPassword || confirmPassword.trim().length === 0) {
-      errors.confirmPassword = {
-        valid: false,
-        message: "Confirm password is required",
-      };
-    } else if (newPassword !== confirmPassword) {
-      errors.confirmPassword = {
-        valid: false,
-        message: "Passwords do not match",
-      };
-    }
-  }
 
   return errors;
 };
@@ -201,20 +180,18 @@ export const validateProfileFields = (data: {
 export const validateAdminProfile = (data: {
   username: string;
   email: string;
-  password?: string;
 }): ValidationResult => {
   const fields = validateAdminProfileFields(data);
   const first = Object.values(fields).find((r) => !r.valid);
   return first ?? { valid: true };
 };
 
-/** Per-field validation for admin profile */
+/** Per-field validation for admin profile (password: use Change password page / API). */
 export const validateAdminProfileFields = (data: {
   username: string;
   email: string;
-  password?: string;
 }): Record<string, ValidationResult> => {
-  const { username, email, password } = data;
+  const { username, email } = data;
   const errors: Record<string, ValidationResult> = {};
 
   if (!username?.trim()) errors.username = { valid: false, message: "Username is required" };
@@ -226,10 +203,34 @@ export const validateAdminProfileFields = (data: {
   else if (email.trim().length > LIMITS.EMAIL_MAX_ADMIN) errors.email = { valid: false, message: `Email must be at most ${LIMITS.EMAIL_MAX_ADMIN} characters` };
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = { valid: false, message: "Invalid email format" };
 
-  if (password && password.trim().length > 0 && password.length > LIMITS.PASSWORD_MAX_ADMIN) {
-    errors.password = { valid: false, message: `Password must be at most ${LIMITS.PASSWORD_MAX_ADMIN} characters` };
-  } else if (password && password.trim().length > 0 && !passwordRegex.test(password)) {
-    errors.password = { valid: false, message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters` };
+  return errors;
+};
+
+/** Optional new + confirm for edit-user modal (only when user typed a new password). */
+export const validateOptionalNewPasswordPair = (
+  newPassword: string,
+  confirmPassword: string
+): Record<string, ValidationResult> => {
+  const errors: Record<string, ValidationResult> = {};
+  const np = newPassword.trim();
+  const cp = confirmPassword.trim();
+  if (!np && !cp) return errors;
+  if (!np) {
+    errors.newPassword = { valid: false, message: "New password is required" };
+    return errors;
+  }
+  if (np.length > LIMITS.PASSWORD_MAX_USER) {
+    errors.newPassword = { valid: false, message: `Password must be at most ${LIMITS.PASSWORD_MAX_USER} characters` };
+  } else if (!passwordRegex.test(np)) {
+    errors.newPassword = {
+      valid: false,
+      message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters`,
+    };
+  }
+  if (!cp) {
+    errors.confirmPassword = { valid: false, message: "Please confirm the new password" };
+  } else if (np !== cp) {
+    errors.confirmPassword = { valid: false, message: "Passwords do not match" };
   }
   return errors;
 };
@@ -240,7 +241,7 @@ export const validateEditUser = (data: {
   lastname: string;
   email: string;
   phone: string;
-  password?: string;
+  gender?: string;
 }): ValidationResult => {
   const fields = validateEditUserFields(data);
   const first = Object.values(fields).find((r) => !r.valid);
@@ -253,10 +254,9 @@ export const validateEditUserFields = (data: {
   lastname: string;
   email: string;
   phone: string;
-  password?: string;
-  gender?: string
+  gender?: string;
 }): Record<string, ValidationResult> => {
-  const base = validateProfileFields({
+  return validateProfileFields({
     username: data.username,
     firstname: data.firstname,
     lastname: data.lastname,
@@ -264,12 +264,4 @@ export const validateEditUserFields = (data: {
     phone: data.phone,
     gender: data.gender ?? "",
   });
-  if (data.password && data.password.trim().length > 0 && !passwordRegex.test(data.password)) {
-    if (data.password.length > LIMITS.PASSWORD_MAX_USER) {
-      base.password = { valid: false, message: `Password must be at most ${LIMITS.PASSWORD_MAX_USER} characters` };
-    } else {
-      base.password = { valid: false, message: `Password must contain uppercase, lowercase, number and symbol (@$!%*?&) and be at least ${LIMITS.PASSWORD_MIN} characters` };
-    }
-  }
-  return base;
 };

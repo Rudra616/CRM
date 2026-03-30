@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { getProfileApi, updateProfileWithImageApi, getAdminProfileApi, updateAdminProfileWithImageApi } from '../api/user.api';
 import { showSuccess, showError } from '../../../shared/utils/toast';
@@ -9,6 +9,7 @@ import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import type { User, Admin, Gender } from '../../../shared/types/common.types';
 import { roleIdToRole } from '../../../shared/utils/roleUtils';
 import { PageShell } from '../../../shared/components/PageShell';
+import { authLinkStyle } from '../../../shared/components/AuthPageLayout';
 import { colors } from '../../../theme/colors';
 
 const API_BASE = import.meta.env.DEV
@@ -36,9 +37,6 @@ type ProfileFormKeys =
   | 'lastname'
   | 'email'
   | 'phone'
-  | 'password'
-  | 'newPassword'
-  | 'confirmPassword'
   | 'gender';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
@@ -50,7 +48,7 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
 const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, login } = useAuth();
+  const { user, login } = useAuth();
   const role = user?.role;
   const isAdmin = role === 'admin';
 
@@ -66,14 +64,11 @@ const Profile = () => {
     useFormValidation<Record<ProfileFormKeys, string>>();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [userNewPassword, setUserNewPassword] = useState('');
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const [gender, setGender] = useState<Gender | ''>('');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const fetchProfile = async () => {
     try {
@@ -82,20 +77,34 @@ const Profile = () => {
         if (res.data) setProfile({ ...res.data, role: 'admin' });
       } else {
         const res = await getProfileApi();
-        if (res.data) {
-          const d = res.data as User & { role_id?: number };
-          const profileRole = roleIdToRole(d.role ?? d.role_id);
-          setProfile({
-            ...res.data,
-            role: profileRole,
-            username: res.data.username ?? '',
-            firstname: res.data.firstname ?? '',
-            lastname: res.data.lastname ?? '',
-            email: res.data.email ?? '',
-            phone: res.data.phone ?? '',
-          });
-          setGender((res.data.gender as Gender) ?? 'other');
-        }
+if (res.data) {
+  const d = res.data as User & { role_id?: number };
+  const userRole = roleIdToRole(d.role ?? d.role_id);
+
+  setProfile({
+    ...profile,
+    ...res.data,
+    role: userRole,
+    image_url: res.data.image_url
+      ? res.data.image_url + `?t=${Date.now()}`
+      : res.data.image_url,
+  });
+
+  setGender((res.data.gender as Gender) ?? gender);
+
+  login({
+    id: Number((res.data as User).id),
+    username: res.data.username,
+    role: userRole,
+    firstname: res.data.firstname ?? '',
+    lastname: res.data.lastname ?? '',
+    email: res.data.email,
+    phone: (res.data as User).phone ?? '',
+  });
+}
+
+setProfileImage(null);
+setImageFailed(false);
       }
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load profile');
@@ -156,7 +165,6 @@ const Profile = () => {
       const payload = {
         username: String(profile.username ?? '').trim(),
         email: String(profile.email ?? '').trim(),
-        password: adminPassword.trim() || undefined,
       };
       const fieldResults = validateAdminProfileFields(payload);
       const hasError = Object.values(fieldResults).some((r) => !r.valid);
@@ -169,19 +177,18 @@ const Profile = () => {
       try {
         const res = await updateAdminProfileWithImageApi(payload, profileImage ?? undefined);
         if (res.data) {
-          setProfile({ ...profile, ...res.data });
-          // Update auth context? Not necessary for admin? We'll update user in context
+setProfile({
+  ...profile,
+  ...res.data,
+  image_url: res.data.image_url
+    ? res.data.image_url + `?t=${Date.now()}`
+    : res.data.image_url,
+});          // Update auth context? Not necessary for admin? We'll update user in context
           // but admin doesn't have a user object in auth context? Actually we can update.
           // For simplicity, we can just logout if password changed.
         }
         showSuccess('Profile updated successfully');
         setProfileImage(null);
-        if (adminPassword.trim().length > 0) {
-          showSuccess('Password changed. Please log in again.');
-          await logout();
-          window.location.href = '/admin/login';
-          return;
-        }
       } catch (err: unknown) {
         showError((err as { message?: string })?.message || 'Update failed');
       } finally {
@@ -198,8 +205,6 @@ const Profile = () => {
       email: String(profile.email ?? '').trim(),
       phone: String((profile as User).phone ?? '').replace(/\D/g, '').slice(0, 10),
       gender: (gender || undefined) as Gender | undefined,
-      newPassword: userNewPassword.trim() || undefined,
-      confirmPassword: confirmPassword.trim() || undefined,
     };
     const fieldResults = validateProfileFields(payload);
     const hasError = Object.values(fieldResults).some((r) => !r.valid);
@@ -214,8 +219,14 @@ const Profile = () => {
       if (res.data) {
         const d = res.data as User & { role_id?: number };
         const userRole = roleIdToRole(d.role ?? d.role_id);
-        setProfile({ ...profile, ...res.data, role: userRole });
-        setGender((res.data.gender as Gender) ?? gender);
+setProfile({
+  ...profile,
+  ...res.data,
+  role: userRole,
+  image_url: res.data.image_url
+    ? res.data.image_url + `?t=${Date.now()}`
+    : res.data.image_url,
+});        setGender((res.data.gender as Gender) ?? gender);
         // Update auth context
         login({
           id: Number((res.data as User).id),
@@ -229,12 +240,6 @@ const Profile = () => {
       }
       showSuccess('Profile updated successfully');
       setProfileImage(null);
-      if (userNewPassword.trim().length > 0) {
-        showSuccess('Password changed. Please log in again.');
-        await logout();
-        window.location.href = '/login';
-        return;
-      }
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Update failed');
     } finally {
@@ -370,34 +375,11 @@ const Profile = () => {
                   placeholder="valid@email.com"
                 />
                 {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
-              </div>
-              <div className="mb-3">
-                <label className="form-label">New Password (optional)</label>
-                <input
-                  className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => {
-                    setAdminPassword(e.target.value);
-                    clearFieldError('password');
-                  }}
-                  placeholder="Leave blank to keep current"
-                />
-                {errors.password && <div className="invalid-feedback d-block">{errors.password}</div>}
-              </div>
-              <div className="mb-3">
-                <label className="form-label">Confirm Password</label>
-                <input
-                  className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    clearFieldError('confirmPassword');
-                  }}
-                  placeholder="Re-enter new password"
-                />
-                {errors.confirmPassword && <div className="invalid-feedback d-block">{errors.confirmPassword}</div>}
+            </div>
+            <div className="mb-3 text-center small">
+              <Link to="/admin/change-password" style={authLinkStyle}>
+                Change password
+              </Link>
             </div>
             <button type="submit" className="btn btn-primary w-100" disabled={updating}>
               {updating ? 'Updating...' : 'Update Profile'}
@@ -495,34 +477,10 @@ const Profile = () => {
               </select>
               {errors.gender && <div className="invalid-feedback d-block">{errors.gender}</div>}
             </div>
-
-            <div className="mb-3">
-              <label className="form-label">New Password (optional)</label>
-              <input
-                className={`form-control ${errors.newPassword ? 'is-invalid' : ''}`}
-                type="password"
-                value={userNewPassword}
-                onChange={(e) => {
-                  setUserNewPassword(e.target.value);
-                  clearFieldError('newPassword');
-                }}
-                placeholder="Leave blank to keep current password"
-              />
-              {errors.newPassword && <div className="invalid-feedback d-block">{errors.newPassword}</div>}
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Confirm Password</label>
-              <input
-                className={`form-control ${errors.confirmPassword ? 'is-invalid' : ''}`}
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  clearFieldError('confirmPassword');
-                }}
-                placeholder="Re-enter new password"
-              />
-              {errors.confirmPassword && <div className="invalid-feedback d-block">{errors.confirmPassword}</div>}
+            <div className="mb-3 text-center small">
+              <Link to="/change-password" style={authLinkStyle}>
+                Change password
+              </Link>
             </div>
           <button type="submit" className="btn btn-primary w-100" disabled={updating}>
             {updating ? 'Updating...' : 'Update Profile'}

@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Sidebar as ProSidebar, Menu, MenuItem, SubMenu } from 'react-pro-sidebar';
 import { useNavigate } from 'react-router-dom';
-import { FaTachometerAlt, FaUsers, FaUserShield, FaUserPlus, FaUser, FaTimes } from 'react-icons/fa';
+import { FaTachometerAlt, FaUsers, FaUserShield, FaUserPlus, FaUser, FaTimes, FaKey } from 'react-icons/fa';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
@@ -123,6 +123,7 @@ const Sidebar = ({ role }: Props) => {
                 </SubMenu>
                 <MenuItem icon={<FaUsers />} onClick={nav('/admin/users')}>Manage Users</MenuItem>
                 <MenuItem icon={<FaUser />} onClick={nav('/admin/profile')}>Profile</MenuItem>
+                <MenuItem icon={<FaKey />} onClick={nav('/admin/change-password')}>Change password</MenuItem>
               </>
             )}
             {role === 'subadmin' && (
@@ -130,12 +131,14 @@ const Sidebar = ({ role }: Props) => {
                 <MenuItem icon={<FaTachometerAlt />} onClick={nav('/subadmin/dashboard')}>Dashboard</MenuItem>
                 <MenuItem icon={<FaUsers />} onClick={nav('/users')}>Manage Users</MenuItem>
                 <MenuItem icon={<FaUser />} onClick={nav('/profile')}>Profile</MenuItem>
+                <MenuItem icon={<FaKey />} onClick={nav('/change-password')}>Change password</MenuItem>
               </>
             )}
             {role === 'user' && (
               <>
                 <MenuItem icon={<FaTachometerAlt />} onClick={nav('/user/dashboard')}>Dashboard</MenuItem>
                 <MenuItem icon={<FaUser />} onClick={nav('/profile')}>Profile</MenuItem>
+                <MenuItem icon={<FaKey />} onClick={nav('/change-password')}>Change password</MenuItem>
               </>
             )}
           </Menu>

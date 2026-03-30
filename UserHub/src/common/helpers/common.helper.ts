@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import path from "path";
 import fs from "fs";
+import { Request } from "express";
+import { absoluteUploadFilePath } from "../../config/uploads";
 
 // ─── Password ─────────────────────────────────────────────────────────────────
 
@@ -29,9 +30,11 @@ export const verifyToken = (token: string): any => {
 // ─── File ─────────────────────────────────────────────────────────────────────
 
 export const deleteFileIfExists = (relativeUrl: string): void => {
-  const abs = path.join(__dirname, "../../", relativeUrl);
+  const abs = absoluteUploadFilePath(relativeUrl);
   if (fs.existsSync(abs)) fs.unlinkSync(abs);
 };
 
-export const buildImageUrl = (filename: string): string =>
-  `/uploads/${filename}`;
+export const buildImageUrl = (req: Request, filePath: string): string => {
+  const host = req.headers.host;
+  return `${req.protocol}://${host}/${filePath}`;
+};

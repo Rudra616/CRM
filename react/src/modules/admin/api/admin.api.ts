@@ -27,6 +27,20 @@ export const updateSubadminApi = (
   return apiRequest<User>('PUT', `/admin/subadmins/${id}`, data);
 };
 
+export const changeAdminPasswordApi = (body: {
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<ApiResponse<null>> => {
+  return apiRequest<null>('POST', '/admin/change-password', body);
+};
+
+export const changeSubadminPasswordApi = (
+  subadminId: string | number,
+  body: { newPassword: string; confirmPassword: string }
+): Promise<ApiResponse<null>> => {
+  return apiRequest<null>('POST', `/admin/subadmins/${subadminId}/change-password`, body);
+};
+
 export const deleteSubadminApi = (
   id: string | number
 ): Promise<ApiResponse<null>> => {

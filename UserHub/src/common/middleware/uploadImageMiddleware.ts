@@ -1,12 +1,30 @@
 import multer from "multer";
 import path from "path";
+import fs from "fs";
+import { UPLOADS_ROOT, uploadFolderForRole } from "../../config/uploads";
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, "uploads"),
-  filename: (_req, file, cb) => {
-    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    cb(null, `${date}-${Date.now()}${path.extname(file.originalname)}`);
+  destination: (req: any, _file, cb) => {
+    const userId = req.user?.id;
+    const role = req.user?.role;
+
+    if (!userId || role == null || role === undefined) {
+      return cb(new Error("Missing user ID or role"), "" as unknown as string);
+    }
+
+    const dir = path.join(UPLOADS_ROOT, uploadFolderForRole(Number(role)), String(userId));
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    cb(null, dir);
   },
+filename: (_req, file, cb) => {
+  const timestamp = Date.now();
+  const safeName = file.originalname.replace(/[^\w.-]/g, "_"); // replace spaces/special chars
+  cb(null, `${timestamp}-${safeName}`);
+}
 });
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
@@ -22,7 +40,6 @@ export const uploadImage = multer({
   fileFilter,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
 });
-
 /** Convenience wrapper — handles multer errors and passes to next() */
 export const uploadSingle =
   (fieldName = "image") =>

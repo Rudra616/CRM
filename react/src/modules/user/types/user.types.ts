@@ -1,4 +1,4 @@
-import { Gender } from '../../../shared/types/common.types';
+import type { Gender } from '../../../shared/types/common.types';
 
 export interface UpdateProfileRequest {
   username: string;
@@ -6,7 +6,5 @@ export interface UpdateProfileRequest {
   lastname: string;
   email: string;
   phone: string;
-  newPassword?: string;
-  confirmPassword?: string;
   gender?: Gender;
 }

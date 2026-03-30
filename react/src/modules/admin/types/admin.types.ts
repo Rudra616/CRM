@@ -6,12 +6,10 @@ export interface UpdateUserRequest {
   lastname: string;
   email: string;
   phone: string;
-  password?: string;
   gender: Gender;
 }
 
 export interface UpdateAdminRequest {
   username: string;
   email: string;
-  password?: string;
 }

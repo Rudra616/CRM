@@ -53,6 +53,15 @@ export const removeUserToken = async (token: string): Promise<void> => {
   }
 };
 
+export const removeAllUserTokensForUserId = async (userId: number): Promise<void> => {
+  try {
+    await db.query("DELETE FROM user_tokens WHERE user_id = ?", [userId]);
+  } catch (error: any) {
+    console.error("Error in removeAllUserTokensForUserId:", error.message);
+    throw error;
+  }
+};
+
 // ─── Admin Tokens ─────────────────────────────────────────────────────────────
 
 export const upsertAdminToken = async (

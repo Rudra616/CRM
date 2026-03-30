@@ -8,6 +8,7 @@ import {
   loginSchema,
   updateProfileSchema,
   resetPasswordSchema,
+  changePasswordSchema
 } from "./user.validation";
 import {
   registerUser,
@@ -19,7 +20,8 @@ import {
   getUsers,
   forgotPassword,
   resetPassword,
-  verifyResetToken
+  verifyResetToken,
+  changePassword
 } from "./user.controller";
 
 const router = Router();
@@ -57,6 +59,14 @@ router.get(
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
   getUsers
+);
+
+router.post(
+  "/change-password",
+  authenticate,
+  allowRoles(Role.USER, Role.SUBADMIN),
+  validateSchema(changePasswordSchema),
+  changePassword
 );
 
 export default router;
