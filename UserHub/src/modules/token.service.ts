@@ -1,6 +1,8 @@
 import db from "../config/db";
 
-// ─── User Tokens ──────────────────────────────────────────────────────────────
+// Central store for login/session tokens for users, subadmins, and admins.
+
+// ─── User Tokens (login sessions for users + subadmins) ──────────────────────
 
 export const upsertUserToken = async (
   userId: number,
@@ -76,6 +78,8 @@ export const hasActiveUserTokenForUserId = async (userId: number): Promise<boole
 };
 
 // ─── Admin Tokens ─────────────────────────────────────────────────────────────
+
+// ─── Admin Tokens (login sessions for admins) ────────────────────────────────
 
 export const upsertAdminToken = async (
   adminId: number,

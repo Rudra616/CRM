@@ -17,13 +17,12 @@ import {
   updateUserById,
   updateUserPassword,
   deleteUserByIdAndRole,
-  isResetTokenUsed,
-  markResetTokenUsed,
-  deleteAllUserSessions
 } from "./user.service";
 import { upsertUserToken, removeUserToken, removeAllUserTokensForUserId } from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
 import { findAdminById } from "../admin/admin.service";
+
+// User (and subadmin) auth, profile, and password flows for the public side of the app.
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 
@@ -257,7 +256,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Reset Password ───────────────────────────────────────────
+// ─── Reset Password (via emailed token; logs out all sessions) ───────────────
 export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
@@ -275,32 +274,22 @@ export const resetPassword = async (req: Request, res: Response) => {
       return errorResponse(res, msg, 400);
     }
 
-    // 2. Check if already used
-    const used = await isResetTokenUsed(token);
-    if (used)
-      return errorResponse(res, 'This reset link has already been used.', 400);
-
-    // 3. Update password
+    // 2. Update password
     const hashedPassword = await hashPassword(newPassword);
     const updated = await updateUserPassword(decoded.id, hashedPassword);
     if (!updated)
       return errorResponse(res, 'User not found or password not updated', 404);
 
-    // 4. Mark token used + kill all sessions (session cleanup must not fail the whole flow)
-    await markResetTokenUsed(token);
-    try {
-      await deleteAllUserSessions(decoded.id);
-    } catch (sessionErr: any) {
-      console.error('deleteAllUserSessions after reset:', sessionErr?.message);
-    }
+    // 3. Kill all user tokens (forces logout from all devices)
+    await removeAllUserTokensForUserId(decoded.id);
 
-    return successResponse(res, 'Password reset successfully', null, 200);
+    return successResponse(res, 'Password reset successfully. Please sign in again.', null, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
 };
 
-// ─── Verify Reset Token ───────────────────────────────────────
+// ─── Verify Reset Token (JWT only; no DB state) ───────────────
 export const verifyResetToken = async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
@@ -317,11 +306,6 @@ export const verifyResetToken = async (req: Request, res: Response) => {
       return errorResponse(res, msg, 400);
     }
 
-    // 2. Check already used
-    const used = await isResetTokenUsed(token);
-    if (used)
-      return errorResponse(res, 'This reset link has already been used.', 400);
-
     return successResponse(res, 'Token is valid', { valid: true }, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
@@ -330,6 +314,8 @@ export const verifyResetToken = async (req: Request, res: Response) => {
 
 
 
+// Change password for an authenticated user and invalidate all their sessions.
+// Change password for an authenticated user and invalidate all their tokens.
 export const changePassword: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -341,11 +327,6 @@ export const changePassword: RequestHandler = async (req, res) => {
     if (!updated) return errorResponse(res, "Failed to update password", 400);
 
     await removeAllUserTokensForUserId(authReq.user.id);
-    try {
-      await deleteAllUserSessions(authReq.user.id);
-    } catch (e: any) {
-      console.error("deleteAllUserSessions after change password:", e?.message);
-    }
 
     const token = req.cookies?.token as string | undefined;
     if (token) {

@@ -25,8 +25,6 @@ import {
   updateUserById,
   updateUserPassword,
   deleteUserByIdAndRole,
-  deleteAllUserSessions,
-  
 } from "../user/user.service";
 import {
   upsertAdminToken,
@@ -35,6 +33,8 @@ import {
   hasActiveUserTokenForUserId,
 } from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
+
+// Admin-side auth, profile, subadmin management, user management, and dashboard APIs.
 
 // ─── Admin Login ──────────────────────────────────────────────────────────────
 
@@ -211,6 +211,7 @@ export const deleteSubadmin: RequestHandler = async (req, res) => {
   }
 };
 
+// Change password for the current admin and invalidate their tokens.
 export const changeAdminPassword: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -238,6 +239,7 @@ export const changeAdminPassword: RequestHandler = async (req, res) => {
   }
 };
 
+// Change a subadmin's password from the admin panel and invalidate their tokens.
 export const changeSubadminPasswordByAdmin: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -256,11 +258,6 @@ export const changeSubadminPasswordByAdmin: RequestHandler = async (req, res) =>
     if (!updated) return errorResponse(res, "Failed to update password", 400);
 
     await removeAllUserTokensForUserId(id);
-    try {
-      await deleteAllUserSessions(id);
-    } catch (e: any) {
-      console.error("deleteAllUserSessions after subadmin password change:", e?.message);
-    }
 
     return successResponse(res, "Subadmin password updated", null, 200);
   } catch (err: any) {
@@ -318,11 +315,6 @@ export const logoutUserByAdmin = async (req: Request, res: Response) => {
 
     const wasLoggedIn = await hasActiveUserTokenForUserId(userId);
     await removeAllUserTokensForUserId(userId);
-    try {
-      await deleteAllUserSessions(userId);
-    } catch (sessionErr: any) {
-      console.error("deleteAllUserSessions by admin:", sessionErr?.message);
-    }
 
     return successResponse(
       res,
@@ -339,13 +331,6 @@ export const deleteUserByAdmin = async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
     if (Number.isNaN(userId)) return errorResponse(res, "Invalid user id", 400);
-
-    await removeAllUserTokensForUserId(userId);
-    try {
-      await deleteAllUserSessions(userId);
-    } catch (sessionErr: any) {
-      console.error("deleteAllUserSessions before delete:", sessionErr?.message);
-    }
 
     const deleted = await softDeleteUserByAdmin(userId);
     if (!deleted) return errorResponse(res, "User not found", 404);

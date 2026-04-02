@@ -1,6 +1,8 @@
 import db from "../../config/db";
 import { User } from "../../common/types/user";
 
+// Data access helpers for admin accounts and admin-facing views of user data.
+
 export interface Admin {
   id: number;
   username: string;
