@@ -10,6 +10,7 @@ export interface User {
   role: 'admin' | 'subadmin' | 'user';
   image_url?: string | null;
   gender?: Gender;
+  status?: 'active' | 'pending' | 'inactive' | 'delete';
 }
 
 export interface Admin {

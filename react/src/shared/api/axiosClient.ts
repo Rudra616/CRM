@@ -56,14 +56,13 @@ axiosClient.interceptors.response.use(
       const url = error.config?.url || '';
       const isAuthRoute =
         url.includes('/login') || url.includes('/register') || url.includes('/logout');
-      const isSessionBootstrap = url.includes('/profile') || url.includes('/session');
       const currentPath = window.location.pathname;
       const isAlreadyOnPublicAuthPage = isPublicAuthPath(currentPath);
 
       clearClientAuthStorage();
 
       // In-app requests after cookie removed/tampered: hard redirect so no half-loaded pages.
-      if (!isAuthRoute && !isSessionBootstrap && !isAlreadyOnPublicAuthPage) {
+      if (!isAuthRoute && !isAlreadyOnPublicAuthPage) {
         window.location.replace(buildSessionEndedLoginUrl(currentPath));
         return Promise.reject(new Error('Session ended. Please sign in again.'));
       }

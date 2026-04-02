@@ -35,46 +35,29 @@ export const registerUser = async (req: Request, res: Response) => {
     if (existing) return errorResponse(res, "Username or email already exists", 409);
 
     const hashedPassword = await hashPassword(password);
-    const insertId = await insertUser(username, hashedPassword, firstname, lastname, phone, email, Role.USER, gender);
+    await insertUser(username, hashedPassword, firstname, lastname, phone, email, Role.USER, gender,'pending');
 
-    const token = signToken({
-      id: insertId,
-      role: Role.USER,
-      username,
-      firstname,
-      lastname,
-      email,
-      phone,
-      gender: gender ?? undefined,
-    });
-    await upsertUserToken(insertId, username, Role.USER, token);
-    setAuthCookie(res, token); // 🔥 ADD THIS
-
-    return successResponse(res, "User registered successfully", {
-      user: {
-        id: insertId,
-        username,
-        firstname,
-        lastname,
-        email,
-        phone,
-        gender,
-        role: roleLabel(Role.USER),
-      },
-    }, 201);
+    return successResponse(res, "User registered successfully. Please sign in.", null, 201);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
 };
 
 // ─── Login ────────────────────────────────────────────────────────────────────
-
 export const loginUser = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
     const user = await findUserByUsername(username);
     if (!user) return errorResponse(res, "User not found", 404);
+
+    // Only active users are allowed to login.
+    if (user.status !== "active") {
+      if (user.status === "pending") return errorResponse(res, "Your account is pending approval by admin.", 403);
+      if (user.status === "inactive") return errorResponse(res, "Your account has been deactivated by admin.", 403);
+      if (user.status === "delete") return errorResponse(res, "This account has been deleted.", 403);
+      return errorResponse(res, "Your account is not active.", 403);
+    }
 
     const isMatch = await comparePassword(password, user.password);
     if (!isMatch) return errorResponse(res, "Invalid password", 401);
@@ -102,13 +85,13 @@ export const loginUser = async (req: Request, res: Response) => {
         email: user.email,
         gender: user.gender,
         role: roleLabel(user.role_id),
+        status: user.status,
       },
     }, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
 };
-
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
 export const logoutUser = async (req: Request, res: Response) => {

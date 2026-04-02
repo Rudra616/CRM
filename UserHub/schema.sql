@@ -11,11 +11,14 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
   role_id INT NOT NULL,
+  status ENUM('active','pending','inactive','delete') NOT NULL DEFAULT 'active',
   image_url VARCHAR(500) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- If users table exists without image_url: ALTER TABLE users ADD COLUMN image_url VARCHAR(500) DEFAULT NULL;
+-- If users table exists without status:
+-- ALTER TABLE users ADD COLUMN status ENUM('active','pending','inactive','delete') NOT NULL DEFAULT 'active';
 
 -- Admin table: separate from users
 CREATE TABLE IF NOT EXISTS admin (

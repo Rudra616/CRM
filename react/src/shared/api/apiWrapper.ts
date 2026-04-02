@@ -20,7 +20,7 @@ const getErrorMessage = (err: unknown): string => {
 };
 
 export const apiRequest = async <T>(
-  method: "GET" | "POST" | "PUT" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   data?: unknown
 ): Promise<ApiResponse<T>> => {

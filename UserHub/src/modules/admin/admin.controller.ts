@@ -9,6 +9,11 @@ import {
   findAdminById,
   checkDuplicateAdminUsernameOrEmail,
   updateAdminById,
+  getUsersPaginatedByRole,
+  updateUserStatus,
+  updateUserProfileByAdmin,
+  softDeleteUserByAdmin,
+  getAdminDashboardSummary
 } from "./admin.service";
 import { updateAdminPassword } from "./password.service";
 import {
@@ -21,8 +26,14 @@ import {
   updateUserPassword,
   deleteUserByIdAndRole,
   deleteAllUserSessions,
+  
 } from "../user/user.service";
-import { upsertAdminToken, removeAdminToken, removeAllUserTokensForUserId } from "../token.service";
+import {
+  upsertAdminToken,
+  removeAdminToken,
+  removeAllUserTokensForUserId,
+  hasActiveUserTokenForUserId,
+} from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
 
 // ─── Admin Login ──────────────────────────────────────────────────────────────
@@ -252,6 +263,129 @@ export const changeSubadminPasswordByAdmin: RequestHandler = async (req, res) =>
     }
 
     return successResponse(res, "Subadmin password updated", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+
+
+export const getUsers = async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1); // keep page from query
+    const limit = 10; // always 10 users per page
+
+    const { items, total } = await getUsersPaginatedByRole(Role.USER, page, limit);
+
+    return successResponse(
+      res,
+      "Users fetched successfully",
+      {
+        items,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
+        },
+      },
+      200
+    );
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    const { status } = req.body;
+    if (Number.isNaN(userId)) return errorResponse(res, "Invalid user id", 400);
+
+    const updatedUser = await updateUserStatus(userId, status);
+    if (!updatedUser) return errorResponse(res, "User not found", 404);
+
+    return successResponse(res, "User updated successfully", updatedUser, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 400);
+  }
+};
+
+export const logoutUserByAdmin = async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    if (Number.isNaN(userId)) return errorResponse(res, "Invalid user id", 400);
+
+    const wasLoggedIn = await hasActiveUserTokenForUserId(userId);
+    await removeAllUserTokensForUserId(userId);
+    try {
+      await deleteAllUserSessions(userId);
+    } catch (sessionErr: any) {
+      console.error("deleteAllUserSessions by admin:", sessionErr?.message);
+    }
+
+    return successResponse(
+      res,
+      wasLoggedIn ? "User logged out successfully" : "User was already logged out",
+      { wasLoggedIn },
+      200
+    );
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+export const deleteUserByAdmin = async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    if (Number.isNaN(userId)) return errorResponse(res, "Invalid user id", 400);
+
+    await removeAllUserTokensForUserId(userId);
+    try {
+      await deleteAllUserSessions(userId);
+    } catch (sessionErr: any) {
+      console.error("deleteAllUserSessions before delete:", sessionErr?.message);
+    }
+
+    const deleted = await softDeleteUserByAdmin(userId);
+    if (!deleted) return errorResponse(res, "User not found", 404);
+
+    return successResponse(res, "User deleted successfully", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+}; 
+
+export const updateUserProfileByAdminController: RequestHandler = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    if (Number.isNaN(userId)) return errorResponse(res, "Invalid user id", 400);
+    const { username, firstname, lastname, phone, email, gender, status } = req.body;
+
+    const isDup = await checkDuplicateUsernameOrEmail(username, email, userId);
+    if (isDup) return errorResponse(res, "Username or email already exists", 409);
+
+    const updated = await updateUserProfileByAdmin(userId, {
+      username,
+      firstname,
+      lastname,
+      phone,
+      email,
+      gender,
+      status,
+    });
+    if (!updated) return errorResponse(res, "User not found", 404);
+
+    return successResponse(res, "User updated successfully", updated, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 400);
+  }
+};
+
+export const getDashboardSummary: RequestHandler = async (_req, res) => {
+  try {
+    const summary = await getAdminDashboardSummary();
+    return successResponse(res, "Dashboard summary fetched", summary, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }

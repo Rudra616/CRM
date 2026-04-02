@@ -9,6 +9,8 @@ export interface User {
   role_id: number;
   image_url?: string | null;
   gender?: "male" | "female" | "other";
+  status: 'active' | 'pending' | 'inactive' | 'delete';
+
 }
 
 export interface RegisterUserDTO {

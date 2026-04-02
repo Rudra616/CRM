@@ -1,12 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { roleIdToRole } from '../shared/utils/roleUtils';
 import type { UserInfo } from '../shared/types/common.types';
-import { logoutAdminApi, logoutApi, getSessionApi } from '../modules/auth/api/auth.api';
-import {
-  buildSessionEndedLoginUrl,
-  clearClientAuthStorage,
-  isPublicAuthPath,
-} from '../shared/utils/authSession';
+import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
+import { getAdminProfileApi } from '../modules/admin/api/admin.api';
+import { clearClientAuthStorage } from '../shared/utils/authSession';
 
 interface AuthContextType {
   user: UserInfo | null;
@@ -31,67 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const userRef = useRef<UserInfo | null>(null);
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-
-  const refreshSession = useCallback(async () => {
-    try {
-      const res = await getSessionApi();
-      if (res.data) {
-        setUser(normalizeUser(res.data as UserInfo));
-      } else {
-        setUser(null);
-        clearClientAuthStorage();
-        const path = window.location.pathname;
-        if (!isPublicAuthPath(path)) {
-          window.location.replace(buildSessionEndedLoginUrl(path));
-        }
-      }
-    } catch {
-      setUser(null);
-      clearClientAuthStorage();
-      const path = window.location.pathname;
-      if (!isPublicAuthPath(path)) {
-        window.location.replace(buildSessionEndedLoginUrl(path));
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const loadUser = async () => {
-      const path = window.location.pathname;
-
-      if (isPublicAuthPath(path)) {
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const res = await getSessionApi();
-        if (res.data) {
-          setUser(normalizeUser(res.data as UserInfo));
-        } else {
-          setUser(null);
-          clearClientAuthStorage();
-          window.location.replace(buildSessionEndedLoginUrl(path));
-          return;
-        }
-      } catch {
-        setUser(null);
-        clearClientAuthStorage();
-        window.location.replace(buildSessionEndedLoginUrl(path));
-        return;
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadUser();
-  }, []);
 
   const login = (userData: UserInfo) => {
-    setUser(normalizeUser(userData));
+    const normalized = normalizeUser(userData);
+    userRef.current = normalized;
+    setUser(normalized);
   };
 
   const logout = async (): Promise<void> => {
@@ -106,9 +47,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // clear state even if API call fails
     } finally {
       clearClientAuthStorage();
+      userRef.current = null;
       setUser(null);
     }
   };
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    const isAdminRoute =
+      path === '/admin' ||
+      path === '/admin/login' ||
+      path.startsWith('/admin/');
+
+    if (!isAdminRoute) {
+      setIsLoading(false);
+      return;
+    }
+
+    const loadAdmin = async () => {
+      try {
+        const res = await getAdminProfileApi();
+        if (res.data) {
+          login({
+            id: Number(res.data.id),
+            username: res.data.username,
+            email: res.data.email,
+            role: 'admin',
+            firstname: '',
+            lastname: '',
+            phone: '',
+          });
+        }
+      } catch {
+        clearClientAuthStorage();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAdmin();
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -116,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         login,
         logout,
-        refreshSession,
+        refreshSession: async () => {},
         isAuthenticated: !!user,
         isLoading,
       }}

@@ -10,6 +10,8 @@ import {
   subadminSchema,
   updateSubadminProfileSchema,
   changePasswordSchema,
+  adminUpdateUserStatusSchema,
+  adminUpdateUserProfileSchema,
 } from "../user/user.validation";
 import { updateAdminSchema } from "./admin.validation";
 import {
@@ -22,6 +24,12 @@ import {
   updateSubadmin,
   deleteSubadmin,
   changeAdminPassword,
+  getUsers,
+  updateUser,
+  logoutUserByAdmin,
+  deleteUserByAdmin,
+  updateUserProfileByAdminController,
+  getDashboardSummary,
   changeSubadminPasswordByAdmin,
 } from "./admin.controller";
 
@@ -55,7 +63,49 @@ router.post(
   validateSchema(changePasswordSchema),
   changeAdminPassword
 );
+router.get(
+  "/dashboard-summary",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  getDashboardSummary
+);
+router.get(
+  "/users",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  getUsers
+);
 
+// ✅ Update user role or status
+router.patch(
+  "/users/:id",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  validateSchema(adminUpdateUserStatusSchema),
+  updateUser
+);
+
+router.put(
+  "/users/:id",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  validateSchema(adminUpdateUserProfileSchema),
+  updateUserProfileByAdminController
+);
+
+router.post(
+  "/users/:id/logout",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  logoutUserByAdmin
+);
+
+router.delete(
+  "/users/:id",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  deleteUserByAdmin
+);
 router.post(
   "/subadmins",
   authenticate,

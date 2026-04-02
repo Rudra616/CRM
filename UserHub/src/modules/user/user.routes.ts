@@ -14,14 +14,13 @@ import {
   registerUser,
   loginUser,
   logoutUser,
-  getSession,
   getProfile,
   updateProfile,
   getUsers,
   forgotPassword,
   resetPassword,
   verifyResetToken,
-  changePassword
+  changePassword,
 } from "./user.controller";
 
 const router = Router();
@@ -33,8 +32,6 @@ router.post("/logout",          logoutUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", validateSchema(resetPasswordSchema), resetPassword);
 router.post("/verify-reset-token", verifyResetToken);
-
-router.get("/session", authenticate, getSession);
 
 // ─── Protected (user / subadmin) ──────────────────────────────────────────────
 router.get(

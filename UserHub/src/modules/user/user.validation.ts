@@ -103,6 +103,29 @@ export const updateUserSchema = Joi.object({
   password:  optionalPasswordField(256),
 });
 
+/** Admin panel quick status update for users. */
+export const adminUpdateUserStatusSchema = Joi.object({
+  status: Joi.string().valid("active", "pending", "inactive", "delete").required().messages({
+    "any.only": "Status must be one of: active, pending, inactive, delete",
+    "string.empty": "Status is required",
+    "any.required": "Status is required",
+  }),
+});
+
+export const adminUpdateUserProfileSchema = Joi.object({
+  username: usernameField,
+  firstname: firstnameField,
+  lastname: lastnameField,
+  phone: phoneField,
+  email: emailField,
+  gender: genderRequired,
+  status: Joi.string().valid("active", "pending", "inactive", "delete").required().messages({
+    "any.only": "Status must be one of: active, pending, inactive, delete",
+    "string.empty": "Status is required",
+    "any.required": "Status is required",
+  }),
+});
+
 /** Subadmin profile update (no password — use POST .../change-password). */
 export const updateSubadminProfileSchema = Joi.object({
   username:  usernameField,

@@ -62,6 +62,19 @@ export const removeAllUserTokensForUserId = async (userId: number): Promise<void
   }
 };
 
+export const hasActiveUserTokenForUserId = async (userId: number): Promise<boolean> => {
+  try {
+    const [rows]: any = await db.query(
+      "SELECT id FROM user_tokens WHERE user_id = ? AND expires_at > NOW() LIMIT 1",
+      [userId]
+    );
+    return rows.length > 0;
+  } catch (error: any) {
+    console.error("Error in hasActiveUserTokenForUserId:", error.message);
+    throw error;
+  }
+};
+
 // ─── Admin Tokens ─────────────────────────────────────────────────────────────
 
 export const upsertAdminToken = async (

@@ -4,8 +4,7 @@ import { registerApi, createSubadminApi } from '../api/auth.api';
 import { validateRegister } from '../../../shared/utils/validation';
 import { showSuccess, showError } from '../../../shared/utils/toast';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
-import { useAuth } from '../../../context/AuthContext';
-import type { Gender, User, UserInfo } from '../../../shared/types/common.types';
+import type { Gender } from '../../../shared/types/common.types';
 import { AuthPageLayout, authLinkStyle } from '../../../shared/components/AuthPageLayout';
 
 type RegisterForm = {
@@ -19,16 +18,6 @@ type RegisterForm = {
   gender: Gender;
 };
 
-const registerUserToUserInfo = (u: User): UserInfo => ({
-  id: Number(u.id),
-  username: u.username,
-  email: u.email,
-  role: u.role,
-  firstname: u.firstname ?? '',
-  lastname: u.lastname ?? '',
-  phone: u.phone ?? '',
-});
-
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
@@ -38,7 +27,6 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
   const isCreateSubadmin = location.pathname === '/admin/create-subadmin';
 
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } = useFormValidation<RegisterForm>();
@@ -94,7 +82,7 @@ const Register: React.FC = () => {
           gender: 'other',
         });
       } else {
-        const response = await registerApi({
+        await registerApi({
           username: form.username,
           firstname: form.firstname,
           lastname: form.lastname,
@@ -103,16 +91,8 @@ const Register: React.FC = () => {
           password: form.password,
           gender: form.gender,
         });
-
-        const { user } = response.data || {};
-        if (user) {
-          login(registerUserToUserInfo(user as User));
-          showSuccess('User registered successfully');
-          navigate('/user/dashboard', { replace: true });
-        } else {
-          showSuccess('User registered successfully. Please sign in.');
-          navigate('/login', { replace: true });
-        }
+        showSuccess('Account created. Please sign in.');
+        navigate('/login', { replace: true });
       }
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message;

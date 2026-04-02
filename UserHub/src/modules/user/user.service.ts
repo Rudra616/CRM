@@ -10,7 +10,7 @@ export const findUserByUsernameOrEmail = async (
 ): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM users WHERE username = ? OR email = ?",
+      "SELECT id FROM users WHERE (username = ? OR email = ?) AND (status IS NULL OR status != 'delete')",
       [username, email]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -23,7 +23,7 @@ export const findUserByUsernameOrEmail = async (
 export const findUserByUsername = async (username: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id, username, password, firstname, lastname, email, role_id, gender FROM users WHERE username = ?",
+      "SELECT id, username, password, firstname, lastname, email, role_id, gender, status FROM users WHERE username = ? AND (status IS NULL OR status != 'delete') ORDER BY id DESC LIMIT 1",
       [username]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -36,7 +36,7 @@ export const findUserByUsername = async (username: string): Promise<User | null>
 export const findUserById = async (id: number): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id, username, firstname, lastname, phone, email, role_id, image_url, gender FROM users WHERE id = ?",
+      "SELECT id, username, firstname, lastname, phone, email, role_id, image_url, gender,status FROM users WHERE id = ?",
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -52,7 +52,7 @@ export const findUserByIdAndRole = async (
 ): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id, username, firstname, lastname, phone, email, gender FROM users WHERE id = ? AND role_id = ?",
+      "SELECT id, username, firstname, lastname, phone, email, gender,status FROM users WHERE id = ? AND role_id = ?",
       [id, roleId]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -77,7 +77,7 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
 
 export const findAllByRole = async (roleId: number): Promise<User[]> => {
   const [rows]: any = await db.query(
-    "SELECT id, username, firstname, lastname, phone, email, gender FROM users WHERE role_id = ?",
+    "SELECT id, username, firstname, lastname, phone, email, gender, status FROM users WHERE role_id = ? AND (status IS NULL OR status != 'delete')",
     [roleId]
   );
   return rows;
@@ -90,7 +90,7 @@ export const checkDuplicateUsernameOrEmail = async (
 ): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?",
+      "SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ? AND (status IS NULL OR status != 'delete')",
       [username, email, excludeId]
     );
     return rows.length > 0;
@@ -110,12 +110,14 @@ export const insertUser = async (
   phone: string,
   email: string,
   roleId: number,
-  gender?: string
+  gender?: string,
+  status: 'pending' | 'active' | 'inactive' | 'delete' = 'pending'
+
 ): Promise<number> => {
   try {
     const [result]: any = await db.query(
-      "INSERT INTO users (username,password,firstname,lastname,phone,email,role_id,gender) VALUES (?,?,?,?,?,?,?,?)",
-      [username, hashedPassword, firstname, lastname, phone, email, roleId, gender ?? null]
+      "INSERT INTO users (username,password,firstname,lastname,phone,email,role_id,gender,status) VALUES (?,?,?,?,?,?,?,?,?)",
+      [username, hashedPassword, firstname, lastname, phone, email, roleId, gender ?? null,status]
     );
 
     return result.insertId;
