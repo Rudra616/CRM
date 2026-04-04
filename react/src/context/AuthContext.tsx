@@ -3,6 +3,7 @@ import { roleIdToRole } from '../shared/utils/roleUtils';
 import type { UserInfo } from '../shared/types/common.types';
 import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
 import { getAdminProfileApi } from '../modules/admin/api/admin.api';
+import { pingSessionApi } from '../modules/user/api/user.api';
 import { clearClientAuthStorage } from '../shared/utils/authSession';
 
 interface AuthContextType {
@@ -87,6 +88,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     loadAdmin();
   }, []);
+
+  // User/subadmin: periodic + focus ping so admin status/delete invalidates the session without a manual reload.
+  useEffect(() => {
+    const u = user;
+    if (!u || (u.role !== 'user' && u.role !== 'subadmin')) return;
+
+    const ping = () => {
+      if (document.visibilityState !== 'visible') return;
+      void pingSessionApi().catch(() => {
+        /* 401: axios interceptor clears storage and redirects */
+      });
+    };
+
+    const t = window.setInterval(ping, 20000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ping();
+    };
+
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', ping);
+    ping();
+
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', ping);
+    };
+  }, [user?.role, user?.id]);
 
   return (
     <AuthContext.Provider

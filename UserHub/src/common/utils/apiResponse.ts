@@ -10,7 +10,7 @@ export const successResponse = <T>(
 
   // Professional handling for "empty" data
   if (data === null || data === undefined) {
-    responseData = Array.isArray(data) ? [] : undefined; // arrays empty, else undefined
+    responseData = Array.isArray(data) ? [] : undefined; 
   } else if (typeof data === "object" && !Array.isArray(data)) {
     // If object but empty, return empty object
     if (Object.keys(data as object).length === 0) {

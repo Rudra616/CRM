@@ -7,6 +7,11 @@ export const getProfileApi = (): Promise<ApiResponse<User>> => {
   return apiRequest<User>('GET', '/profile');
 };
 
+/** Validates cookie + token row + user status; 401 triggers global logout redirect. */
+export const pingSessionApi = (): Promise<ApiResponse<{ ok: boolean }>> => {
+  return apiRequest<{ ok: boolean }>('GET', '/session/ping');
+};
+
 export const updateProfileApi = (
   data: UpdateProfileRequest
 ): Promise<ApiResponse<User>> => {

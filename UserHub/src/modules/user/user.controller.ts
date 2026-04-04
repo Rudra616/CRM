@@ -20,12 +20,8 @@ import {
 } from "./user.service";
 import { upsertUserToken, removeUserToken, removeAllUserTokensForUserId } from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
-import { findAdminById } from "../admin/admin.service";
 
-// User (and subadmin) auth, profile, and password flows for the public side of the app.
-
-// ─── Register ─────────────────────────────────────────────────────────────────
-
+// register
 export const registerUser = async (req: Request, res: Response) => {
   try {
     const { username, password, firstname, lastname, phone, email, gender } = req.body;
@@ -34,7 +30,7 @@ export const registerUser = async (req: Request, res: Response) => {
     if (existing) return errorResponse(res, "Username or email already exists", 409);
 
     const hashedPassword = await hashPassword(password);
-    await insertUser(username, hashedPassword, firstname, lastname, phone, email, Role.USER, gender,'pending');
+    await insertUser(username, hashedPassword, firstname, lastname, phone, email, Role.USER, gender, 'pending');
 
     return successResponse(res, "User registered successfully. Please sign in.", null, 201);
   } catch (err: any) {
@@ -42,7 +38,7 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+// login
 export const loginUser = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
@@ -73,7 +69,7 @@ export const loginUser = async (req: Request, res: Response) => {
     });
     await upsertUserToken(user.id, user.username, user.role_id, token);
 
-    setAuthCookie(res, token); 
+    setAuthCookie(res, token);
 
     return successResponse(res, "Login successful", {
       user: {
@@ -91,8 +87,8 @@ export const loginUser = async (req: Request, res: Response) => {
     return errorResponse(res, err.message, 500);
   }
 };
-// ─── Logout ───────────────────────────────────────────────────────────────────
 
+// logout
 export const logoutUser = async (req: Request, res: Response) => {
   const token = req.cookies.token; // 🔥 CHANGED
   if (token) {
@@ -108,69 +104,8 @@ export const logoutUser = async (req: Request, res: Response) => {
   return successResponse(res, "Logged out", null, 200);
 };
 
-// ─── Session (claims from JWT in httpOnly cookie; client uses this instead of localStorage user) ─
 
-export const getSession: RequestHandler = async (req, res) => {
-  const authReq = req as AuthRequest;
-  const token = req.cookies?.token as string | undefined;
-  if (!authReq.user || !token) return errorResponse(res, "Unauthorized", 401);
-
-  try {
-    const decoded = verifyToken(token) as Record<string, unknown> & { id: number };
-    const roleNum = authReq.user.role;
-
-    const uname = decoded.username;
-    if (typeof uname === "string" && uname.length > 0) {
-      return successResponse(
-        res,
-        "Session",
-        {
-          id: Number(decoded.id),
-          username: String(decoded.username),
-          firstname: String(decoded.firstname ?? ""),
-          lastname: String(decoded.lastname ?? ""),
-          email: String(decoded.email ?? ""),
-          phone: String(decoded.phone ?? ""),
-          gender: decoded.gender != null ? String(decoded.gender) : undefined,
-          role: roleLabel(roleNum),
-        },
-        200
-      );
-    }
-
-    if (roleNum === Role.ADMIN) {
-      const admin = await findAdminById(authReq.user.id);
-      if (!admin) return errorResponse(res, "Unauthorized", 401);
-      return successResponse(res, "Session", {
-        id: admin.id,
-        username: admin.username,
-        firstname: "",
-        lastname: "",
-        email: admin.email,
-        phone: "",
-        role: "admin",
-      }, 200);
-    }
-
-    const row = await findUserById(authReq.user.id);
-    if (!row) return errorResponse(res, "Unauthorized", 401);
-    return successResponse(res, "Session", {
-      id: row.id,
-      username: row.username,
-      firstname: row.firstname ?? "",
-      lastname: row.lastname ?? "",
-      email: row.email,
-      phone: row.phone ?? "",
-      gender: row.gender ?? undefined,
-      role: roleLabel(row.role_id),
-    }, 200);
-  } catch {
-    return errorResponse(res, "Unauthorized", 401);
-  }
-};
-
-// ─── Get Profile ──────────────────────────────────────────────────────────────
-
+// profile
 export const getProfile: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -190,8 +125,7 @@ export const getProfile: RequestHandler = async (req, res) => {
   }
 };
 
-// ─── Update Profile ───────────────────────────────────────────────────────────
-
+// update profile
 export const updateProfile: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -219,17 +153,16 @@ export const updateProfile: RequestHandler = async (req, res) => {
 
     const updated = await findUserById(authReq.user.id);
     // ✅ ADD THIS
-if (updated?.image_url) {
-  updated.image_url = buildImageUrl(req, updated.image_url);
-}
+    if (updated?.image_url) {
+      updated.image_url = buildImageUrl(req, updated.image_url);
+    }
     return successResponse(res, "Profile updated", updated, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 409);
   }
 };
 
-// ─── Get All Users ────────────────────────────────────────────────────────────
-
+// get users
 export const getUsers = async (req: Request, res: Response) => {
   try {
     const users = await findAllByRole(Role.USER);
@@ -238,6 +171,8 @@ export const getUsers = async (req: Request, res: Response) => {
     return errorResponse(res, err.message, 500);
   }
 };
+
+// forgot password
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -256,7 +191,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Reset Password (via emailed token; logs out all sessions) ───────────────
+// reset password
 export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
@@ -289,7 +224,7 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Verify Reset Token (JWT only; no DB state) ───────────────
+// 
 export const verifyResetToken = async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
@@ -312,9 +247,11 @@ export const verifyResetToken = async (req: Request, res: Response) => {
   }
 };
 
+// Lightweight auth check so the client can detect revoked sessions without a full page reload.
+export const pingSession: RequestHandler = (_req, res) => {
+  return successResponse(res, "ok", { ok: true }, 200);
+};
 
-
-// Change password for an authenticated user and invalidate all their sessions.
 // Change password for an authenticated user and invalidate all their tokens.
 export const changePassword: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;

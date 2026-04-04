@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   getAdminUsersApi,
   getUsersApi,
@@ -17,16 +18,28 @@ import { FaEdit, FaSignOutAlt } from 'react-icons/fa';
 const ManageUsers = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const location = useLocation();
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | number | null>(null);
   const [statusDraft, setStatusDraft] = useState<Record<string, 'active' | 'pending' | 'inactive' | 'delete'>>({});
   const [editUser, setEditUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'inactive' | 'delete'>('all');
+
   const rowsPerPage = 10;
   const [totalRows, setTotalRows] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Pick up dashboard filter state
+useEffect(() => {
+  const status = (location.state as any)?.statusFilter;
+  if (status) {
+    setStatusFilter(status);
+    setCurrentPage(1); // start fresh
+  }
+}, [location.state]);
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -61,7 +74,15 @@ const ManageUsers = () => {
 
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const currentUsers = isAdmin ? users : users.slice(startIndex, endIndex);
+const filteredAllUsers = users.filter(user =>
+  statusFilter === 'all' ? true : (user.status || 'active') === statusFilter
+);
+
+const currentUsers = isAdmin
+  ? filteredAllUsers
+  : filteredAllUsers.slice(startIndex, endIndex);
+
+const filteredUsers = currentUsers;
 
   const theadStyle = { backgroundColor: colors.cardPrimaryBg };
   const statusOptions: Array<'active' | 'pending' | 'inactive' | 'delete'> = ['active', 'pending', 'inactive', 'delete'];
@@ -72,19 +93,23 @@ const ManageUsers = () => {
       setBusyUserId(id);
       const res = await updateUserStatusApi(id, next);
       const updated = res.data;
-      if (next === 'delete') {
-        setUsers((prev) => prev.filter((u) => u.id !== id));
-        setTotalRows((prev) => Math.max(0, prev - 1));
-      } else {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, ...(updated || {}), status: next } : u))
-        );
-      }
+
+      // Always update user status, even for "delete"
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === id ? { ...u, ...(updated || {}), status: next } : u
+        )
+      );
+
+      setStatusDraft(p => ({
+        ...p,
+        [String(id)]: next,
+      }));
+
       showSuccess('User status updated');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to update status');
-      // revert local draft on error
-      setStatusDraft((p) => ({
+      setStatusDraft(p => ({
         ...p,
         [String(id)]: (user.status as any) || 'active',
       }));
@@ -105,7 +130,6 @@ const ManageUsers = () => {
     }
   };
 
-
   const handleEditUser = async (data: EditUserProfilePayload) => {
     if (!editUser) return;
     const id = editUser.id;
@@ -114,9 +138,7 @@ const ManageUsers = () => {
       const status = statusDraft[String(id)] || 'active';
       const res = await updateUserByAdminApi(id, { ...data, status });
       const updated = res.data;
-      setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, ...(updated || {}), status } : u))
-      );
+      setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...(updated || {}), status } : u)));
       showSuccess('User updated');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to update user');
@@ -127,14 +149,25 @@ const ManageUsers = () => {
   };
 
   return (
-    <PageShell
-      title="Manage Users"
-      subtitle="View registered users"
-      loading={loading}
-      loadingMessage="Loading users…"
-      flush
-    >
+    <PageShell title="Manage Users" subtitle="View registered users" loading={loading} loadingMessage="Loading users…" flush>
       <div className="p-3 p-md-4">
+        {isAdmin && (
+          <div className="mb-2 d-flex gap-2 align-items-center">
+            <label className="small mb-0">Filter by status:</label>
+            <select
+              className="form-select form-select-sm"
+              style={{ maxWidth: 150 }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+            >
+              <option value="all">All</option>
+              {statusOptions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="table-responsive">
           <table className="table table-bordered table-striped align-middle mb-0">
             <thead style={theadStyle}>
@@ -148,87 +181,77 @@ const ManageUsers = () => {
               </tr>
             </thead>
             <tbody>
-              {currentUsers.map((user, index) => (
-                <tr key={user.id}>
-                  <td>{startIndex + index + 1}</td>
-                  <td className="text-break">
-                    {user.firstname} {user.lastname} ({user.username})
-                  </td>
-                  <td>{user.phone}</td>
-                  <td className="text-break">{user.email}</td>
-                  {isAdmin && (
-                    <td style={{ minWidth: 180 }}>
-                      <div className="d-flex align-items-center gap-2">
-                        <span
-                          className={`badge text-capitalize ${
-                            (statusDraft[String(user.id)] || user.status || 'active') === 'active'
-                              ? 'bg-success'
-                              : (statusDraft[String(user.id)] || user.status) === 'pending'
-                                ? 'bg-warning text-dark'
-                                : (statusDraft[String(user.id)] || user.status) === 'inactive'
-                                  ? 'bg-secondary'
-                                  : 'bg-danger'
-                          }`}
-                        >
-                          {statusDraft[String(user.id)] || user.status || 'active'}
-                        </span>
-                        <select
-                          className="form-select form-select-sm text-capitalize"
-                          style={{ maxWidth: 120 }}
-                          value={statusDraft[String(user.id)] || user.status || 'active'}
-                          onChange={(e) =>
-                            setStatusDraft((p) => ({
-                              ...p,
-                              [String(user.id)]:
-                                e.target.value as 'active' | 'pending' | 'inactive' | 'delete',
-                            }))
-                          }
-                          onBlur={async (e) => {
-                            const next = (e.target.value ||
-                              statusDraft[String(user.id)] ||
-                              user.status ||
-                              'active') as 'active' | 'pending' | 'inactive' | 'delete';
-                            if (next !== user.status) {
-                              await handleUpdateStatus(user, next);
-                            }
-                          }}
-                        >
-                          {statusOptions.map((s) => (
-                            <option key={s} value={s} className="text-capitalize">
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </td>
-                  )}
-                  {isAdmin && (
-                    <td style={{ minWidth: 180 }}>
-                      <div className="d-flex gap-1 flex-wrap">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-primary"
-                          onClick={() => setEditUser(user)}
-                          disabled={busyUserId === user.id}
-                          title="Edit user"
-                        >
-                          <FaEdit size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-warning"
-                          onClick={() => handleLogout(user.id)}
-                          disabled={busyUserId === user.id}
-                          title="Logout user"
-                        >
-                          <FaSignOutAlt size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {currentUsers.length === 0 && (
+              {filteredUsers.map((user, index) => {
+                const currentStatus = statusDraft[String(user.id)] || user.status || 'active';
+                return (
+                  <tr key={user.id}>
+                    <td>{startIndex + index + 1}</td>
+                    <td className="text-break">{user.firstname} {user.lastname} ({user.username})</td>
+                    <td>{user.phone}</td>
+                    <td className="text-break">{user.email}</td>
+
+                    {isAdmin && (
+                      <td style={{ minWidth: 180 }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <span
+                            className={`badge text-capitalize ${
+                              currentStatus === 'active'
+                                ? 'bg-success'
+                                : currentStatus === 'pending'
+                                  ? 'bg-warning text-dark'
+                                  : currentStatus === 'inactive'
+                                    ? 'bg-secondary'
+                                    : 'bg-danger'
+                            }`}
+                          >
+                            {currentStatus}
+                          </span>
+
+                          {/* Hide dropdown if status is "delete" */}
+                          {currentStatus !== 'delete' && (
+                            <select
+                              className="form-select form-select-sm text-capitalize"
+                              style={{ maxWidth: 120 }}
+                              value={currentStatus}
+                              onChange={(e) =>
+                                setStatusDraft(p => ({
+                                  ...p,
+                                  [String(user.id)]: e.target.value as any
+                                }))
+                              }
+                              onBlur={async (e) => {
+                                const next = (e.target.value || currentStatus) as any;
+                                if (next !== user.status) {
+                                  await handleUpdateStatus(user, next);
+                                }
+                              }}
+                            >
+                              {statusOptions.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
+                    {isAdmin && (
+                      <td style={{ minWidth: 180 }}>
+                        <div className="d-flex gap-1 flex-wrap">
+                          <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditUser(user)} disabled={busyUserId === user.id} title="Edit user">
+                            <FaEdit size={14} />
+                          </button>
+                          <button type="button" className="btn btn-sm btn-warning" onClick={() => handleLogout(user.id)} disabled={busyUserId === user.id} title="Logout user">
+                            <FaSignOutAlt size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+
+              {filteredUsers.length === 0 && (
                 <tr>
                   <td colSpan={isAdmin ? 6 : 4} className="text-center text-muted py-4">
                     No users found
@@ -246,12 +269,7 @@ const ManageUsers = () => {
             </div>
             <div className="btn-group">
               {Array.from({ length: totalPages }, (_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`btn btn-sm ${currentPage === i + 1 ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => setCurrentPage(i + 1)}
-                >
+                <button key={i} type="button" className={`btn btn-sm ${currentPage === i + 1 ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setCurrentPage(i + 1)}>
                   {i + 1}
                 </button>
               ))}
@@ -259,13 +277,9 @@ const ManageUsers = () => {
           </div>
         )}
       </div>
+
       {isAdmin && editUser && (
-        <EditUserModal
-          user={editUser}
-          title="Edit User"
-          onClose={() => setEditUser(null)}
-          onSave={handleEditUser}
-        />
+        <EditUserModal user={editUser} title="Edit User" onClose={() => setEditUser(null)} onSave={handleEditUser} />
       )}
     </PageShell>
   );

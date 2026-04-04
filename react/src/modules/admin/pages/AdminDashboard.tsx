@@ -10,27 +10,27 @@ const AdminDashboard = () => {
   const [userCount, setUserCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-const [activeUsers, setActiveUsers] = useState(0);
-const [pendingUsers, setPendingUsers] = useState(0);
-const [inactiveUsers, setInactiveUsers] = useState(0);
-const [deletedUsers, setDeletedUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [pendingUsers, setPendingUsers] = useState(0);
+  const [inactiveUsers, setInactiveUsers] = useState(0);
+  const [deletedUsers, setDeletedUsers] = useState(0);
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
       try {
         try {
-const res = await getAdminDashboardSummaryApi();
-const dashboard = res.data;
-setUserCount(dashboard?.userCount ?? 0);
-setSubadminCount(dashboard?.subadminCount ?? 0);
-setActiveUsers(dashboard?.activeUsers ?? 0);
-setPendingUsers(dashboard?.pendingUsers ?? 0);
-setInactiveUsers(dashboard?.inactiveUsers ?? 0);
-setDeletedUsers(dashboard?.deletedUsers ?? 0);
+          const res = await getAdminDashboardSummaryApi();
+          const dashboard = res.data;
+          setUserCount(dashboard?.userCount ?? 0);
+          setSubadminCount(dashboard?.subadminCount ?? 0);
+          setActiveUsers(dashboard?.activeUsers ?? 0);
+          setPendingUsers(dashboard?.pendingUsers ?? 0);
+          setInactiveUsers(dashboard?.inactiveUsers ?? 0);
+          setDeletedUsers(dashboard?.deletedUsers ?? 0);
         } catch (err: unknown) {
           const msg = (err as { message?: string })?.message || '';
-          // Backward compatibility while backend process is old and route is unavailable.
+          // Backward compatibility
           if (!msg.toLowerCase().includes('not found')) throw err;
           const [subRes, userRes] = await Promise.all([getSubadminsApi(), getUsersApi()]);
           setSubadminCount(Array.isArray(subRes.data) ? subRes.data.length : 0);
@@ -45,6 +45,15 @@ setDeletedUsers(dashboard?.deletedUsers ?? 0);
     fetch();
   }, []);
 
+  // Function to navigate to users page with a status filter
+  const navigateToUsers = (status?: 'active' | 'pending' | 'inactive' | 'delete') => {
+    if (status) {
+      navigate('/admin/users', { state: { statusFilter: status } });
+    } else {
+      navigate('/admin/users');
+    }
+  };
+
   return (
     <PageShell
       title="Admin Dashboard"
@@ -52,48 +61,52 @@ setDeletedUsers(dashboard?.deletedUsers ?? 0);
       loading={loading}
       loadingMessage="Loading dashboard…"
     >
-<div className="row g-4">
-  {/* Subadmin */}
-  <DashboardStatCard
-    title="Subadmins"
-    value={subadminCount}
-    hint="Total registered subadmins"
-    onClick={() => navigate('/admin/subadmins')}
-  />
+      <div className="row g-4">
+        {/* Subadmin */}
+        <DashboardStatCard
+          title="Subadmins"
+          value={subadminCount}
+          hint="Total registered subadmins"
+          onClick={() => navigate('/admin/subadmins')}
+        />
 
-  {/* Users Total */}
-  <DashboardStatCard
-    title="Users"
-    value={userCount}
-    hint="Total registered users"
-    onClick={() => navigate('/admin/users')}
-  />
+        {/* Users Total */}
+        <DashboardStatCard
+          title="Users"
+          value={userCount}
+          hint="Total registered users"
+          onClick={() => navigateToUsers()}
+        />
 
-  {/* User Status Breakdown */}
-  <DashboardStatCard
-    title="Active Users"
-    value={activeUsers}
-    hint="Currently active users"
-  />
+        {/* User Status Breakdown */}
+        <DashboardStatCard
+          title="Active Users"
+          value={activeUsers}
+          hint="Currently active users"
+          onClick={() => navigateToUsers('active')}
+        />
 
-  <DashboardStatCard
-    title="Pending Users"
-    value={pendingUsers}
-    hint="Users waiting approval"
-  />
+        <DashboardStatCard
+          title="Pending Users"
+          value={pendingUsers}
+          hint="Users waiting approval"
+          onClick={() => navigateToUsers('pending')}
+        />
 
-  <DashboardStatCard
-    title="Inactive Users"
-    value={inactiveUsers}
-    hint="Disabled or inactive users"
-  />
+        <DashboardStatCard
+          title="Inactive Users"
+          value={inactiveUsers}
+          hint="Disabled or inactive users"
+          onClick={() => navigateToUsers('inactive')}
+        />
 
-  <DashboardStatCard
-    title="Deleted Users"
-    value={deletedUsers}
-    hint="Soft deleted users"
-  />
-</div>
+        <DashboardStatCard
+          title="Deleted Users"
+          value={deletedUsers}
+          hint="Soft deleted users"
+          onClick={() => navigate('/admin/users', { state: { statusFilter: 'delete' } })}
+        />
+      </div>
     </PageShell>
   );
 };

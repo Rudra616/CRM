@@ -3,7 +3,10 @@ import { Role } from "../../common/types/role";
 // import { authenticate, allowRoles } from "../../middleware/authMiddleware";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
-import { authenticate,allowRoles } from "../../common/middleware/authMiddleware";
+import {
+  authenticate,
+  allowRoles,
+} from "../../common/middleware/authMiddleware";
 
 import {
   loginSchema,
@@ -14,75 +17,99 @@ import {
   adminUpdateUserProfileSchema,
 } from "../user/user.validation";
 import { updateAdminSchema } from "./admin.validation";
+
+import {
+  getUsers,
+  updateUser,
+  logoutUserByAdmin,
+  updateUserProfileByAdminController,
+  deleteUserByAdmin,
+} from "./controller/user.controller";
+
+import {
+  createSubadmin,
+  getSubadmins,
+  updateSubadmin,
+  deleteSubadmin,
+  changeSubadminPasswordByAdmin,
+} from "./controller/subadmin.controller";
+
 import {
   adminLogin,
   adminLogout,
   getAdminProfile,
   updateAdminProfile,
-  createSubadmin,
-  getSubadmins,
-  updateSubadmin,
-  deleteSubadmin,
   changeAdminPassword,
-  getUsers,
-  updateUser,
-  logoutUserByAdmin,
-  deleteUserByAdmin,
-  updateUserProfileByAdminController,
   getDashboardSummary,
-  changeSubadminPasswordByAdmin,
-} from "./admin.controller";
+} from "./controller/admin.controller";
 
 const router = Router();
 
-// ─── Public ───────────────────────────────────────────────────────────────────
-router.post("/login",  validateSchema(loginSchema), adminLogin);
+// ------------admin------------
+router.post("/login", validateSchema(loginSchema), adminLogin);
 router.post("/logout", adminLogout);
-
-// ─── Protected (admin only) ───────────────────────────────────────────────────
-router.get(
-  "/profile",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  getAdminProfile
-);
-
+router.get("/profile", authenticate, allowRoles(Role.ADMIN), getAdminProfile);
 router.put(
   "/profile",
   authenticate,
   allowRoles(Role.ADMIN),
   uploadSingle("image"),
   validateSchema(updateAdminSchema),
-  updateAdminProfile
+  updateAdminProfile,
 );
-
 router.post(
   "/change-password",
   authenticate,
   allowRoles(Role.ADMIN),
   validateSchema(changePasswordSchema),
-  changeAdminPassword
+  changeAdminPassword,
 );
 router.get(
   "/dashboard-summary",
   authenticate,
   allowRoles(Role.ADMIN),
-  getDashboardSummary
-);
-router.get(
-  "/users",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  getUsers
+  getDashboardSummary,
 );
 
-// ✅ Update user role or status
+// ------------subadmin------------
+router.post(
+  "/subadmins",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  validateSchema(subadminSchema),
+  createSubadmin,
+);
+router.get("/subadmins", authenticate, allowRoles(Role.ADMIN), getSubadmins);
+router.put(
+  "/subadmins/:id",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  validateSchema(updateSubadminProfileSchema),
+  updateSubadmin,
+);
+router.post(
+  "/subadmins/:id/change-password",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  validateSchema(changePasswordSchema),
+  changeSubadminPasswordByAdmin,
+);
+router.delete(
+  "/subadmins/:id",
+  authenticate,
+  allowRoles(Role.ADMIN),
+  deleteSubadmin,
+);
+
+// ------------users------------
+router.get("/users", authenticate, allowRoles(Role.ADMIN), getUsers);
+
 router.patch(
   "/users/:id",
   authenticate,
   allowRoles(Role.ADMIN),
   validateSchema(adminUpdateUserStatusSchema),
-  updateUser
+  updateUser,
 );
 
 router.put(
@@ -90,58 +117,21 @@ router.put(
   authenticate,
   allowRoles(Role.ADMIN),
   validateSchema(adminUpdateUserProfileSchema),
-  updateUserProfileByAdminController
+  updateUserProfileByAdminController,
 );
 
 router.post(
   "/users/:id/logout",
   authenticate,
   allowRoles(Role.ADMIN),
-  logoutUserByAdmin
+  logoutUserByAdmin,
 );
 
 router.delete(
   "/users/:id",
   authenticate,
   allowRoles(Role.ADMIN),
-  deleteUserByAdmin
-);
-router.post(
-  "/subadmins",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  validateSchema(subadminSchema),
-  createSubadmin
-);
-
-router.get(
-  "/subadmins",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  getSubadmins
-);
-
-router.put(
-  "/subadmins/:id",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  validateSchema(updateSubadminProfileSchema),
-  updateSubadmin
-);
-
-router.post(
-  "/subadmins/:id/change-password",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  validateSchema(changePasswordSchema),
-  changeSubadminPasswordByAdmin
-);
-
-router.delete(
-  "/subadmins/:id",
-  authenticate,
-  allowRoles(Role.ADMIN),
-  deleteSubadmin
+  deleteUserByAdmin,
 );
 
 export default router;

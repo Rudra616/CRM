@@ -2,7 +2,14 @@ import { RequestHandler } from "express";
 import { AuthRequest } from "../types/AuthRequest";
 import { signToken, verifyToken } from "../helpers/common.helper";
 import { clearAuthCookie, clearSessionCookies, setAuthCookie } from "../helpers/cookie.helper";
-import { findUserToken, findAdminToken, upsertAdminToken, upsertUserToken } from "../../modules/token.service";
+import {
+  findUserToken,
+  findAdminToken,
+  upsertAdminToken,
+  upsertUserToken,
+  removeUserToken,
+} from "../../modules/token.service";
+import { findUserById } from "../../modules/user/user.service";
 
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authReq = req as AuthRequest;
@@ -26,6 +33,22 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     }
 
     const role = adminTokenRow ? 1 : userTokenRow.role_id;
+
+    // Users and subadmins must still be `active`; admin status changes / deletes revoke tokens, but this
+    // catches race conditions and ensures inactive/pending/deleted accounts cannot keep using the session.
+    if (userTokenRow) {
+      const row = await findUserById(Number(decoded.id));
+      if (!row || row.status !== "active") {
+        try {
+          await removeUserToken(token);
+        } catch {
+          /* ignore */
+        }
+        clearAuthCookie(res);
+        clearSessionCookies(res);
+        return res.status(401).json({ success: false, message: "Session invalid" });
+      }
+    }
 
     // Sliding session: refresh token+cookie when close to expiry.
     const nowSec = Math.floor(Date.now() / 1000);

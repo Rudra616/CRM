@@ -1,10 +1,8 @@
 import db from "../../config/db";
 import { User, RegisterUserDTO, UpdateProfileDTO } from "../../common/types/user";
 
-// Data access helpers for user records (lookup, registration, profile updates, and soft deletes).
 
-// ─── SELECT ───────────────────────────────────────────────────────────────────
-
+// find user name with check delete or not
 export const findUserByUsernameOrEmail = async (
   username: string,
   email: string
@@ -21,6 +19,7 @@ export const findUserByUsernameOrEmail = async (
   }
 };
 
+// check user name exist or not 
 export const findUserByUsername = async (username: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
@@ -34,6 +33,7 @@ export const findUserByUsername = async (username: string): Promise<User | null>
   }
 };
 
+// find user by id 
 export const findUserById = async (id: number): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
@@ -47,6 +47,7 @@ export const findUserById = async (id: number): Promise<User | null> => {
   }
 };
 
+// 
 export const findUserByIdAndRole = async (
   id: number,
   roleId: number
@@ -196,6 +197,3 @@ export const deleteUserByIdAndRole = async (id: number, roleId: number): Promise
   }
 };
 
-
-// NOTE: user_sessions table is no longer used by the application; session invalidation
-// is handled solely via user_tokens / admin_tokens and cookie deletion.

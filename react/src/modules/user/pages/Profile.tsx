@@ -77,34 +77,34 @@ const Profile = () => {
         if (res.data) setProfile({ ...res.data, role: 'admin' });
       } else {
         const res = await getProfileApi();
-if (res.data) {
-  const d = res.data as User & { role_id?: number };
-  const userRole = roleIdToRole(d.role ?? d.role_id);
+        if (res.data) {
+          const d = res.data as User & { role_id?: number };
+          const userRole = roleIdToRole(d.role ?? d.role_id);
 
-  setProfile({
-    ...profile,
-    ...res.data,
-    role: userRole,
-    image_url: res.data.image_url
-      ? res.data.image_url + `?t=${Date.now()}`
-      : res.data.image_url,
-  });
+          setProfile({
+            ...profile,
+            ...res.data,
+            role: userRole,
+            image_url: res.data.image_url
+              ? res.data.image_url + `?t=${Date.now()}`
+              : res.data.image_url,
+          });
 
-  setGender((res.data.gender as Gender) ?? gender);
+          setGender((res.data.gender as Gender) ?? gender);
 
-  login({
-    id: Number((res.data as User).id),
-    username: res.data.username,
-    role: userRole,
-    firstname: res.data.firstname ?? '',
-    lastname: res.data.lastname ?? '',
-    email: res.data.email,
-    phone: (res.data as User).phone ?? '',
-  });
-}
+          login({
+            id: Number((res.data as User).id),
+            username: res.data.username,
+            role: userRole,
+            firstname: res.data.firstname ?? '',
+            lastname: res.data.lastname ?? '',
+            email: res.data.email,
+            phone: (res.data as User).phone ?? '',
+          });
+        }
 
-setProfileImage(null);
-setImageFailed(false);
+        setProfileImage(null);
+        setImageFailed(false);
       }
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load profile');
@@ -177,13 +177,13 @@ setImageFailed(false);
       try {
         const res = await updateAdminProfileWithImageApi(payload, profileImage ?? undefined);
         if (res.data) {
-setProfile({
-  ...profile,
-  ...res.data,
-  image_url: res.data.image_url
-    ? res.data.image_url + `?t=${Date.now()}`
-    : res.data.image_url,
-});          // Update auth context? Not necessary for admin? We'll update user in context
+          setProfile({
+            ...profile,
+            ...res.data,
+            image_url: res.data.image_url
+              ? res.data.image_url + `?t=${Date.now()}`
+              : res.data.image_url,
+          });          // Update auth context? Not necessary for admin? We'll update user in context
           // but admin doesn't have a user object in auth context? Actually we can update.
           // For simplicity, we can just logout if password changed.
         }
@@ -219,14 +219,14 @@ setProfile({
       if (res.data) {
         const d = res.data as User & { role_id?: number };
         const userRole = roleIdToRole(d.role ?? d.role_id);
-setProfile({
-  ...profile,
-  ...res.data,
-  role: userRole,
-  image_url: res.data.image_url
-    ? res.data.image_url + `?t=${Date.now()}`
-    : res.data.image_url,
-});        setGender((res.data.gender as Gender) ?? gender);
+        setProfile({
+          ...profile,
+          ...res.data,
+          role: userRole,
+          image_url: res.data.image_url
+            ? res.data.image_url + `?t=${Date.now()}`
+            : res.data.image_url,
+        }); setGender((res.data.gender as Gender) ?? gender);
         // Update auth context
         login({
           id: Number((res.data as User).id),
@@ -354,27 +354,27 @@ setProfile({
           <form onSubmit={handleUpdate}>
             <ProfileImageBlock />
             <div className="mb-2">
-                <label className="form-label">Username *</label>
-                <input
-                  className={`form-control ${errors.username ? 'is-invalid' : ''}`}
-                  name="username"
-                  value={profile.username ?? ''}
-                  onChange={handleChange}
-                  placeholder="Min 3 characters"
-                />
-                {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
-              </div>
-              <div className="mb-2">
-                <label className="form-label">Email *</label>
-                <input
-                  className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                  type="email"
-                  name="email"
-                  value={profile.email ?? ''}
-                  onChange={handleChange}
-                  placeholder="valid@email.com"
-                />
-                {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
+              <label className="form-label">Username *</label>
+              <input
+                className={`form-control ${errors.username ? 'is-invalid' : ''}`}
+                name="username"
+                value={profile.username ?? ''}
+                onChange={handleChange}
+                placeholder="Min 3 characters"
+              />
+              {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Email *</label>
+              <input
+                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                type="email"
+                name="email"
+                value={profile.email ?? ''}
+                onChange={handleChange}
+                placeholder="valid@email.com"
+              />
+              {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
             </div>
             <div className="mb-3 text-center small">
               <Link to="/admin/change-password" style={authLinkStyle}>
@@ -397,91 +397,91 @@ setProfile({
           <ProfileImageBlock />
 
           <div className="mb-2">
-              <label className="form-label">Username *</label>
-              <input
-                className={`form-control ${errors.username ? 'is-invalid' : ''}`}
-                name="username"
-                value={profile.username ?? ''}
-                onChange={handleChange}
-                placeholder="Min 3 characters"
-              />
-              {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
-            </div>
+            <label className="form-label">Username *</label>
+            <input
+              className={`form-control ${errors.username ? 'is-invalid' : ''}`}
+              name="username"
+              value={profile.username ?? ''}
+              onChange={handleChange}
+              placeholder="Min 3 characters"
+            />
+            {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
+          </div>
 
-            <div className="mb-2">
-              <label className="form-label">First Name *</label>
-              <input
-                className={`form-control ${errors.firstname ? 'is-invalid' : ''}`}
-                name="firstname"
-                value={(profile as User).firstname ?? ''}
-                onChange={handleChange}
-                placeholder="Letters only"
-              />
-              {errors.firstname && <div className="invalid-feedback d-block">{errors.firstname}</div>}
-            </div>
+          <div className="mb-2">
+            <label className="form-label">First Name *</label>
+            <input
+              className={`form-control ${errors.firstname ? 'is-invalid' : ''}`}
+              name="firstname"
+              value={(profile as User).firstname ?? ''}
+              onChange={handleChange}
+              placeholder="Letters only"
+            />
+            {errors.firstname && <div className="invalid-feedback d-block">{errors.firstname}</div>}
+          </div>
 
-            <div className="mb-2">
-              <label className="form-label">Last Name *</label>
-              <input
-                className={`form-control ${errors.lastname ? 'is-invalid' : ''}`}
-                name="lastname"
-                value={(profile as User).lastname ?? ''}
-                onChange={handleChange}
-                placeholder="Letters only"
-              />
-              {errors.lastname && <div className="invalid-feedback d-block">{errors.lastname}</div>}
-            </div>
+          <div className="mb-2">
+            <label className="form-label">Last Name *</label>
+            <input
+              className={`form-control ${errors.lastname ? 'is-invalid' : ''}`}
+              name="lastname"
+              value={(profile as User).lastname ?? ''}
+              onChange={handleChange}
+              placeholder="Letters only"
+            />
+            {errors.lastname && <div className="invalid-feedback d-block">{errors.lastname}</div>}
+          </div>
 
-            <div className="mb-2">
-              <label className="form-label">Email *</label>
-              <input
-                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                type="email"
-                name="email"
-                value={profile.email ?? ''}
-                onChange={handleChange}
-                placeholder="valid@email.com"
-              />
-              {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
-            </div>
+          <div className="mb-2">
+            <label className="form-label">Email *</label>
+            <input
+              className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+              type="email"
+              name="email"
+              value={profile.email ?? ''}
+              onChange={handleChange}
+              placeholder="valid@email.com"
+            />
+            {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
+          </div>
 
-            <div className="mb-2">
-              <label className="form-label">Phone *</label>
-              <input
-                className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
-                name="phone"
-                value={(profile as User).phone ?? ''}
-                onChange={handleChange}
-                placeholder="10 digits only"
-                maxLength={10}
-              />
-              {errors.phone && <div className="invalid-feedback d-block">{errors.phone}</div>}
-            </div>
+          <div className="mb-2">
+            <label className="form-label">Phone *</label>
+            <input
+              className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
+              name="phone"
+              value={(profile as User).phone ?? ''}
+              onChange={handleChange}
+              placeholder="10 digits only"
+              maxLength={10}
+            />
+            {errors.phone && <div className="invalid-feedback d-block">{errors.phone}</div>}
+          </div>
 
-            <div className="mb-2">
-              <label className="form-label">Gender *</label>
-              <select
-                className={`form-select ${errors.gender ? 'is-invalid' : ''}`}
-                value={gender}
-                onChange={(e) => {
-                  setGender(e.target.value as Gender);
-                  clearFieldError('gender');
-                }}
-              >
-                <option value="">----- Select -----</option>
-                {GENDER_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {errors.gender && <div className="invalid-feedback d-block">{errors.gender}</div>}
-            </div>
-            <div className="mb-3 text-center small">
-              <Link to="/change-password" style={authLinkStyle}>
-                Change password
-              </Link>
-            </div>
+          <div className="mb-2">
+            <label className="form-label">Gender *</label>
+            <select
+              className={`form-select ${errors.gender ? 'is-invalid' : ''}`}
+              value={gender}
+              onChange={(e) => {
+                setGender(e.target.value as Gender);
+                clearFieldError('gender');
+              }}
+            >
+              <option value="">----- Select -----</option>
+              {GENDER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {errors.gender && <div className="invalid-feedback d-block">{errors.gender}</div>}
+          </div>
+          <div className="mb-3 text-center small">
+            <Link to="/change-password" style={authLinkStyle}>
+              Change password
+            </Link>
+          </div>
           <button type="submit" className="btn btn-primary w-100" disabled={updating}>
             {updating ? 'Updating...' : 'Update Profile'}
           </button>
