@@ -33,33 +33,35 @@ const ManageUsers = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   // Pick up dashboard filter state
+  useEffect(() => {
+    const status = (location.state as any)?.statusFilter;
+    if (status) {
+      setStatusFilter(status);
+      setCurrentPage(1); // start fresh
+    }
+  }, [location.state]);
 useEffect(() => {
-  const status = (location.state as any)?.statusFilter;
-  if (status) {
-    setStatusFilter(status);
-    setCurrentPage(1); // start fresh
-  }
-}, [location.state]);
   const fetchUsers = async () => {
+    const effectiveStatus = statusFilter === 'all' ? undefined : statusFilter;
     setLoading(true);
     try {
       if (isAdmin) {
-        const res = await getAdminUsersApi(currentPage, rowsPerPage);
-        const list = Array.isArray(res.data?.items) ? res.data.items : [];
-        setUsers(list);
-        setTotalRows(Number(res.data?.pagination?.total ?? 0));
-        setTotalPages(Number(res.data?.pagination?.totalPages ?? 1));
+        const res = await getAdminUsersApi(currentPage, rowsPerPage, effectiveStatus);
+        const data = res.data;
+        setUsers(data?.items || []);
+        setTotalRows(data?.pagination?.total || 0);
+        setTotalPages(data?.pagination?.totalPages || 1);
         const drafts: Record<string, 'active' | 'pending' | 'inactive' | 'delete'> = {};
-        for (const u of list) {
-          drafts[String(u.id)] = (u.status as 'active' | 'pending' | 'inactive' | 'delete') || 'active';
+        for (const u of (data?.items || [])) {
+          drafts[String(u.id)] = (u.status as any) || 'active';
         }
         setStatusDraft(drafts);
       } else {
-        const res = await getUsersApi();
-        const list = Array.isArray(res.data) ? res.data : [];
-        setUsers(list);
-        setTotalRows(list.length);
-        setTotalPages(Math.max(1, Math.ceil(list.length / rowsPerPage)));
+        const res = await getUsersApi(currentPage, rowsPerPage, effectiveStatus);
+        const data = res.data;
+        setUsers(data?.items || []);
+        setTotalRows(data?.pagination?.total || 0);
+        setTotalPages(data?.pagination?.totalPages || 1);
       }
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load users');
@@ -68,22 +70,13 @@ useEffect(() => {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, [currentPage, isAdmin]);
+  fetchUsers();
+}, [currentPage, isAdmin, statusFilter]); // ✅ re-runs with fresh values every time
 
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-const filteredAllUsers = users.filter(user =>
-  statusFilter === 'all' ? true : (user.status || 'active') === statusFilter
-);
 
-const currentUsers = isAdmin
-  ? filteredAllUsers
-  : filteredAllUsers.slice(startIndex, endIndex);
-
-const filteredUsers = currentUsers;
-
+  const filteredUsers = users;
   const theadStyle = { backgroundColor: colors.cardPrimaryBg };
   const statusOptions: Array<'active' | 'pending' | 'inactive' | 'delete'> = ['active', 'pending', 'inactive', 'delete'];
 
@@ -94,10 +87,10 @@ const filteredUsers = currentUsers;
       const res = await updateUserStatusApi(id, next);
       const updated = res.data;
 
-      // Always update user status, even for "delete"
+      // In handleUpdateStatus, after success, update users array correctly:
       setUsers(prev =>
         prev.map(u =>
-          u.id === id ? { ...u, ...(updated || {}), status: next } : u
+          u.id === id ? { ...u, status: next } : u  // ← ensure status is updated
         )
       );
 
@@ -158,8 +151,10 @@ const filteredUsers = currentUsers;
               className="form-select form-select-sm"
               style={{ maxWidth: 150 }}
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-            >
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}            >
               <option value="all">All</option>
               {statusOptions.map(s => (
                 <option key={s} value={s}>{s}</option>
@@ -194,15 +189,14 @@ const filteredUsers = currentUsers;
                       <td style={{ minWidth: 180 }}>
                         <div className="d-flex align-items-center gap-2">
                           <span
-                            className={`badge text-capitalize ${
-                              currentStatus === 'active'
-                                ? 'bg-success'
-                                : currentStatus === 'pending'
-                                  ? 'bg-warning text-dark'
-                                  : currentStatus === 'inactive'
-                                    ? 'bg-secondary'
-                                    : 'bg-danger'
-                            }`}
+                            className={`badge text-capitalize ${currentStatus === 'active'
+                              ? 'bg-success'
+                              : currentStatus === 'pending'
+                                ? 'bg-warning text-dark'
+                                : currentStatus === 'inactive'
+                                  ? 'bg-secondary'
+                                  : 'bg-danger'
+                              }`}
                           >
                             {currentStatus}
                           </span>
@@ -213,17 +207,10 @@ const filteredUsers = currentUsers;
                               className="form-select form-select-sm text-capitalize"
                               style={{ maxWidth: 120 }}
                               value={currentStatus}
-                              onChange={(e) =>
-                                setStatusDraft(p => ({
-                                  ...p,
-                                  [String(user.id)]: e.target.value as any
-                                }))
-                              }
-                              onBlur={async (e) => {
-                                const next = (e.target.value || currentStatus) as any;
-                                if (next !== user.status) {
-                                  await handleUpdateStatus(user, next);
-                                }
+                              disabled={busyUserId === user.id}
+                              onChange={async (e) => {
+                                const next = e.target.value as 'active' | 'pending' | 'inactive' | 'delete';
+                                await handleUpdateStatus(user, next);
                               }}
                             >
                               {statusOptions.map(s => (

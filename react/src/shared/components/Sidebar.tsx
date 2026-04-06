@@ -26,29 +26,12 @@ const Sidebar = ({ role }: Props) => {
   const { collapsed, setCollapsed, sidebarOpen, setSidebarOpen, isMobile } = useSidebar();
   const { user } = useAuth();
   const username = user?.username ?? 'User';
-  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getProfilePath = () => (role === 'admin' ? '/admin/profile' : '/profile');
 
   const nav = (path: string) => () => {
     navigate(path);
     if (isMobile) setSidebarOpen(false);
-  };
-
-  const handleMouseEnter = () => {
-    if (collapseTimerRef.current) {
-      clearTimeout(collapseTimerRef.current);
-      collapseTimerRef.current = null;
-    }
-    if (!isMobile && collapsed) setCollapsed(false);
-  };
-
-  const handleMouseLeave = () => {
-    if (isMobile) return;
-    collapseTimerRef.current = setTimeout(() => {
-      if (!collapsed) setCollapsed(true);
-      collapseTimerRef.current = null;
-    }, COLLAPSE_DELAY_MS);
   };
 
   return (
@@ -69,19 +52,16 @@ const Sidebar = ({ role }: Props) => {
         />
       )}
 
-      <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
         <ProSidebar
           collapsed={isMobile ? false : collapsed}
           width={`${SIDEBAR_WIDTH}px`}
           collapsedWidth="70px"
-          transitionDuration={500}
           style={{
             position: 'fixed',
             top: 56,
             left: isMobile ? (sidebarOpen ? 0 : -SIDEBAR_WIDTH - 20) : 0,
             height: 'calc(100vh - 56px)',
             maxWidth: '85vw',
-            transition: 'left 0.5s ease, width 1s ease',
             zIndex: 1002,
           }}
           backgroundColor={colors.sidebarBg}
@@ -143,7 +123,6 @@ const Sidebar = ({ role }: Props) => {
             )}
           </Menu>
         </ProSidebar>
-      </div>
     </>
   );
 };

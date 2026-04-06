@@ -247,11 +247,6 @@ export const verifyResetToken = async (req: Request, res: Response) => {
   }
 };
 
-// Lightweight auth check so the client can detect revoked sessions without a full page reload.
-export const pingSession: RequestHandler = (_req, res) => {
-  return successResponse(res, "ok", { ok: true }, 200);
-};
-
 // Change password for an authenticated user and invalidate all their tokens.
 export const changePassword: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;

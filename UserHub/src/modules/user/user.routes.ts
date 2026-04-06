@@ -21,7 +21,6 @@ import {
   resetPassword,
   verifyResetToken,
   changePassword,
-  pingSession,
 } from "./user.controller";
 
 const router = Router();
@@ -35,13 +34,6 @@ router.post("/reset-password", validateSchema(resetPasswordSchema), resetPasswor
 router.post("/verify-reset-token", verifyResetToken);
 
 // ─── Protected (user / subadmin) ──────────────────────────────────────────────
-router.get(
-  "/session/ping",
-  authenticate,
-  allowRoles(Role.USER, Role.SUBADMIN),
-  pingSession
-);
-
 router.get(
   "/profile",
   authenticate,

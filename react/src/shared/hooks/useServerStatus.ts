@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { checkHealth, subscribe, subscribeRecovered } from '../utils/serverStatus';
+import { subscribe, subscribeRecovered, notifyServerRecovered } from '../utils/serverStatus';
 
+/**
+ * “Server down” is driven only by real API failures (axios), not a /health probe.
+ */
 export const useServerStatus = () => {
   const [serverDown, setServerDown] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -8,10 +11,8 @@ export const useServerStatus = () => {
   const attemptRecovery = useCallback(async () => {
     setIsChecking(true);
     try {
-      await checkHealth();
+      notifyServerRecovered();
       setServerDown(false);
-    } catch {
-      // stay down
     } finally {
       setIsChecking(false);
     }
@@ -25,16 +26,6 @@ export const useServerStatus = () => {
       unsubUp();
     };
   }, []);
-
-  useEffect(() => {
-    checkHealth().catch(() => setServerDown(true));
-  }, []);
-
-  useEffect(() => {
-    if (!serverDown) return;
-    const id = setInterval(attemptRecovery, 5000);
-    return () => clearInterval(id);
-  }, [serverDown, attemptRecovery]);
 
   return { serverDown, isChecking, attemptRecovery };
 };

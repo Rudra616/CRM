@@ -80,8 +80,8 @@ const ServerDownOverlay: React.FC<Props> = ({ onRetry, isChecking }) => {
           lineHeight: 1.5
         }}
       >
-        Please try again later. We'll automatically retry when the server is
-        back.
+        The last request could not reach the server. Use Retry when your
+        backend is running, or try again after fixing your connection.
       </p>
 
       <button

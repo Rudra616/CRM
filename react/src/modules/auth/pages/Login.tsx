@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { loginApi, adminLoginApi } from '../api/auth.api';
+import { loginApi, adminLoginApi, logoutApi, logoutAdminApi } from '../api/auth.api';
+import { clearClientAuthStorage } from '../../../shared/utils/authSession';
 import { validateLoginFields } from '../../../shared/utils/validation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import { showError, showSuccess,showInfo } from '../../../shared/utils/toast';
@@ -26,6 +27,12 @@ const Login = () => {
   const isAdminRoute =
     location.pathname === '/admin' || location.pathname === '/admin/login';
   const sessionMsgShown = useRef(false);
+
+  useEffect(() => {
+    clearClientAuthStorage();
+    const clearServerSession = isAdminRoute ? logoutAdminApi : logoutApi;
+    void clearServerSession().catch(() => {});
+  }, [isAdminRoute]);
 
   useEffect(() => {
     if (sessionMsgShown.current || searchParams.get('reason') !== 'session') return;

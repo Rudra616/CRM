@@ -20,15 +20,38 @@ export type AdminDashboardSummary = {
   inactiveUsers: number;
   deletedUsers: number;
 };
-export const getUsersApi = (): Promise<ApiResponse<User[]>> => {
-  return apiRequest<User[]>('GET', '/users');
+export const getUsersApi = (
+  page: number,
+  limit: number,
+  statusFilter?: string
+): Promise<ApiResponse<UsersPageData>> => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  if (statusFilter && statusFilter !== 'all') {
+    params.append('status', statusFilter);
+  }
+
+return apiRequest<UsersPageData>('GET', `/users?${params.toString()}`);
 };
 
 export const getAdminUsersApi = (
-  page = 1,
-  limit = 10
-): Promise<ApiResponse<UsersPageData>> => {
-  return apiRequest<UsersPageData>('GET', `/admin/users?page=${page}&limit=${limit}`);
+  page: number,
+  limit: number,
+  statusFilter?: string
+) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  if (statusFilter && statusFilter !== 'all') {
+    params.append('status', statusFilter);
+  }
+
+  return apiRequest('GET', `/admin/users?${params.toString()}`);
 };
 
 export const getAdminDashboardSummaryApi = (): Promise<ApiResponse<AdminDashboardSummary>> => {

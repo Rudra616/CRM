@@ -19,9 +19,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(UPLOADS_ROOT));
 app.use(cookieParser());
 
-
-app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
-
 app.use("/api/admin", adminRoutes);
 app.use("/api",       userRoutes);
 

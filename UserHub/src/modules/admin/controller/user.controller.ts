@@ -24,8 +24,9 @@ export const getUsers = async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1); // keep page from query
     const limit = 10; // always 10 users per page
+    const status = req.query.status as string | undefined; // ✅ read from query
 
-    const { items, total } = await getUsersPaginatedByRole(Role.USER, page, limit);
+    const { items, total } = await getUsersPaginatedByRole(Role.USER, page, limit, status);
 
     return successResponse(
       res,

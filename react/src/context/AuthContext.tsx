@@ -3,8 +3,8 @@ import { roleIdToRole } from '../shared/utils/roleUtils';
 import type { UserInfo } from '../shared/types/common.types';
 import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
 import { getAdminProfileApi } from '../modules/admin/api/admin.api';
-import { pingSessionApi } from '../modules/user/api/user.api';
-import { clearClientAuthStorage } from '../shared/utils/authSession';
+import { getProfileApi } from '../modules/user/api/user.api';
+import { clearClientAuthStorage, isPublicAuthPath } from '../shared/utils/authSession';
 
 interface AuthContextType {
   user: UserInfo | null;
@@ -55,67 +55,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const path = window.location.pathname;
-    const isAdminRoute =
-      path === '/admin' ||
-      path === '/admin/login' ||
-      path.startsWith('/admin/');
 
-    if (!isAdminRoute) {
+    if (isPublicAuthPath(path)) {
       setIsLoading(false);
       return;
     }
 
-    const loadAdmin = async () => {
-      try {
-        const res = await getAdminProfileApi();
-        if (res.data) {
-          login({
-            id: Number(res.data.id),
-            username: res.data.username,
-            email: res.data.email,
-            role: 'admin',
-            firstname: '',
-            lastname: '',
-            phone: '',
-          });
-        }
-      } catch {
-        clearClientAuthStorage();
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const isAdminApp = path.startsWith('/admin/') && !path.startsWith('/admin/login');
 
-    loadAdmin();
+    if (isAdminApp) {
+      setIsLoading(true);
+      void (async () => {
+        try {
+          const res = await getAdminProfileApi();
+          if (res.data) {
+            login({
+              id: Number(res.data.id),
+              username: res.data.username,
+              email: res.data.email,
+              role: 'admin',
+              firstname: '',
+              lastname: '',
+              phone: '',
+            });
+          }
+        } catch {
+          clearClientAuthStorage();
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+      return;
+    }
+
+    const needsUserBootstrap =
+      path.startsWith('/user/') ||
+      path.startsWith('/subadmin/') ||
+      path === '/profile' ||
+      path === '/change-password' ||
+      path === '/users';
+
+    if (needsUserBootstrap) {
+      setIsLoading(true);
+      void (async () => {
+        try {
+          const res = await getProfileApi();
+          const p = res.data;
+          if (p) {
+            const row = p as typeof p & { role_id?: number };
+            login(
+              normalizeUser({
+                id: Number(row.id),
+                username: row.username,
+                email: row.email,
+                role_id: row.role_id,
+                role: row.role,
+                firstname: row.firstname ?? '',
+                lastname: row.lastname ?? '',
+                phone: row.phone ?? '',
+              } as UserInfo & { role_id?: number })
+            );
+          }
+        } catch {
+          clearClientAuthStorage();
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+      return;
+    }
+
+    setIsLoading(false);
   }, []);
 
-  // User/subadmin: periodic + focus ping so admin status/delete invalidates the session without a manual reload.
-  useEffect(() => {
-    const u = user;
-    if (!u || (u.role !== 'user' && u.role !== 'subadmin')) return;
-
-    const ping = () => {
-      if (document.visibilityState !== 'visible') return;
-      void pingSessionApi().catch(() => {
-        /* 401: axios interceptor clears storage and redirects */
-      });
-    };
-
-    const t = window.setInterval(ping, 20000);
-    const onVis = () => {
-      if (document.visibilityState === 'visible') ping();
-    };
-
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('focus', ping);
-    ping();
-
-    return () => {
-      window.clearInterval(t);
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('focus', ping);
-    };
-  }, [user?.role, user?.id]);
+  // Session validity is checked on each real API call (auth middleware + axios 401), not a background ping.
 
   return (
     <AuthContext.Provider

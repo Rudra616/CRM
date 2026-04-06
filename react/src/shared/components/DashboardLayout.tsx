@@ -27,7 +27,6 @@ const DashboardLayout = ({ role: roleProp, children }: Props) => {
           flex: 1,
           padding: '20px',
           marginLeft: isMobile ? 0 : collapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH,
-          transition: 'margin-left 0.5s ease',
           width: '100%',
         }}
       >
