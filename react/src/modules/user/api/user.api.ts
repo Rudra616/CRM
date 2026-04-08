@@ -10,7 +10,14 @@ export const getProfileApi = (): Promise<ApiResponse<User>> => {
 export const updateProfileApi = (
   data: UpdateProfileRequest
 ): Promise<ApiResponse<User>> => {
-  return apiRequest<User>('PUT', '/profile', data);
+  return apiRequest<User>('PUT', '/profile', {
+    username: data.username,
+    first_name: data.firstname,
+    last_name: data.lastname,
+    email: data.email,
+    phone: data.phone,
+    gender: data.gender,
+  });
 };
 
 export const updateProfileWithImageApi = async (
@@ -19,8 +26,8 @@ export const updateProfileWithImageApi = async (
 ): Promise<ApiResponse<User>> => {
   const formData = new FormData();
   formData.append('username', data.username);
-  formData.append('firstname', data.firstname);
-  formData.append('lastname', data.lastname);
+  formData.append('first_name', data.firstname);
+  formData.append('last_name', data.lastname);
   formData.append('email', data.email);
   formData.append('phone', data.phone);
   if (data.gender) formData.append('gender', data.gender);
@@ -34,6 +41,29 @@ export const changeUserPasswordApi = (body: {
   confirmPassword: string;
 }): Promise<ApiResponse<null>> => {
   return apiRequest<null>('POST', '/change-password', body);
+};
+
+export const getSubadminProfileApi = (): Promise<ApiResponse<Admin>> => {
+  return apiRequest<Admin>('GET', '/subadmin/profile');
+};
+
+export const updateSubadminProfileWithImageApi = async (
+  data: { username: string; email: string },
+  imageFile?: File | null
+): Promise<ApiResponse<Admin>> => {
+  const formData = new FormData();
+  formData.append('username', data.username);
+  formData.append('email', data.email);
+  if (imageFile) formData.append('image', imageFile);
+  const res = await axiosClient.put<ApiResponse<Admin>>('/subadmin/profile', formData);
+  return res.data;
+};
+
+export const changeSubadminPasswordApi = (body: {
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<ApiResponse<null>> => {
+  return apiRequest<null>('POST', '/subadmin/change-password', body);
 };
 
 export const getAdminProfileApi = (): Promise<ApiResponse<Admin>> => {

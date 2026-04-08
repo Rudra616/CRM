@@ -21,6 +21,13 @@ export const adminLoginApi = (
   return apiRequest<AdminLoginResponse>('POST', '/admin/login', { username, password });
 };
 
+export const subadminLoginApi = (
+  username: string,
+  password: string
+): Promise<ApiResponse<AdminLoginResponse>> => {
+  return apiRequest<AdminLoginResponse>('POST', '/subadmin/login', { username, password });
+};
+
 export const logoutApi = (): Promise<ApiResponse<null>> => {
   return apiRequest<null>('POST', '/logout');
 };
@@ -29,16 +36,36 @@ export const logoutAdminApi = (): Promise<ApiResponse<null>> => {
   return apiRequest<null>('POST', '/admin/logout');
 };
 
+export const logoutSubadminApi = (): Promise<ApiResponse<null>> => {
+  return apiRequest<null>('POST', '/subadmin/logout');
+};
+
 export const registerApi = (
   data: RegisterRequest
 ): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('POST', '/register', data);
+  return apiRequest<null>('POST', '/register', {
+    username: data.username,
+    email: data.email,
+    password: data.password,
+    first_name: data.firstname,
+    last_name: data.lastname,
+    phone: data.phone,
+    gender: data.gender,
+  });
 };
 
 export const createSubadminApi = (
   data: CreateSubadminRequest
 ): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('POST', '/admin/subadmins', data);
+  return apiRequest<null>('POST', '/admin/subadmins', {
+    username: data.username,
+    email: data.email,
+    password: data.password,
+    first_name: data.firstname,
+    last_name: data.lastname,
+    phone: data.phone,
+    gender: data.gender,
+  });
 };
 
 export const forgotPasswordApi = (email: string) =>

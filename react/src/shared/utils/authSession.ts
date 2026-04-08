@@ -1,11 +1,13 @@
 
 
-const STORAGE_KEYS_TO_CLEAR = ['user', 'token', 'refreshToken'] as const;
+const STORAGE_KEYS_TO_CLEAR = ['user', 'user_info', 'token', 'refreshToken', 'accessToken'] as const;
 
 export const PUBLIC_AUTH_PATHS = [
   '/login',
   '/admin',
   '/admin/login',
+  '/subadmin',
+  '/subadmin/login',
   '/register',
   '/forgot-password',
   '/reset-password',

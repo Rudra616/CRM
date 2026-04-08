@@ -4,7 +4,7 @@ import { PageShell } from '../../../shared/components/PageShell';
 import { colors } from '../../../theme/colors';
 import { validateResetPasswordFields } from '../../../shared/utils/validation';
 import { showError, showSuccess } from '../../../shared/utils/toast';
-import { changeUserPasswordApi } from '../api/user.api';
+import { changeUserPasswordApi, changeSubadminPasswordApi } from '../api/user.api';
 import { changeAdminPasswordApi } from '../../admin/api/admin.api';
 import { useAuth } from '../../../context/AuthContext';
 import { clearClientAuthStorage } from '../../../shared/utils/authSession';
@@ -25,6 +25,7 @@ const formPanelStyle: React.CSSProperties = {
 const ChangePassword = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isSubadmin = user?.role === 'subadmin';
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -44,10 +45,17 @@ const ChangePassword = () => {
     try {
       const body = { newPassword, confirmPassword };
       if (isAdmin) await changeAdminPasswordApi(body);
+      else if (isSubadmin) await changeSubadminPasswordApi(body);
       else await changeUserPasswordApi(body);
       showSuccess('Password updated. Please sign in again.');
       clearClientAuthStorage();
-      window.location.replace(isAdmin ? '/admin/login?reason=session' : '/login?reason=session');
+      window.location.replace(
+        isAdmin
+          ? '/admin/login?reason=session'
+          : isSubadmin
+            ? '/subadmin/login?reason=session'
+            : '/login?reason=session'
+      );
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to change password');
     } finally {

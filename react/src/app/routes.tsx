@@ -27,6 +27,8 @@ export const AppRoutes = () => (
     <Route path="/login" element={<Login />} />
     <Route path="/admin" element={<Login />} />
     <Route path="/admin/login" element={<Login />} />
+    <Route path="/subadmin" element={<Login />} />
+    <Route path="/subadmin/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
     <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/reset-password" element={<ResetPassword />} />
@@ -43,7 +45,7 @@ export const AppRoutes = () => (
 
       {/* Subadmin routes */}
       <Route path="/subadmin/dashboard" element={<ProtectedRoute roles={['subadmin']}><SubadminDashboard /></ProtectedRoute>} />
-      <Route path="/users" element={<ProtectedRoute roles={['subadmin']}><ManageUsers /></ProtectedRoute>} />
+      <Route path="/subadmin/users" element={<ProtectedRoute roles={['subadmin']}><ManageUsers /></ProtectedRoute>} />
 
       {/* User routes */}
       <Route path="/user/dashboard" element={<ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>} />

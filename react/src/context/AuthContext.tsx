@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { roleIdToRole } from '../shared/utils/roleUtils';
 import type { UserInfo } from '../shared/types/common.types';
-import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
+import { logoutAdminApi, logoutApi, logoutSubadminApi } from '../modules/auth/api/auth.api';
 import { getAdminProfileApi } from '../modules/admin/api/admin.api';
 import { getProfileApi } from '../modules/user/api/user.api';
 import { clearClientAuthStorage, isPublicAuthPath } from '../shared/utils/authSession';
@@ -42,6 +42,8 @@ const logout = async (): Promise<void> => {
   try {
     if (currentRole === 'admin') {
       await logoutAdminApi();
+      } else if (currentRole === 'subadmin') {
+        await logoutSubadminApi();
     } else {
       await logoutApi();
     }
@@ -111,8 +113,14 @@ useEffect(() => {
                 email: row.email,
                 role_id: row.role_id,
                 role: row.role,
-                firstname: row.firstname ?? '',
-                lastname: row.lastname ?? '',
+                firstname:
+                  (row as unknown as { firstname?: string; first_name?: string }).firstname ??
+                  (row as unknown as { first_name?: string }).first_name ??
+                  '',
+                lastname:
+                  (row as unknown as { lastname?: string; last_name?: string }).lastname ??
+                  (row as unknown as { last_name?: string }).last_name ??
+                  '',
                 phone: row.phone ?? '',
               } as UserInfo & { role_id?: number })
             );

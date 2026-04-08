@@ -109,7 +109,7 @@ const Sidebar = ({ role }: Props) => {
             {role === 'subadmin' && (
               <>
                 <MenuItem icon={<FaTachometerAlt />} onClick={nav('/subadmin/dashboard')}>Dashboard</MenuItem>
-                <MenuItem icon={<FaUsers />} onClick={nav('/users')}>Manage Users</MenuItem>
+                <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/users')}>Manage Users</MenuItem>
                 <MenuItem icon={<FaUser />} onClick={nav('/profile')}>Profile</MenuItem>
                 <MenuItem icon={<FaKey />} onClick={nav('/change-password')}>Change password</MenuItem>
               </>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { loginApi, adminLoginApi, logoutApi, logoutAdminApi } from '../api/auth.api';
+import { loginApi, adminLoginApi, subadminLoginApi } from '../api/auth.api';
 import { clearClientAuthStorage } from '../../../shared/utils/authSession';
 import { validateLoginFields } from '../../../shared/utils/validation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
@@ -13,8 +13,10 @@ const toUserInfo = (u: User | Admin): UserInfo => ({
   username: u.username,
   email: u.email,
   role: u.role,
-  firstname: 'firstname' in u ? (u.firstname ?? '') : '',
-  lastname: 'lastname' in u ? (u.lastname ?? '') : '',
+  firstname:
+    ('firstname' in u ? u.firstname : (u as unknown as { first_name?: string }).first_name) ?? '',
+  lastname:
+    ('lastname' in u ? u.lastname : (u as unknown as { last_name?: string }).last_name) ?? '',
   phone: 'phone' in u ? (u.phone ?? '') : '',
 });
 
@@ -26,13 +28,14 @@ const Login = () => {
 
   const isAdminRoute =
     location.pathname === '/admin' || location.pathname === '/admin/login';
+  const isSubadminRoute =
+    location.pathname === '/subadmin' || location.pathname === '/subadmin/login';
   const sessionMsgShown = useRef(false);
 
   useEffect(() => {
+    // Login page should not trigger extra network calls.
     clearClientAuthStorage();
-    const clearServerSession = isAdminRoute ? logoutAdminApi : logoutApi;
-    void clearServerSession().catch(() => {});
-  }, [isAdminRoute]);
+  }, [isAdminRoute, isSubadminRoute]);
 
   useEffect(() => {
     if (sessionMsgShown.current || searchParams.get('reason') !== 'session') return;
@@ -57,14 +60,16 @@ const Login = () => {
     try {
       const response = isAdminRoute
         ? await adminLoginApi(username, password)
-        : await loginApi(username, password);
+        : isSubadminRoute
+          ? await subadminLoginApi(username, password)
+          : await loginApi(username, password);
 
       if (!response.data) {
         showError(response.message);
         return;
       }
 
-      const apiUser = isAdminRoute
+      const apiUser = (isAdminRoute || isSubadminRoute)
         ? (response.data as { admin?: Admin }).admin
         : (response.data as { user?: User }).user;
 
@@ -91,6 +96,8 @@ const Login = () => {
       subtitle={
         isAdminRoute
           ? 'Administrator access'
+          : isSubadminRoute
+            ? 'Subadmin access'
           : ''
       }
     >
@@ -126,9 +133,9 @@ const Login = () => {
           {errors.password && <div className="invalid-feedback d-block">{errors.password}</div>}
         </div>
         <button type="submit" className="btn btn-primary w-100 mb-2">
-          {isAdminRoute ? 'Sign in as admin' : 'Sign in'}
+          {isAdminRoute ? 'Sign in as admin' : isSubadminRoute ? 'Sign in as subadmin' : 'Sign in'}
         </button>
-        {!isAdminRoute && (
+        {!isAdminRoute && !isSubadminRoute && (
           <div className="text-center small text-muted mt-3">
             <div className="mb-2">
               <span>No account? </span>

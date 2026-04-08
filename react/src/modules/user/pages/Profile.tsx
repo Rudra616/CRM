@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { getProfileApi, updateProfileWithImageApi, getAdminProfileApi, updateAdminProfileWithImageApi } from '../api/user.api';
+import {
+  getProfileApi,
+  updateProfileWithImageApi,
+  getAdminProfileApi,
+  updateAdminProfileWithImageApi,
+  getSubadminProfileApi,
+  updateSubadminProfileWithImageApi,
+} from '../api/user.api';
 import { showSuccess, showError } from '../../../shared/utils/toast';
 import { validateProfileFields, validateAdminProfileFields } from '../../../shared/utils/validation';
 import { validateProfileImage } from '../../../shared/utils/imageValidation';
@@ -51,6 +58,7 @@ const Profile = () => {
   const { user, login } = useAuth();
   const role = user?.role;
   const isAdmin = role === 'admin';
+  const isSubadmin = role === 'subadmin';
 
   useEffect(() => {
     if (isAdmin && location.pathname === '/profile') {
@@ -75,15 +83,26 @@ const Profile = () => {
       if (isAdmin) {
         const res = await getAdminProfileApi();
         if (res.data) setProfile({ ...res.data, role: 'admin' });
+      } else if (isSubadmin) {
+        const res = await getSubadminProfileApi();
+        if (res.data) setProfile({ ...res.data, role: 'subadmin' });
       } else {
         const res = await getProfileApi();
         if (res.data) {
-          const d = res.data as User & { role_id?: number };
+          const d = res.data as User & {
+            role_id?: number;
+            first_name?: string;
+            last_name?: string;
+          };
           const userRole = roleIdToRole(d.role ?? d.role_id);
+          const firstName = d.firstname ?? d.first_name ?? '';
+          const lastName = d.lastname ?? d.last_name ?? '';
 
           setProfile({
             ...profile,
             ...res.data,
+            firstname: firstName,
+            lastname: lastName,
             role: userRole,
             image_url: res.data.image_url
               ? res.data.image_url + `?t=${Date.now()}`
@@ -96,8 +115,8 @@ const Profile = () => {
             id: Number((res.data as User).id),
             username: res.data.username,
             role: userRole,
-            firstname: res.data.firstname ?? '',
-            lastname: res.data.lastname ?? '',
+            firstname: firstName,
+            lastname: lastName,
             email: res.data.email,
             phone: (res.data as User).phone ?? '',
           });
@@ -115,7 +134,7 @@ const Profile = () => {
 
   useEffect(() => {
     fetchProfile();
-  }, [isAdmin]);
+  }, [isAdmin, isSubadmin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile) return;
@@ -161,7 +180,7 @@ const Profile = () => {
     if (!profile || updating) return;
     resetErrors();
 
-    if (isAdmin) {
+    if (isAdmin || isSubadmin) {
       const payload = {
         username: String(profile.username ?? '').trim(),
         email: String(profile.email ?? '').trim(),
@@ -175,7 +194,9 @@ const Profile = () => {
 
       setUpdating(true);
       try {
-        const res = await updateAdminProfileWithImageApi(payload, profileImage ?? undefined);
+        const res = isAdmin
+          ? await updateAdminProfileWithImageApi(payload, profileImage ?? undefined)
+          : await updateSubadminProfileWithImageApi(payload, profileImage ?? undefined);
         if (res.data) {
           setProfile({
             ...profile,
@@ -217,11 +238,19 @@ const Profile = () => {
     try {
       const res = await updateProfileWithImageApi(payload, profileImage ?? undefined);
       if (res.data) {
-        const d = res.data as User & { role_id?: number };
+        const d = res.data as User & {
+          role_id?: number;
+          first_name?: string;
+          last_name?: string;
+        };
         const userRole = roleIdToRole(d.role ?? d.role_id);
+        const firstName = d.firstname ?? d.first_name ?? '';
+        const lastName = d.lastname ?? d.last_name ?? '';
         setProfile({
           ...profile,
           ...res.data,
+          firstname: firstName,
+          lastname: lastName,
           role: userRole,
           image_url: res.data.image_url
             ? res.data.image_url + `?t=${Date.now()}`
@@ -232,8 +261,8 @@ const Profile = () => {
           id: Number((res.data as User).id),
           username: res.data.username,
           role: userRole,
-          firstname: res.data.firstname ?? '',
-          lastname: res.data.lastname ?? '',
+          firstname: firstName,
+          lastname: lastName,
           email: res.data.email,
           phone: (res.data as User).phone ?? '',
         });
@@ -347,9 +376,12 @@ const Profile = () => {
     );
   }
 
-  if (isAdmin) {
+  if (isAdmin || isSubadmin) {
     return (
-      <PageShell title="Admin Profile" subtitle="Update your admin account">
+      <PageShell
+        title={isAdmin ? "Admin Profile" : "Subadmin Profile"}
+        subtitle={isAdmin ? "Update your admin account" : "Update your subadmin account"}
+      >
         <div style={profileFormPanelStyle}>
           <form onSubmit={handleUpdate}>
             <ProfileImageBlock />
@@ -377,7 +409,7 @@ const Profile = () => {
               {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
             </div>
             <div className="mb-3 text-center small">
-              <Link to="/admin/change-password" style={authLinkStyle}>
+              <Link to={isAdmin ? "/admin/change-password" : "/change-password"} style={authLinkStyle}>
                 Change password
               </Link>
             </div>

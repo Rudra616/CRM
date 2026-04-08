@@ -42,6 +42,27 @@ export const getUsersApi = (
   return apiRequest<UsersPageData>('GET', `/users?${params.toString()}`);
 };
 
+export const getSubadminUsersApi = (
+  page: number,
+  limit: number,
+  statusFilter?: string,
+  search?: string
+): Promise<ApiResponse<UsersPageData>> => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  if (statusFilter && statusFilter !== 'all') {
+    params.append('status', statusFilter);
+  }
+  if (search && search.trim() !== '') {
+    params.append('search', search.trim());
+  }
+
+  return apiRequest<UsersPageData>('GET', `/subadmin/users?${params.toString()}`);
+};
+
 export const getAdminUsersApi = (
   page: number,
   limit: number,
@@ -89,7 +110,11 @@ export const updateSubadminApi = (
   id: string | number,
   data: UpdateUserRequest
 ): Promise<ApiResponse<User>> => {
-  return apiRequest<User>('PUT', `/admin/subadmins/${id}`, data);
+  return apiRequest<User>('PUT', `/admin/subadmins/${id}`, {
+    ...data,
+    first_name: (data as unknown as { firstname?: string }).firstname,
+    last_name: (data as unknown as { lastname?: string }).lastname,
+  });
 };
 
 export const updateUserStatusApi = (
@@ -97,6 +122,13 @@ export const updateUserStatusApi = (
   status: 'active' | 'pending' | 'inactive' | 'delete'
 ): Promise<ApiResponse<User>> => {
   return apiRequest<User>('PATCH', `/admin/users/${userId}`, { status });
+};
+
+export const updateUserStatusBySubadminApi = (
+  userId: string | number,
+  status: 'inactive'
+): Promise<ApiResponse<User>> => {
+  return apiRequest<User>('PATCH', `/subadmin/users/${userId}/status`, { status });
 };
  
 export const updateUserByAdminApi = (
@@ -111,7 +143,15 @@ export const updateUserByAdminApi = (
     status: 'active' | 'pending' | 'inactive' | 'delete';
   }
 ): Promise<ApiResponse<User>> => {
-  return apiRequest<User>('PUT', `/admin/users/${userId}`, data);
+  return apiRequest<User>('PUT', `/admin/users/${userId}`, {
+    username: data.username,
+    first_name: data.firstname,
+    last_name: data.lastname,
+    email: data.email,
+    phone: data.phone,
+    gender: data.gender,
+    status: data.status,
+  });
 };
 
 export const adminLogoutUserApi = (

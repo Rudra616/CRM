@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   getAdminUsersApi,
+  getSubadminUsersApi,
   getUsersApi,
   updateUserStatusApi,
+  updateUserStatusBySubadminApi,
   adminLogoutUserApi,
   updateUserByAdminApi,
 } from '../api/admin.api';
@@ -18,8 +20,10 @@ import { FaEdit, FaSignOutAlt } from 'react-icons/fa';
 const ManageUsers = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isSubadmin = user?.role === 'subadmin';
   const location = useLocation();
-const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | number | null>(null);
@@ -46,7 +50,7 @@ useEffect(() => {
     setLoading(true);
     try {
       if (isAdmin) {
-        const res = await getAdminUsersApi(currentPage, rowsPerPage, effectiveStatus, searchTerm);
+        const res = await getAdminUsersApi(currentPage, rowsPerPage, effectiveStatus, appliedSearchTerm);
         const data = res.data as { items: User[]; pagination: { total: number; totalPages: number } };
         
         setUsers(data?.items || []);
@@ -58,8 +62,14 @@ useEffect(() => {
           drafts[String(u.id)] = (u.status as any) || 'active';
         }
         setStatusDraft(drafts);
+      } else if (isSubadmin) {
+        const res = await getSubadminUsersApi(currentPage, rowsPerPage, effectiveStatus, appliedSearchTerm);
+        const data = res.data as { items: User[]; pagination: { total: number; totalPages: number } };
+        setUsers(data?.items || []);
+        setTotalRows(data?.pagination?.total || 0);
+        setTotalPages(data?.pagination?.totalPages || 1);
       } else {
-        const res = await getUsersApi(currentPage, rowsPerPage, effectiveStatus, searchTerm);
+        const res = await getUsersApi(currentPage, rowsPerPage, effectiveStatus, appliedSearchTerm);
         const data = res.data as { items: User[]; pagination: { total: number; totalPages: number } };
         setUsers(data?.items || []);
         setTotalRows(data?.pagination?.total || 0);
@@ -73,19 +83,23 @@ useEffect(() => {
   };
 
   fetchUsers();
-}, [currentPage, isAdmin, statusFilter, searchTerm]); // ✅ include searchTerm
+}, [currentPage, isAdmin, isSubadmin, statusFilter, appliedSearchTerm]);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
 
   const filteredUsers = users;
   const theadStyle = { backgroundColor: colors.cardPrimaryBg };
-  const statusOptions: Array<'active' | 'pending' | 'inactive' | 'delete'> = ['active', 'pending', 'inactive', 'delete'];
+  const statusOptions: Array<'active' | 'pending' | 'inactive' | 'delete'> = isSubadmin
+    ? ['inactive']
+    : ['active', 'pending', 'inactive', 'delete'];
 
   const handleUpdateStatus = async (user: User, next: 'active' | 'pending' | 'inactive' | 'delete') => {
     const id = user.id;
     try {
       setBusyUserId(id);
-      const res = await updateUserStatusApi(id, next);
+      const res = isAdmin
+        ? await updateUserStatusApi(id, next)
+        : await updateUserStatusBySubadminApi(id, 'inactive');
       const updated = res.data;
 
       // In handleUpdateStatus, after success, update users array correctly:
@@ -145,7 +159,7 @@ useEffect(() => {
   return (
     <PageShell title="Manage Users" subtitle="View registered users" loading={loading} loadingMessage="Loading users…" flush>
       <div className="p-3 p-md-4">
-        {isAdmin && (
+        {(isAdmin || isSubadmin) && (
           <div className="mb-2 d-flex gap-2 align-items-center">
             <label className="small mb-0">Filter by status:</label>
             <select
@@ -163,19 +177,43 @@ useEffect(() => {
             </select>
           </div>
         )}
-<div className="mb-2 d-flex gap-2 align-items-center">
-  <input
-    type="text"
-    placeholder="Search by name, username, email, gender..."
-    className="form-control form-control-sm"
-    style={{ maxWidth: 300 }}
-    value={searchTerm}
-    onChange={(e) => {
-      setSearchTerm(e.target.value);
-      setCurrentPage(1); // reset page when search changes
-    }}
-  />
-</div>
+        <div className="mb-2 d-flex gap-2 align-items-center">
+          <input
+            type="text"
+            placeholder="Search by name, username, email, gender..."
+            className="form-control form-control-sm"
+            style={{ maxWidth: 300 }}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setCurrentPage(1);
+                setAppliedSearchTerm(searchTerm.trim());
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => {
+              setCurrentPage(1);
+              setAppliedSearchTerm(searchTerm.trim());
+            }}
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => {
+              setSearchTerm('');
+              setCurrentPage(1);
+              setAppliedSearchTerm('');
+            }}
+          >
+            Clear
+          </button>
+        </div>
         <div className="table-responsive">
           <table className="table table-bordered table-striped align-middle mb-0">
             <thead style={theadStyle}>
@@ -184,21 +222,29 @@ useEffect(() => {
                 <th>Name</th>
                 <th>Phone</th>
                 <th>Email</th>
-                {isAdmin && <th>Status</th>}
+                {(isAdmin || isSubadmin) && <th>Status</th>}
                 {isAdmin && <th>Action</th>}
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((user, index) => {
                 const currentStatus = statusDraft[String(user.id)] || user.status || 'active';
+                const firstName =
+                  (user as unknown as { first_name?: string }).first_name ??
+                  user.firstname ??
+                  '';
+                const lastName =
+                  (user as unknown as { last_name?: string }).last_name ??
+                  user.lastname ??
+                  '';
                 return (
                   <tr key={user.id}>
                     <td>{startIndex + index + 1}</td>
-                    <td className="text-break">{user.firstname} {user.lastname} ({user.username})</td>
+                    <td className="text-break">{`${firstName} ${lastName}`.trim()} ({user.username})</td>
                     <td>{user.phone}</td>
                     <td className="text-break">{user.email}</td>
 
-                    {isAdmin && (
+                    {(isAdmin || isSubadmin) && (
                       <td style={{ minWidth: 180 }}>
                         <div className="d-flex align-items-center gap-2">
                           <span
@@ -219,7 +265,7 @@ useEffect(() => {
                             <select
                               className="form-select form-select-sm text-capitalize"
                               style={{ maxWidth: 120 }}
-                              value={currentStatus}
+                              value={isSubadmin ? 'inactive' : currentStatus}
                               disabled={busyUserId === user.id}
                               onChange={async (e) => {
                                 const next = e.target.value as 'active' | 'pending' | 'inactive' | 'delete';
@@ -253,7 +299,7 @@ useEffect(() => {
 
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 6 : 4} className="text-center text-muted py-4">
+                  <td colSpan={(isAdmin || isSubadmin) ? 6 : 4} className="text-center text-muted py-4">
                     No users found
                   </td>
                 </tr>
