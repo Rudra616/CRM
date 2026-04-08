@@ -41,7 +41,8 @@ export const getUsersPaginatedByRole = async (
   roleId: number,
   page: number,
   limit: number,
-  statusFilter?: string
+  statusFilter?: string,
+  search?: string
 ): Promise<{ items: User[]; total: number }> => {
   const offset = (page - 1) * limit;
 
@@ -53,10 +54,25 @@ export const getUsersPaginatedByRole = async (
 
   const params: any[] = [roleId];
 
-  // ✅ Only filter if explicitly provided
+  // Status filter
   if (statusFilter) {
     query += " AND status = ?";
     params.push(statusFilter);
+  }
+
+  // Search filter
+  if (search) {
+    query += `
+      AND (
+        firstname LIKE ? OR
+        lastname LIKE ? OR
+        username LIKE ? OR
+        email LIKE ? OR
+        gender LIKE ?
+      )
+    `;
+    const like = `%${search}%`;
+    params.push(like, like, like, like, like);
   }
 
   query += " ORDER BY id DESC LIMIT ? OFFSET ?";
@@ -70,13 +86,25 @@ export const getUsersPaginatedByRole = async (
     FROM users 
     WHERE (role_id = ? OR role_id IS NULL)
   `;
-
   const countParams: any[] = [roleId];
 
-  // ✅ Same logic for count
   if (statusFilter) {
     countQuery += " AND status = ?";
     countParams.push(statusFilter);
+  }
+
+  if (search) {
+    countQuery += `
+      AND (
+        firstname LIKE ? OR
+        lastname LIKE ? OR
+        username LIKE ? OR
+        email LIKE ? OR
+        gender LIKE ?
+      )
+    `;
+    const like = `%${search}%`;
+    countParams.push(like, like, like, like, like);
   }
 
   const [countRows]: any = await db.query(countQuery, countParams);

@@ -9,21 +9,22 @@ const SubadminDashboard: React.FC = () => {
   const [userCount, setUserCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetch = async () => {
-      setLoading(true);
-      try {
-        const res = await getUsersApi();
-        setUserCount(Array.isArray(res.data) ? res.data.length : 0);
-      } catch (err) {
-        showError((err as { message?: string })?.message || 'Failed to load');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
-  }, []);
-
+useEffect(() => {
+  const fetch = async () => {
+    setLoading(true);
+    try {
+      const res = await getUsersApi(1, 10); // ✅ provide required args
+      const data = res.data as { items: any[]; pagination: { total: number } };
+      setUserCount(data?.pagination?.total || 0);
+    } catch (err) {
+      showError((err as { message?: string })?.message || 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetch();
+}, []);
+ 
   return (
     <PageShell
       title="Subadmin Dashboard"

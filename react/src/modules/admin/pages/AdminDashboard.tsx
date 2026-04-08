@@ -32,7 +32,7 @@ const AdminDashboard = () => {
           const msg = (err as { message?: string })?.message || '';
           // Backward compatibility
           if (!msg.toLowerCase().includes('not found')) throw err;
-const [subRes, userRes] = await Promise.all([getSubadminsApi(), getUsersApi(1, 10)]);
+        const [subRes, userRes] = await Promise.all([getSubadminsApi(), getUsersApi(1, 10)]);
           setSubadminCount(Array.isArray(subRes.data) ? subRes.data.length : 0);
           setUserCount(Array.isArray(userRes.data) ? userRes.data.length : 0);
         }

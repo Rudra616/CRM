@@ -23,7 +23,8 @@ export type AdminDashboardSummary = {
 export const getUsersApi = (
   page: number,
   limit: number,
-  statusFilter?: string
+  statusFilter?: string,
+  search?: string
 ): Promise<ApiResponse<UsersPageData>> => {
   const params = new URLSearchParams({
     page: String(page),
@@ -34,13 +35,18 @@ export const getUsersApi = (
     params.append('status', statusFilter);
   }
 
-return apiRequest<UsersPageData>('GET', `/users?${params.toString()}`);
+  if (search && search.trim() !== '') {
+    params.append('search', search.trim());
+  }
+
+  return apiRequest<UsersPageData>('GET', `/users?${params.toString()}`);
 };
 
 export const getAdminUsersApi = (
   page: number,
   limit: number,
-  statusFilter?: string
+  statusFilter?: string,
+  search?: string
 ) => {
   const params = new URLSearchParams({
     page: String(page),
@@ -49,6 +55,10 @@ export const getAdminUsersApi = (
 
   if (statusFilter && statusFilter !== 'all') {
     params.append('status', statusFilter);
+  }
+
+  if (search && search.trim() !== '') {
+    params.append('search', search.trim());
   }
 
   return apiRequest('GET', `/admin/users?${params.toString()}`);
@@ -88,7 +98,7 @@ export const updateUserStatusApi = (
 ): Promise<ApiResponse<User>> => {
   return apiRequest<User>('PATCH', `/admin/users/${userId}`, { status });
 };
-
+ 
 export const updateUserByAdminApi = (
   userId: string | number,
   data: {

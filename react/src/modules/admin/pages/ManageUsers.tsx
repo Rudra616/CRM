@@ -19,7 +19,7 @@ const ManageUsers = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const location = useLocation();
-
+const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | number | null>(null);
@@ -46,19 +46,21 @@ useEffect(() => {
     setLoading(true);
     try {
       if (isAdmin) {
-        const res = await getAdminUsersApi(currentPage, rowsPerPage, effectiveStatus);
-        const data = res.data;
+        const res = await getAdminUsersApi(currentPage, rowsPerPage, effectiveStatus, searchTerm);
+        const data = res.data as { items: User[]; pagination: { total: number; totalPages: number } };
+        
         setUsers(data?.items || []);
         setTotalRows(data?.pagination?.total || 0);
         setTotalPages(data?.pagination?.totalPages || 1);
+
         const drafts: Record<string, 'active' | 'pending' | 'inactive' | 'delete'> = {};
-        for (const u of (data?.items || [])) {
+        for (const u of data?.items || []) {
           drafts[String(u.id)] = (u.status as any) || 'active';
         }
         setStatusDraft(drafts);
       } else {
-        const res = await getUsersApi(currentPage, rowsPerPage, effectiveStatus);
-        const data = res.data;
+        const res = await getUsersApi(currentPage, rowsPerPage, effectiveStatus, searchTerm);
+        const data = res.data as { items: User[]; pagination: { total: number; totalPages: number } };
         setUsers(data?.items || []);
         setTotalRows(data?.pagination?.total || 0);
         setTotalPages(data?.pagination?.totalPages || 1);
@@ -71,8 +73,7 @@ useEffect(() => {
   };
 
   fetchUsers();
-}, [currentPage, isAdmin, statusFilter]); // ✅ re-runs with fresh values every time
-
+}, [currentPage, isAdmin, statusFilter, searchTerm]); // ✅ include searchTerm
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
 
@@ -162,7 +163,19 @@ useEffect(() => {
             </select>
           </div>
         )}
-
+<div className="mb-2 d-flex gap-2 align-items-center">
+  <input
+    type="text"
+    placeholder="Search by name, username, email, gender..."
+    className="form-control form-control-sm"
+    style={{ maxWidth: 300 }}
+    value={searchTerm}
+    onChange={(e) => {
+      setSearchTerm(e.target.value);
+      setCurrentPage(1); // reset page when search changes
+    }}
+  />
+</div>
         <div className="table-responsive">
           <table className="table table-bordered table-striped align-middle mb-0">
             <thead style={theadStyle}>

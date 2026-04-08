@@ -22,11 +22,12 @@ import {
 // get users all with pagination
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1); // keep page from query
+    const page = Math.max(1, Number(req.query.page) || 1); // page
     const limit = 10; // always 10 users per page
-    const status = req.query.status as string | undefined; // ✅ read from query
+    const status = req.query.status as string | undefined; // optional
+    const search = (req.query.search as string | undefined)?.trim(); // optional search
 
-    const { items, total } = await getUsersPaginatedByRole(Role.USER, page, limit, status);
+    const { items, total } = await getUsersPaginatedByRole(Role.USER, page, limit, status, search);
 
     return successResponse(
       res,

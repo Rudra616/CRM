@@ -5,7 +5,7 @@ import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
 import { getAdminProfileApi } from '../modules/admin/api/admin.api';
 import { getProfileApi } from '../modules/user/api/user.api';
 import { clearClientAuthStorage, isPublicAuthPath } from '../shared/utils/authSession';
-
+import { saveUserToStorage,clearUserStorage,loadUserFromStorage } from '../shared/authSession';
 interface AuthContextType {
   user: UserInfo | null;
   login: (user: UserInfo) => void;
@@ -30,64 +30,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const userRef = useRef<UserInfo | null>(null);
 
-  const login = (userData: UserInfo) => {
-    const normalized = normalizeUser(userData);
-    userRef.current = normalized;
-    setUser(normalized);
-  };
+const login = (userData: UserInfo) => {
+  const normalized = normalizeUser(userData);
+  saveUserToStorage(normalized);   // ← add this
+  userRef.current = normalized;
+  setUser(normalized);
+};
 
-  const logout = async (): Promise<void> => {
-    const currentRole = userRef.current?.role;
-    try {
-      if (currentRole === 'admin') {
-        await logoutAdminApi();
-      } else {
-        await logoutApi();
-      }
-    } catch {
-      // clear state even if API call fails
-    } finally {
-      clearClientAuthStorage();
-      userRef.current = null;
-      setUser(null);
+const logout = async (): Promise<void> => {
+  const currentRole = userRef.current?.role;
+  try {
+    if (currentRole === 'admin') {
+      await logoutAdminApi();
+    } else {
+      await logoutApi();
     }
-  };
+  } catch {}
+  finally {
+    clearClientAuthStorage();
+    clearUserStorage();          // ← add this
+    userRef.current = null;
+    setUser(null);
+  }
+};
 
-  useEffect(() => {
-    const path = window.location.pathname;
+useEffect(() => {
+  const path = window.location.pathname;
 
-    if (isPublicAuthPath(path)) {
-      setIsLoading(false);
-      return;
-    }
+  if (isPublicAuthPath(path)) {
+    setIsLoading(false);
+    return;
+  }
 
-    const isAdminApp = path.startsWith('/admin/') && !path.startsWith('/admin/login');
+  const stored = loadUserFromStorage();   // ← try localStorage first
+  if (stored) {
+    login(stored);
+    setIsLoading(false);
+    return;                               // ← skip ALL profile API calls
+  }
 
-    if (isAdminApp) {
-      setIsLoading(true);
-      void (async () => {
-        try {
-          const res = await getAdminProfileApi();
-          if (res.data) {
-            login({
-              id: Number(res.data.id),
-              username: res.data.username,
-              email: res.data.email,
-              role: 'admin',
-              firstname: '',
-              lastname: '',
-              phone: '',
-            });
-          }
-        } catch {
-          clearClientAuthStorage();
-        } finally {
-          setIsLoading(false);
+  // No stored user — fall through to API calls as fallback
+  // (handles first load after hard logout or cleared storage)
+  const isAdminApp = path.startsWith('/admin/') && !path.startsWith('/admin/login');
+
+  if (isAdminApp) {
+    setIsLoading(true);
+    void (async () => {
+      try {
+        const res = await getAdminProfileApi();
+        if (res.data) {
+          login({ ...res.data, role: 'admin', firstname: '', lastname: '', phone: '' });
         }
-      })();
-      return;
-    }
-
+      } catch {
+        clearClientAuthStorage();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    return;
+  }
     const needsUserBootstrap =
       path.startsWith('/user/') ||
       path.startsWith('/subadmin/') ||
