@@ -106,6 +106,13 @@ const AdminDashboard = () => {
           hint="Soft deleted users"
           onClick={() => navigate('/admin/users', { state: { statusFilter: 'delete' } })}
         />
+
+        <DashboardStatCard
+          title="Role Permissions"
+          value="RBAC"
+          hint="Manage role, module and permissions"
+          onClick={() => navigate('/admin/permissions')}
+        />
       </div>
     </PageShell>
   );

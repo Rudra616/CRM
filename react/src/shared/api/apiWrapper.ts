@@ -3,6 +3,7 @@ import type { ApiResponse } from "../../modules/auth/types/auth.types";
 interface ApiError {
   message?: string;
   response?: { data?: { message?: string }; status?: number };
+  config?: { method?: string; url?: string; data?: unknown };
 }
 
 const getErrorMessage = (err: unknown): string => {
@@ -27,10 +28,24 @@ export const apiRequest = async <T>(
   try {
     const response = await axiosClient({ method, url, data });
     return response.data;
- } catch (error) {
-  const msg = getErrorMessage(error);
-  const err = new Error(msg) as Error & { original: unknown };
-  err.original = error;
-  throw err;
-}
+  } catch (error) {
+    const e = error as ApiError;
+    const msg = getErrorMessage(error);
+
+    // Keep developer-facing diagnostics in console without exposing internals to users.
+    console.error("[API ERROR]", {
+      request: {
+        method,
+        url,
+        data,
+      },
+      responseStatus: e?.response?.status,
+      responseMessage: e?.response?.data?.message,
+      rawError: error,
+    });
+
+    const err = new Error(msg) as Error & { original: unknown };
+    err.original = error;
+    throw err;
+  }
 };

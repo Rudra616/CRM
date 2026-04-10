@@ -18,7 +18,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const normalizeUser = (userData: UserInfo): UserInfo => {
-  const role = (userData as unknown as { role_id?: number }).role_id ?? userData.role;
+  const role = userData.role;
   return {
     ...userData,
     role: roleIdToRole(role),
@@ -105,13 +105,12 @@ useEffect(() => {
           const res = await getProfileApi();
           const p = res.data;
           if (p) {
-            const row = p as typeof p & { role_id?: number };
+            const row = p;
             login(
               normalizeUser({
                 id: Number(row.id),
                 username: row.username,
                 email: row.email,
-                role_id: row.role_id,
                 role: row.role,
                 firstname:
                   (row as unknown as { firstname?: string; first_name?: string }).firstname ??
@@ -122,7 +121,7 @@ useEffect(() => {
                   (row as unknown as { last_name?: string }).last_name ??
                   '',
                 phone: row.phone ?? '',
-              } as UserInfo & { role_id?: number })
+              } as UserInfo)
             );
           }
         } catch {

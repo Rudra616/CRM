@@ -8,6 +8,7 @@ import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import { showError, showSuccess,showInfo } from '../../../shared/utils/toast';
 import { AuthPageLayout, authLinkStyle } from '../../../shared/components/AuthPageLayout';
 import type { Admin, User, UserInfo } from '../../../shared/types/common.types';
+import type { AdminLoginResponse, LoginResponse, SubadminLoginResponse } from '../types/auth.types';
 const toUserInfo = (u: User | Admin): UserInfo => ({
   id: Number(u.id),
   username: u.username,
@@ -69,21 +70,26 @@ const Login = () => {
         return;
       }
 
-      const apiUser = (isAdminRoute || isSubadminRoute)
-        ? (response.data as { admin?: Admin }).admin
-        : (response.data as { user?: User }).user;
+      const apiUser = isAdminRoute
+        ? (response.data as AdminLoginResponse).admin
+        : isSubadminRoute
+          ? (response.data as SubadminLoginResponse).subadmin
+          : (response.data as LoginResponse).user;
 
       if (!apiUser) {
         showError(response.message || 'Login failed');
         return;
       }
 
-      login(toUserInfo(apiUser));
+      // API may send snake_case names; toUserInfo normalizes them.
+      login(toUserInfo(apiUser as User | Admin));
 
       showSuccess('Login successful');
-      if (apiUser.role === 'admin') navigate('/admin/dashboard', { replace: true });
-      else if (apiUser.role === 'subadmin') navigate('/subadmin/dashboard', { replace: true });
-      else navigate('/user/dashboard', { replace: true });
+const role = apiUser.role?.toLowerCase();
+
+if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+else if (role === 'subadmin') navigate('/subadmin/dashboard', { replace: true });
+else navigate('/user/dashboard', { replace: true });
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || 'Login failed';
       showError(msg.toLowerCase().includes('invalid') ? 'Wrong username or password' : msg);

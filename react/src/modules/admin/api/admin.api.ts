@@ -20,6 +20,19 @@ export type AdminDashboardSummary = {
   inactiveUsers: number;
   deletedUsers: number;
 };
+
+export type ModuleItem = {
+  id: number;
+  key: string;
+  name: string;
+  status: 'active' | 'inactive';
+};
+
+export type RoleItem = {
+  id: number;
+  name: string;
+  status: 'active' | 'inactive';
+};
 export const getUsersApi = (
   page: number,
   limit: number,
@@ -60,7 +73,7 @@ export const getSubadminUsersApi = (
     params.append('search', search.trim());
   }
 
-  return apiRequest<UsersPageData>('GET', `/subadmin/users?${params.toString()}`);
+  return apiRequest<UsersPageData>('GET', `/admin/users?${params.toString()}`);
 };
 
 export const getAdminUsersApi = (
@@ -90,6 +103,47 @@ export const getAdminDashboardSummaryApi = (): Promise<ApiResponse<AdminDashboar
     'GET',
     '/admin/dashboard-summary'
   );
+};
+
+export const getModulesApi = (): Promise<ApiResponse<ModuleItem[]>> =>
+  apiRequest<ModuleItem[]>('GET', '/admin/modules');
+
+export const createModuleApi = (body: { key: string; name: string }): Promise<ApiResponse<{ id: number }>> =>
+  apiRequest<{ id: number }>('POST', '/admin/modules', body);
+
+export const getRolesApi = (): Promise<ApiResponse<RoleItem[]>> =>
+  apiRequest<RoleItem[]>('GET', '/admin/roles');
+
+export const createRoleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
+  apiRequest<{ id: number }>('POST', '/admin/roles', body);
+
+export const getRolePermissionsApi = (roleId: number): Promise<ApiResponse<{ roleId: number; moduleIds: number[] }>> =>
+  apiRequest<{ roleId: number; moduleIds: number[] }>('GET', `/admin/roles/${roleId}/permissions`);
+
+export const saveRolePermissionsApi = (
+  roleId: number,
+  moduleIds: number[]
+): Promise<ApiResponse<{ roleId: number }>> =>
+  apiRequest<{ roleId: number }>('PUT', `/admin/roles/${roleId}/permissions`, { moduleIds });
+
+export const getAdminMyModulesApi = (): Promise<ApiResponse<{ moduleKeys: string[] }>> =>
+  apiRequest<{ moduleKeys: string[] }>('GET', '/admin/me/modules');
+
+export const getSubadminMyModulesApi = (): Promise<ApiResponse<{ moduleKeys: string[] }>> =>
+  apiRequest<{ moduleKeys: string[] }>('GET', '/subadmin/me/modules');
+
+export const getMyModulesApi = async (
+  role: 'admin' | 'subadmin'
+): Promise<ApiResponse<{ moduleKeys: string[] }>> => {
+  if (role === 'admin') {
+    return getAdminMyModulesApi();
+  }
+  try {
+    return await getSubadminMyModulesApi();
+  } catch {
+    // Backward compatibility if an older backend only exposes /admin/me/modules.
+    return getAdminMyModulesApi();
+  }
 };
 
 export const getSubadminsApi = (): Promise<ApiResponse<User[]>> => {
@@ -124,13 +178,6 @@ export const updateUserStatusApi = (
   return apiRequest<User>('PATCH', `/admin/users/${userId}`, { status });
 };
 
-export const updateUserStatusBySubadminApi = (
-  userId: string | number,
-  status: 'inactive'
-): Promise<ApiResponse<User>> => {
-  return apiRequest<User>('PATCH', `/subadmin/users/${userId}/status`, { status });
-};
- 
 export const updateUserByAdminApi = (
   userId: string | number,
   data: {

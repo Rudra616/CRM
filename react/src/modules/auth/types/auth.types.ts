@@ -14,6 +14,18 @@ export interface AdminLoginResponse {
   admin: Admin;
 }
 
+/** Subadmin login returns `subadmin` (not `admin`). See UserHub subadmin.self.controller. */
+export interface SubadminLoginResponse {
+  subadmin: {
+    id: number;
+    username: string;
+    email: string;
+    role: 'subadmin';
+    first_name?: string;
+    last_name?: string;
+  };
+}
+
 export interface RegisterRequest {
   username: string;
   email: string;

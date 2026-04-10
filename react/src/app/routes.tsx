@@ -12,6 +12,7 @@ import ResetPassword from '../modules/auth/pages/ResetPassword';
 import AdminDashboard from '../modules/admin/pages/AdminDashboard';
 import ManageUsers from '../modules/admin/pages/ManageUsers';
 import ManageSubadmins from '../modules/admin/pages/ManageSubadmins';
+import ManagePermissions from '../modules/admin/pages/ManagePermissions';
 
 // Subadmin pages
 import SubadminDashboard from '../modules/subadmin/pages/SubadminDashboard';
@@ -39,6 +40,7 @@ export const AppRoutes = () => (
       <Route path="/admin/dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><ManageUsers /></ProtectedRoute>} />
       <Route path="/admin/subadmins" element={<ProtectedRoute roles={['admin']}><ManageSubadmins /></ProtectedRoute>} />
+      <Route path="/admin/permissions" element={<ProtectedRoute roles={['admin']}><ManagePermissions /></ProtectedRoute>} />
       <Route path="/admin/profile" element={<ProtectedRoute roles={['admin']}><Profile /></ProtectedRoute>} />
       <Route path="/admin/change-password" element={<ProtectedRoute roles={['admin']}><ChangePassword /></ProtectedRoute>} />
       <Route path="/admin/create-subadmin" element={<ProtectedRoute roles={['admin']}><Register /></ProtectedRoute>} />

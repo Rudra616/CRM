@@ -17,7 +17,7 @@ export interface Admin {
   id: number;
   username: string;
   email: string;
-  role: 'admin';
+  role: 'admin' | 'subadmin';
   image_url?: string | null;
 }
 

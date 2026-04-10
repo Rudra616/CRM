@@ -11,6 +11,23 @@ import type { User } from '../../../shared/types/common.types';
 import { PageShell } from '../../../shared/components/PageShell';
 import { colors } from '../../../theme/colors';
 
+type SubadminRow = User & { first_name?: string; last_name?: string };
+
+const subadminDisplayName = (u: SubadminRow) => {
+  const fn = u.firstname ?? u.first_name ?? '';
+  const ln = u.lastname ?? u.last_name ?? '';
+  const full = `${fn} ${ln}`.trim();
+  const label = full || '—';
+  return `${label} (${u.username})`;
+};
+
+const mergeSubadminFromApi = (prev: User, raw: SubadminRow): User => ({
+  ...prev,
+  ...raw,
+  firstname: raw.firstname ?? raw.first_name ?? prev.firstname ?? '',
+  lastname: raw.lastname ?? raw.last_name ?? prev.lastname ?? '',
+});
+
 const ManageSubadmins = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +39,8 @@ const ManageSubadmins = () => {
     setLoading(true);
     try {
       const res = await getSubadminsApi();
-      setUsers(res.data ?? []);
+      const rows = (res.data ?? []) as SubadminRow[];
+      setUsers(rows.map((row) => mergeSubadminFromApi(row as User, row)));
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load subadmins');
     } finally {
@@ -40,7 +58,9 @@ const ManageSubadmins = () => {
       const res = await updateSubadminApi(editUser.id, data);
       showSuccess('Subadmin updated');
       if (res.data) {
-        setUsers((prev) => prev.map((u) => (u.id === editUser.id ? { ...u, ...res.data } : u)));
+        setUsers((prev) =>
+          prev.map((u) => (u.id === editUser.id ? mergeSubadminFromApi(u, res.data as SubadminRow) : u))
+        );
       } else {
         setUsers((prev) => prev.map((u) => (u.id === editUser.id ? { ...u, ...data } : u)));
       }
@@ -94,7 +114,6 @@ const ManageSubadmins = () => {
               <thead style={theadStyle}>
                 <tr className="fw-semibold small" style={{ color: colors.primary }}>
                   <th>#</th>
-                  <th>Username</th>
                   <th>Name</th>
                   <th className="d-none d-md-table-cell">Email</th>
                   <th>Phone</th>
@@ -106,10 +125,7 @@ const ManageSubadmins = () => {
                 {currentUsers.map((user, index) => (
                   <tr key={user.id}>
                     <td>{startIndex + index + 1}</td>
-                    <td className="text-break">{user.username}</td>
-                    <td>
-                      {user.firstname} {user.lastname}
-                    </td>
+                    <td className="text-break">{subadminDisplayName(user as SubadminRow)}</td>
                     <td className="d-none d-md-table-cell text-break">{user.email}</td>
                     <td>{user.phone}</td>
                     <td className="text-capitalize">{user.gender ?? '—'}</td>
@@ -131,7 +147,7 @@ const ManageSubadmins = () => {
                 ))}
                 {currentUsers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center text-muted py-4">
+                    <td colSpan={6} className="text-center text-muted py-4">
                       No subadmins found
                     </td>
                   </tr>

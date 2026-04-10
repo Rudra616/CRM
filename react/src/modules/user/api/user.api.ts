@@ -48,12 +48,16 @@ export const getSubadminProfileApi = (): Promise<ApiResponse<Admin>> => {
 };
 
 export const updateSubadminProfileWithImageApi = async (
-  data: { username: string; email: string },
+  data: UpdateProfileRequest,
   imageFile?: File | null
 ): Promise<ApiResponse<Admin>> => {
   const formData = new FormData();
   formData.append('username', data.username);
+  formData.append('first_name', data.firstname);
+  formData.append('last_name', data.lastname);
   formData.append('email', data.email);
+  formData.append('phone', data.phone);
+  if (data.gender) formData.append('gender', data.gender);
   if (imageFile) formData.append('image', imageFile);
   const res = await axiosClient.put<ApiResponse<Admin>>('/subadmin/profile', formData);
   return res.data;

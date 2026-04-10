@@ -5,7 +5,6 @@ import {
   getSubadminUsersApi,
   getUsersApi,
   updateUserStatusApi,
-  updateUserStatusBySubadminApi,
   adminLogoutUserApi,
   updateUserByAdminApi,
 } from '../api/admin.api';
@@ -89,18 +88,14 @@ useEffect(() => {
 
   const filteredUsers = users;
   const theadStyle = { backgroundColor: colors.cardPrimaryBg };
-  const statusOptions: Array<'active' | 'pending' | 'inactive' | 'delete'> = isSubadmin
-    ? ['inactive']
-    : ['active', 'pending', 'inactive', 'delete'];
+  const statusOptions: Array<'active' | 'pending' | 'inactive' | 'delete'> = ['active', 'pending', 'inactive', 'delete'];
 
   const handleUpdateStatus = async (user: User, next: 'active' | 'pending' | 'inactive' | 'delete') => {
     const id = user.id;
     try {
       setBusyUserId(id);
-      const res = isAdmin
-        ? await updateUserStatusApi(id, next)
-        : await updateUserStatusBySubadminApi(id, 'inactive');
-      const updated = res.data;
+      const res = await updateUserStatusApi(id, next);
+      void res.data;
 
       // In handleUpdateStatus, after success, update users array correctly:
       setUsers(prev =>
@@ -159,7 +154,7 @@ useEffect(() => {
   return (
     <PageShell title="Manage Users" subtitle="View registered users" loading={loading} loadingMessage="Loading users…" flush>
       <div className="p-3 p-md-4">
-        {(isAdmin || isSubadmin) && (
+        {isAdmin && (
           <div className="mb-2 d-flex gap-2 align-items-center">
             <label className="small mb-0">Filter by status:</label>
             <select
@@ -246,7 +241,7 @@ useEffect(() => {
 
                     {(isAdmin || isSubadmin) && (
                       <td style={{ minWidth: 180 }}>
-                        <div className="d-flex align-items-center gap-2">
+                        <div className="d-flex align-items-center">
                           <span
                             className={`badge text-capitalize ${currentStatus === 'active'
                               ? 'bg-success'
@@ -259,13 +254,11 @@ useEffect(() => {
                           >
                             {currentStatus}
                           </span>
-
-                          {/* Hide dropdown if status is "delete" */}
-                          {currentStatus !== 'delete' && (
+                          {isAdmin && currentStatus !== 'delete' && (
                             <select
-                              className="form-select form-select-sm text-capitalize"
+                              className="form-select form-select-sm text-capitalize ms-2"
                               style={{ maxWidth: 120 }}
-                              value={isSubadmin ? 'inactive' : currentStatus}
+                              value={currentStatus}
                               disabled={busyUserId === user.id}
                               onChange={async (e) => {
                                 const next = e.target.value as 'active' | 'pending' | 'inactive' | 'delete';
@@ -299,7 +292,7 @@ useEffect(() => {
 
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={(isAdmin || isSubadmin) ? 6 : 4} className="text-center text-muted py-4">
+                  <td colSpan={isAdmin ? 6 : (isSubadmin ? 5 : 4)} className="text-center text-muted py-4">
                     No users found
                   </td>
                 </tr>

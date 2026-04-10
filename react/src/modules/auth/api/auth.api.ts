@@ -2,6 +2,7 @@ import { apiRequest } from '../../../shared/api/apiWrapper';
 import type {
   LoginResponse,
   AdminLoginResponse,
+  SubadminLoginResponse,
   ApiResponse,
   RegisterRequest,
   CreateSubadminRequest,
@@ -24,8 +25,8 @@ export const adminLoginApi = (
 export const subadminLoginApi = (
   username: string,
   password: string
-): Promise<ApiResponse<AdminLoginResponse>> => {
-  return apiRequest<AdminLoginResponse>('POST', '/subadmin/login', { username, password });
+): Promise<ApiResponse<SubadminLoginResponse>> => {
+  return apiRequest<SubadminLoginResponse>('POST', '/subadmin/login', { username, password });
 };
 
 export const logoutApi = (): Promise<ApiResponse<null>> => {

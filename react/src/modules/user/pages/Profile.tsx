@@ -10,7 +10,10 @@ import {
   updateSubadminProfileWithImageApi,
 } from '../api/user.api';
 import { showSuccess, showError } from '../../../shared/utils/toast';
-import { validateProfileFields, validateAdminProfileFields } from '../../../shared/utils/validation';
+import {
+  validateProfileFields,
+  validateAdminProfileFields,
+} from '../../../shared/utils/validation';
 import { validateProfileImage } from '../../../shared/utils/imageValidation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import type { User, Admin, Gender } from '../../../shared/types/common.types';
@@ -85,7 +88,33 @@ const Profile = () => {
         if (res.data) setProfile({ ...res.data, role: 'admin' });
       } else if (isSubadmin) {
         const res = await getSubadminProfileApi();
-        if (res.data) setProfile({ ...res.data, role: 'subadmin' });
+        if (res.data) {
+          const d = res.data as User & { first_name?: string; last_name?: string };
+          const firstName = d.firstname ?? d.first_name ?? '';
+          const lastName = d.lastname ?? d.last_name ?? '';
+          setProfile({
+            ...d,
+            firstname: firstName,
+            lastname: lastName,
+            phone: d.phone ?? '',
+            role: 'subadmin',
+            image_url: d.image_url
+              ? `${d.image_url}?t=${Date.now()}`
+              : d.image_url,
+          });
+          setGender((d.gender as Gender) ?? '');
+          login({
+            id: Number(d.id),
+            username: d.username,
+            role: 'subadmin',
+            firstname: firstName,
+            lastname: lastName,
+            email: d.email,
+            phone: d.phone ?? '',
+          });
+        }
+        setProfileImage(null);
+        setImageFailed(false);
       } else {
         const res = await getProfileApi();
         if (res.data) {
@@ -180,7 +209,7 @@ const Profile = () => {
     if (!profile || updating) return;
     resetErrors();
 
-    if (isAdmin || isSubadmin) {
+    if (isAdmin) {
       const payload = {
         username: String(profile.username ?? '').trim(),
         email: String(profile.email ?? '').trim(),
@@ -194,9 +223,7 @@ const Profile = () => {
 
       setUpdating(true);
       try {
-        const res = isAdmin
-          ? await updateAdminProfileWithImageApi(payload, profileImage ?? undefined)
-          : await updateSubadminProfileWithImageApi(payload, profileImage ?? undefined);
+        const res = await updateAdminProfileWithImageApi(payload, profileImage ?? undefined);
         if (res.data) {
           setProfile({
             ...profile,
@@ -204,9 +231,63 @@ const Profile = () => {
             image_url: res.data.image_url
               ? res.data.image_url + `?t=${Date.now()}`
               : res.data.image_url,
-          });          // Update auth context? Not necessary for admin? We'll update user in context
-          // but admin doesn't have a user object in auth context? Actually we can update.
-          // For simplicity, we can just logout if password changed.
+          });
+        }
+        showSuccess('Profile updated successfully');
+        setProfileImage(null);
+      } catch (err: unknown) {
+        showError((err as { message?: string })?.message || 'Update failed');
+      } finally {
+        setUpdating(false);
+      }
+      return;
+    }
+
+    if (isSubadmin) {
+      const payload = {
+        username: String(profile.username ?? '').trim(),
+        firstname: String((profile as User).firstname ?? '').trim(),
+        lastname: String((profile as User).lastname ?? '').trim(),
+        email: String(profile.email ?? '').trim(),
+        phone: String((profile as User).phone ?? '').replace(/\D/g, '').slice(0, 10),
+        gender: (gender || undefined) as Gender | undefined,
+      };
+      const fieldResults = validateProfileFields(payload);
+      const hasError = Object.values(fieldResults).some((r) => !r.valid);
+      if (hasError) {
+        setErrorsFromValidation(fieldResults);
+        return;
+      }
+
+      setUpdating(true);
+      try {
+        const res = await updateSubadminProfileWithImageApi(payload, profileImage ?? undefined);
+        if (res.data) {
+          const d = res.data as User & { first_name?: string; last_name?: string };
+          const firstName = d.firstname ?? d.first_name ?? '';
+          const lastName = d.lastname ?? d.last_name ?? '';
+          setProfile({
+            ...profile,
+            ...res.data,
+            firstname: firstName,
+            lastname: lastName,
+            role: 'subadmin',
+            image_url: res.data.image_url
+              ? res.data.image_url + `?t=${Date.now()}`
+              : res.data.image_url,
+          });
+          setGender((d.gender as Gender) ?? gender);
+          if (user) {
+            login({
+              id: user.id,
+              username: res.data.username ?? profile.username ?? '',
+              role: 'subadmin',
+              firstname: firstName,
+              lastname: lastName,
+              email: res.data.email ?? profile.email ?? '',
+              phone: d.phone ?? (profile as User).phone ?? '',
+            });
+          }
         }
         showSuccess('Profile updated successfully');
         setProfileImage(null);
@@ -376,11 +457,11 @@ const Profile = () => {
     );
   }
 
-  if (isAdmin || isSubadmin) {
+  if (isAdmin) {
     return (
       <PageShell
-        title={isAdmin ? "Admin Profile" : "Subadmin Profile"}
-        subtitle={isAdmin ? "Update your admin account" : "Update your subadmin account"}
+        title="Admin Profile"
+        subtitle="Update your admin account"
       >
         <div style={profileFormPanelStyle}>
           <form onSubmit={handleUpdate}>
@@ -409,7 +490,113 @@ const Profile = () => {
               {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
             </div>
             <div className="mb-3 text-center small">
-              <Link to={isAdmin ? "/admin/change-password" : "/change-password"} style={authLinkStyle}>
+              <Link to="/admin/change-password" style={authLinkStyle}>
+                Change password
+              </Link>
+            </div>
+            <button type="submit" className="btn btn-primary w-100" disabled={updating}>
+              {updating ? 'Updating...' : 'Update Profile'}
+            </button>
+          </form>
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (isSubadmin) {
+    return (
+      <PageShell
+        title="Subadmin Profile"
+        subtitle="Update your subadmin account"
+      >
+        <div style={profileFormPanelStyle}>
+          <form onSubmit={handleUpdate}>
+            <ProfileImageBlock />
+
+            <div className="mb-2">
+              <label className="form-label">Username *</label>
+              <input
+                className={`form-control ${errors.username ? 'is-invalid' : ''}`}
+                name="username"
+                value={profile.username ?? ''}
+                onChange={handleChange}
+                placeholder="Min 3 characters"
+              />
+              {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
+            </div>
+
+            <div className="mb-2">
+              <label className="form-label">First Name *</label>
+              <input
+                className={`form-control ${errors.firstname ? 'is-invalid' : ''}`}
+                name="firstname"
+                value={(profile as User).firstname ?? ''}
+                onChange={handleChange}
+                placeholder="Letters only"
+              />
+              {errors.firstname && <div className="invalid-feedback d-block">{errors.firstname}</div>}
+            </div>
+
+            <div className="mb-2">
+              <label className="form-label">Last Name *</label>
+              <input
+                className={`form-control ${errors.lastname ? 'is-invalid' : ''}`}
+                name="lastname"
+                value={(profile as User).lastname ?? ''}
+                onChange={handleChange}
+                placeholder="Letters only"
+              />
+              {errors.lastname && <div className="invalid-feedback d-block">{errors.lastname}</div>}
+            </div>
+
+            <div className="mb-2">
+              <label className="form-label">Email *</label>
+              <input
+                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                type="email"
+                name="email"
+                value={profile.email ?? ''}
+                onChange={handleChange}
+                placeholder="valid@email.com"
+              />
+              {errors.email && <div className="invalid-feedback d-block">{errors.email}</div>}
+            </div>
+
+            <div className="mb-2">
+              <label className="form-label">Phone *</label>
+              <input
+                className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
+                name="phone"
+                value={(profile as User).phone ?? ''}
+                onChange={handleChange}
+                placeholder="10 digits only"
+                maxLength={10}
+              />
+              {errors.phone && <div className="invalid-feedback d-block">{errors.phone}</div>}
+            </div>
+
+            <div className="mb-2">
+              <label className="form-label">Gender *</label>
+              <select
+                className={`form-select ${errors.gender ? 'is-invalid' : ''}`}
+                value={gender}
+                onChange={(e) => {
+                  setGender(e.target.value as Gender);
+                  clearFieldError('gender');
+                }}
+              >
+                <option value="">----- Select -----</option>
+                {GENDER_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {errors.gender && <div className="invalid-feedback d-block">{errors.gender}</div>}
+            </div>
+
+            <div className="mb-3 text-center small">
+              <Link to="/change-password" style={authLinkStyle}>
                 Change password
               </Link>
             </div>

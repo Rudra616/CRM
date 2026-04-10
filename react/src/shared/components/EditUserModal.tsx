@@ -33,6 +33,12 @@ interface EditUserModalProps {
   title: string;
 }
 
+const firstNameFromUser = (u: User) =>
+  u.firstname ?? (u as unknown as { first_name?: string }).first_name ?? '';
+
+const lastNameFromUser = (u: User) =>
+  u.lastname ?? (u as unknown as { last_name?: string }).last_name ?? '';
+
 export const EditUserModal: React.FC<EditUserModalProps> = ({
   user,
   onClose,
@@ -59,8 +65,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     if (user) {
       setForm({
         username: user.username ?? '',
-        firstname: user.firstname ?? '',
-        lastname: user.lastname ?? '',
+        firstname: firstNameFromUser(user),
+        lastname: lastNameFromUser(user),
         email: user.email ?? '',
         phone: user.phone ?? '',
         gender: (user.gender ?? 'other') as Gender,
@@ -105,8 +111,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
     const profileChanged =
       profilePayload.username !== (user.username ?? '') ||
-      profilePayload.firstname !== (user.firstname ?? '') ||
-      profilePayload.lastname !== (user.lastname ?? '') ||
+      profilePayload.firstname !== firstNameFromUser(user) ||
+      profilePayload.lastname !== lastNameFromUser(user) ||
       profilePayload.email !== (user.email ?? '') ||
       profilePayload.phone !== (user.phone ?? '').replace(/\D/g, '').slice(0, 10) ||
       profilePayload.gender !== (user.gender ?? 'other');
