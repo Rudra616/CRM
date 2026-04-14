@@ -7,7 +7,7 @@ import { logServiceError } from "../../../common/helpers/serviceError";
 export const findAdminByUsername = async (username: string): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT * FROM `admin` WHERE username = ? AND status = 'active'",
+      "SELECT * FROM `admin` WHERE username = ? AND status = 'active' AND COALESCE(is_delete, 0) = 0",
       [username]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -20,8 +20,8 @@ export const findAdminByUsername = async (username: string): Promise<Admin | nul
 export const findAdminById = async (id: number): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, role, status
-     FROM \`admin\` WHERE id = ?`,
+      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, role, role_id, status
+     FROM \`admin\` WHERE id = ? AND COALESCE(is_delete, 0) = 0`,
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -38,7 +38,7 @@ export const checkDuplicateAdminUsernameOrEmail = async (
 ): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `admin` WHERE (username = ? OR email = ?) AND id != ?",
+      "SELECT id FROM `admin` WHERE (username = ? OR email = ?) AND id != ? AND COALESCE(is_delete, 0) = 0",
       [username, email, excludeId]
     );
     return rows.length > 0;
@@ -61,16 +61,16 @@ export const getAdminDashboardSummary = async (): Promise<{
   try {
     const [[userRow]]: any = await db.query(
       `SELECT
-       COUNT(*) AS total,
-       SUM(status = 'active')   AS activeUsers,
-       SUM(status = 'pending')  AS pendingUsers,
-       SUM(status = 'inactive') AS inactiveUsers,
-       SUM(status = 'delete')   AS deletedUsers
+       SUM(COALESCE(is_delete, 0) = 0) AS total,
+       SUM(COALESCE(is_delete, 0) = 0 AND status = 'active')   AS activeUsers,
+       SUM(COALESCE(is_delete, 0) = 0 AND status = 'pending')  AS pendingUsers,
+       SUM(COALESCE(is_delete, 0) = 0 AND status = 'inactive') AS inactiveUsers,
+       SUM(COALESCE(is_delete, 0) = 1) AS deletedUsers
      FROM \`user\``
     );
 
     const [[subRow]]: any = await db.query(
-      "SELECT COUNT(*) AS subadminCount FROM `admin` WHERE role = 'subadmin' AND status = 'active'"
+      "SELECT COUNT(*) AS subadminCount FROM `admin` WHERE role = 'subadmin' AND status = 'active' AND COALESCE(is_delete, 0) = 0"
     );
 
     return {

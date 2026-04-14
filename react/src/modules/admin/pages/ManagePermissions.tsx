@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import {
   createModuleApi,
   createRoleApi,
@@ -8,10 +8,45 @@ import {
   getRolesApi,
   type ModuleItem,
   type RoleItem,
+  type RolePermissionEntry,
+  type RolePermissionSaveRow,
   saveRolePermissionsApi,
-} from "../api/admin.api";
-import { PageShell } from "../../../shared/components/PageShell";
-import { showError, showSuccess } from "../../../shared/utils/toast";
+} from '../api/admin.api';
+import { PageShell } from '../../../shared/components/PageShell';
+import { showError, showSuccess } from '../../../shared/utils/toast';
+
+type PermFlags = {
+  can_view: boolean;
+  can_add: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+const flagFromDb = (v: unknown): boolean => v === 1 || v === true;
+
+const emptyPerm = (): PermFlags => ({
+  can_view: false,
+  can_add: false,
+  can_edit: false,
+  can_delete: false,
+});
+
+const buildPermMap = (modules: ModuleItem[], rows: RolePermissionEntry[]): Record<number, PermFlags> => {
+  const map = new Map(rows.map((p) => [p.module_id, p]));
+  const out: Record<number, PermFlags> = {};
+  for (const m of modules) {
+    const p = map.get(m.id);
+    out[m.id] = p
+      ? {
+          can_view: flagFromDb(p.can_view),
+          can_add: flagFromDb(p.can_add),
+          can_edit: flagFromDb(p.can_edit),
+          can_delete: flagFromDb(p.can_delete),
+        }
+      : emptyPerm();
+  }
+  return out;
+};
 
 const ManagePermissions = () => {
   const [loading, setLoading] = useState(true);
@@ -20,16 +55,25 @@ const ManagePermissions = () => {
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-  const [selectedModuleIds, setSelectedModuleIds] = useState<number[]>([]);
+  const [permByModule, setPermByModule] = useState<Record<number, PermFlags>>({});
 
-  const [moduleKey, setModuleKey] = useState("");
-  const [moduleName, setModuleName] = useState("");
-  const [roleName, setRoleName] = useState("");
+  const [moduleName, setModuleName] = useState('');
+  const [roleName, setRoleName] = useState('');
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === selectedRoleId) ?? null,
     [roles, selectedRoleId]
   );
+
+  const setFlag = (moduleId: number, key: keyof PermFlags, value: boolean) => {
+    setPermByModule((prev) => ({
+      ...prev,
+      [moduleId]: {
+        ...(prev[moduleId] ?? emptyPerm()),
+        [key]: value,
+      },
+    }));
+  };
 
   const loadBase = async () => {
     setLoading(true);
@@ -46,12 +90,12 @@ const ManagePermissions = () => {
 
       if (roleId) {
         const permsRes = await getRolePermissionsApi(roleId);
-        setSelectedModuleIds(permsRes.data?.moduleIds ?? []);
+        setPermByModule(buildPermMap(nextModules, permsRes.data?.permissions ?? []));
       } else {
-        setSelectedModuleIds([]);
+        setPermByModule(buildPermMap(nextModules, []));
       }
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || "Failed to load role permissions");
+      showError((err as { message?: string })?.message || 'Failed to load role permissions');
     } finally {
       setLoading(false);
     }
@@ -62,13 +106,13 @@ const ManagePermissions = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadPermissionsForRole = async (roleId: number) => {
+  const loadPermissionsForRole = async (roleId: number, moduleList: ModuleItem[]) => {
     try {
       const res = await getRolePermissionsApi(roleId);
-      setSelectedModuleIds(res.data?.moduleIds ?? []);
+      setPermByModule(buildPermMap(moduleList, res.data?.permissions ?? []));
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || "Failed to load role modules");
-      setSelectedModuleIds([]);
+      showError((err as { message?: string })?.message || 'Failed to load role modules');
+      setPermByModule(buildPermMap(moduleList, []));
     }
   };
 
@@ -76,36 +120,28 @@ const ManagePermissions = () => {
     const roleId = Number(value);
     if (!Number.isInteger(roleId) || roleId <= 0) {
       setSelectedRoleId(null);
-      setSelectedModuleIds([]);
+      setPermByModule(buildPermMap(modules, []));
       return;
     }
     setSelectedRoleId(roleId);
-    await loadPermissionsForRole(roleId);
-  };
-
-  const onToggleModule = (moduleId: number) => {
-    setSelectedModuleIds((prev) =>
-      prev.includes(moduleId) ? prev.filter((id) => id !== moduleId) : [...prev, moduleId]
-    );
+    await loadPermissionsForRole(roleId, modules);
   };
 
   const onCreateModule = async (e: FormEvent) => {
     e.preventDefault();
-    const key = moduleKey.trim();
     const name = moduleName.trim();
-    if (!key || !name) {
-      showError("Module key and name are required");
+    if (!name) {
+      showError('Module name is required');
       return;
     }
 
     try {
-      await createModuleApi({ key, name });
-      setModuleKey("");
-      setModuleName("");
-      showSuccess("Module created");
+      await createModuleApi({ name });
+      setModuleName('');
+      showSuccess('Module created');
       await loadBase();
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || "Failed to create module");
+      showError((err as { message?: string })?.message || 'Failed to create module');
     }
   };
 
@@ -113,38 +149,44 @@ const ManagePermissions = () => {
     e.preventDefault();
     const name = roleName.trim().toLowerCase();
     if (!name) {
-      showError("Role name is required");
+      showError('Role name is required');
       return;
     }
 
     try {
       await createRoleApi({ name });
-      setRoleName("");
-      showSuccess("Role created");
+      setRoleName('');
+      showSuccess('Role created');
       await loadBase();
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || "Failed to create role");
+      showError((err as { message?: string })?.message || 'Failed to create role');
     }
   };
 
   const onSavePermissions = async () => {
     if (!selectedRoleId) {
-      showError("Select a role first");
+      showError('Select a role first');
       return;
     }
-    const cleanModuleIds = [...new Set(
-      selectedModuleIds
-        .map((id) => Number(id))
-        .filter((id) => Number.isInteger(id) && id > 0)
-    )];
+
+    const permissions: RolePermissionSaveRow[] = modules.map((m) => {
+      const p = permByModule[m.id] ?? emptyPerm();
+      return {
+        module_id: m.id,
+        can_view: p.can_view,
+        can_add: p.can_add,
+        can_edit: p.can_edit,
+        can_delete: p.can_delete,
+      };
+    });
 
     setSaving(true);
     try {
-      await saveRolePermissionsApi(selectedRoleId, cleanModuleIds);
-      showSuccess("Role permissions saved");
-      await loadPermissionsForRole(selectedRoleId);
+      await saveRolePermissionsApi(selectedRoleId, permissions);
+      showSuccess('Role permissions saved');
+      await loadPermissionsForRole(selectedRoleId, modules);
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || "Failed to save role permissions");
+      showError((err as { message?: string })?.message || 'Failed to save role permissions');
     } finally {
       setSaving(false);
     }
@@ -153,7 +195,7 @@ const ManagePermissions = () => {
   return (
     <PageShell
       title="Role Permissions"
-      subtitle="Create modules/roles and assign modules to each role"
+      subtitle="Create modules and roles, then set view / add / edit / delete per module"
       loading={loading}
       loadingMessage="Loading permissions..."
       flush
@@ -168,15 +210,7 @@ const ManagePermissions = () => {
                   <div className="col-12">
                     <input
                       className="form-control"
-                      placeholder="Module key (example: user_status_update)"
-                      value={moduleKey}
-                      onChange={(e) => setModuleKey(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-12">
-                    <input
-                      className="form-control"
-                      placeholder="Module name"
+                      placeholder="Module name (shown in UI)"
                       value={moduleName}
                       onChange={(e) => setModuleName(e.target.value)}
                     />
@@ -199,7 +233,7 @@ const ManagePermissions = () => {
                   <div className="col-12">
                     <input
                       className="form-control"
-                      placeholder="Role name (example: subadmin)"
+                      placeholder="Role name (example: support)"
                       value={roleName}
                       onChange={(e) => setRoleName(e.target.value)}
                     />
@@ -216,14 +250,14 @@ const ManagePermissions = () => {
         </div>
 
         <div className="card mt-3">
-          <div className="card-header fw-semibold">Assign Modules to Role</div>
+          <div className="card-header fw-semibold">Permissions by module</div>
           <div className="card-body">
             <div className="row g-3 align-items-end">
               <div className="col-12 col-md-6">
                 <label className="form-label">Role</label>
                 <select
                   className="form-select"
-                  value={selectedRoleId ?? ""}
+                  value={selectedRoleId ?? ''}
                   onChange={(e) => void onRoleChange(e.target.value)}
                 >
                   <option value="">Select role</option>
@@ -241,7 +275,7 @@ const ManagePermissions = () => {
                   onClick={onSavePermissions}
                   disabled={!selectedRoleId || saving}
                 >
-                  {saving ? "Saving..." : "Save Permissions"}
+                  {saving ? 'Saving...' : 'Save Permissions'}
                 </button>
               </div>
             </div>
@@ -249,29 +283,48 @@ const ManagePermissions = () => {
             <hr />
 
             <div className="mb-2 text-muted small">
-              Selected role: <span className="text-dark fw-semibold">{selectedRole?.name ?? "-"}</span>
+              Selected role: <span className="text-dark fw-semibold">{selectedRole?.name ?? '-'}</span>
             </div>
 
             {modules.length === 0 ? (
               <div className="text-muted">No modules found.</div>
             ) : (
-              <div className="row g-2">
-                {modules.map((m) => (
-                  <div key={m.id} className="col-12 col-md-6 col-lg-4">
-                    <label className="form-check d-flex align-items-center gap-2 border rounded p-2">
-                      <input
-                        type="checkbox"
-                        className="form-check-input m-0"
-                        checked={selectedModuleIds.includes(m.id)}
-                        onChange={() => onToggleModule(m.id)}
-                      />
-                      <span className="small">
-                        <span className="fw-semibold">{m.name}</span>
-                        <span className="d-block text-muted">{m.key}</span>
-                      </span>
-                    </label>
-                  </div>
-                ))}
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Module</th>
+                      <th className="text-center">View</th>
+                      <th className="text-center">Add</th>
+                      <th className="text-center">Edit</th>
+                      <th className="text-center">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modules.map((m) => {
+                      const p = permByModule[m.id] ?? emptyPerm();
+                      return (
+                        <tr key={m.id}>
+                          <td>
+                            <span className="fw-semibold">{m.name}</span>
+                            <span className="d-block text-muted small">id {m.id}</span>
+                          </td>
+                          {(['can_view', 'can_add', 'can_edit', 'can_delete'] as const).map((key) => (
+                            <td key={key} className="text-center">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={p[key]}
+                                onChange={(e) => setFlag(m.id, key, e.target.checked)}
+                                aria-label={`${m.name} ${key}`}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

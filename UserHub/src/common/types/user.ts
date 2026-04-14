@@ -11,7 +11,8 @@ export interface User {
   email: string;
   gender?: "male" | "female" | "other" | null;
   image_url?: string | null;
-  status: "active" | "pending" | "inactive" | "delete";
+  status: "active" | "pending" | "inactive";
+  is_delete?: 0 | 1;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -28,6 +29,8 @@ export interface Admin {
   gender?: "male" | "female" | "other" | null;
   image_url?: string | null;
   role: AdminRole;
+  role_id?: number | null;
+  role_name?: string | null;
   status: "active" | "inactive";
   created_at?: Date;
   updated_at?: Date;
@@ -67,6 +70,7 @@ export interface CreateSubadminDTO {
   phone: string;
   email: string;
   gender?: "male" | "female" | "other";
+  role_id: number;
 }
 
 export interface UpdateSubadminDTO {
@@ -76,6 +80,7 @@ export interface UpdateSubadminDTO {
   phone: string;
   email: string;
   gender?: "male" | "female" | "other" | null;
+  role_id?: number;
 }
 
 export interface UpdateAdminProfileDTO {

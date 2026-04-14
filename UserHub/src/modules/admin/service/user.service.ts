@@ -4,67 +4,68 @@ import { logServiceError } from "../../../common/helpers/serviceError";
 
 // ─── Paginated list ───────────────────────────────────────────────────────────
 
+/** Allowed `limit` query values for GET users list (shared with API response). */
+export const USERS_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100] as const;
+
+const normalizeLimit = (limit?: number) => {
+  const n = Number(limit);
+  if (!Number.isFinite(n) || n <= 0) return USERS_PAGE_SIZE_OPTIONS[0];
+  return (USERS_PAGE_SIZE_OPTIONS as readonly number[]).includes(n)
+    ? n
+    : USERS_PAGE_SIZE_OPTIONS[0];
+};
+
 export const getUsersPaginated = async (
   page: number,
   limit: number,
   statusFilter?: string,
-  search?: string
-): Promise<{ items: User[]; total: number }> => {
+  search?: string,
+  opts?: { deletedOnly?: boolean }
+): Promise<{ items: User[]; total: number; limit: number }> => {
   try {
-    const offset = (page - 1) * limit;
+    const safeLimit = normalizeLimit(limit);
+    const offset = (page - 1) * safeLimit;
+    const deletedOnly = Boolean(opts?.deletedOnly);
 
-    let query = `
-    SELECT id, username, first_name, last_name, phone, email, gender, image_url, status
-    FROM \`user\`
-    WHERE 1=1
-  `;
-    const params: any[] = [];
+    let where = "WHERE 1=1";
+    const whereParams: unknown[] = [];
 
-    if (statusFilter) {
-      query += " AND status = ?";
-      params.push(statusFilter);
+    if (deletedOnly) {
+      where += " AND COALESCE(is_delete, 0) = 1";
+    } else {
+      where += " AND COALESCE(is_delete, 0) = 0";
+      if (statusFilter) {
+        where += " AND status = ?";
+        whereParams.push(statusFilter);
+      }
     }
 
     if (search) {
-      query += `
-      AND (
-        first_name LIKE ? OR last_name LIKE ? OR
-        username   LIKE ? OR email     LIKE ? OR
-        gender     LIKE ?
-      )
-    `;
       const like = `%${search}%`;
-      params.push(like, like, like, like, like);
+      where += ` AND (
+        first_name LIKE ? OR last_name LIKE ? OR username LIKE ? OR email LIKE ? OR gender LIKE ?
+      )`;
+      whereParams.push(like, like, like, like, like);
     }
 
-    query += " ORDER BY id DESC LIMIT ? OFFSET ?";
-    params.push(limit, offset);
+    const [rows]: any = await db.query(
+      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, status, is_delete
+       FROM \`user\` ${where}
+       ORDER BY id DESC
+       LIMIT ? OFFSET ?`,
+      [...whereParams, safeLimit, offset]
+    );
 
-    const [rows]: any = await db.query(query, params);
+    const [countRows]: any = await db.query(
+      `SELECT COUNT(*) AS total FROM \`user\` ${where}`,
+      whereParams
+    );
 
-    let countQuery = "SELECT COUNT(*) AS total FROM `user` WHERE 1=1";
-    const countParams: any[] = [];
-
-    if (statusFilter) {
-      countQuery += " AND status = ?";
-      countParams.push(statusFilter);
-    }
-
-    if (search) {
-      countQuery += `
-      AND (
-        first_name LIKE ? OR last_name LIKE ? OR
-        username   LIKE ? OR email     LIKE ? OR
-        gender     LIKE ?
-      )
-    `;
-      const like = `%${search}%`;
-      countParams.push(like, like, like, like, like);
-    }
-
-    const [countRows]: any = await db.query(countQuery, countParams);
-
-    return { items: rows, total: Number(countRows?.[0]?.total ?? 0) };
+    return {
+      items: rows,
+      total: Number(countRows?.[0]?.total ?? 0),
+      limit: safeLimit,
+    };
   } catch (error: unknown) {
     logServiceError("admin/user.service", "getUsersPaginated", error);
     throw error;
@@ -78,17 +79,17 @@ export const updateUserStatusService = async (
   status: string
 ): Promise<User | null> => {
   try {
-    if (!["active", "pending", "inactive", "delete"].includes(status)) {
+    if (!["active", "pending", "inactive"].includes(status)) {
       throw new Error("Invalid status value");
     }
 
     await db.query(
-      "UPDATE `user` SET status = ? WHERE id = ? AND status != 'delete'",
+      "UPDATE `user` SET status = ? WHERE id = ? AND COALESCE(is_delete, 0) = 0",
       [status, userId]
     );
 
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, status
+      `SELECT id, username, first_name, last_name, phone, email, gender, status, is_delete
      FROM \`user\` WHERE id = ?`,
       [userId]
     );
@@ -118,7 +119,7 @@ export const updateUserProfileByAdmin = async (
     await db.query(
       `UPDATE \`user\`
      SET username=?, first_name=?, last_name=?, phone=?, email=?, gender=?, status=?
-     WHERE id=?`,
+     WHERE id=? AND COALESCE(is_delete, 0) = 0`,
       [
         data.username,
         data.first_name,
@@ -132,7 +133,7 @@ export const updateUserProfileByAdmin = async (
     );
 
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, status
+      `SELECT id, username, first_name, last_name, phone, email, gender, status, is_delete
      FROM \`user\` WHERE id = ?`,
       [userId]
     );
@@ -149,12 +150,12 @@ export const updateUserProfileByAdmin = async (
 export const softDeleteUserByAdmin = async (userId: number): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE id = ? AND status != 'delete' LIMIT 1",
+      "SELECT id FROM `user` WHERE id = ? AND COALESCE(is_delete, 0) = 0 LIMIT 1",
       [userId]
     );
     if (!rows.length) return false;
 
-    await db.query("UPDATE `user` SET status = 'delete' WHERE id = ?", [userId]);
+    await db.query("UPDATE `user` SET is_delete = 1 WHERE id = ?", [userId]);
     return true;
   } catch (error: unknown) {
     logServiceError("admin/user.service", "softDeleteUserByAdmin", error);
@@ -171,7 +172,7 @@ export const checkDuplicateUserUsernameOrEmail = async (
 ): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND id != ? AND status != 'delete'",
+      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND id != ? AND COALESCE(is_delete, 0) = 0",
       [username, email, excludeId]
     );
     return rows.length > 0;
@@ -180,3 +181,8 @@ export const checkDuplicateUserUsernameOrEmail = async (
     throw error;
   }
 };
+
+
+
+
+// dynamic dropdown limit

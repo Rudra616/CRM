@@ -32,9 +32,14 @@ const AdminDashboard = () => {
           const msg = (err as { message?: string })?.message || '';
           // Backward compatibility
           if (!msg.toLowerCase().includes('not found')) throw err;
-        const [subRes, userRes] = await Promise.all([getSubadminsApi(), getUsersApi(1, 10)]);
-          setSubadminCount(Array.isArray(subRes.data) ? subRes.data.length : 0);
-          setUserCount(Array.isArray(userRes.data) ? userRes.data.length : 0);
+          const [subRes, userRes] = await Promise.all([
+            getSubadminsApi(1, 10),
+            getUsersApi({ page: 1, limit: 10 }),
+          ]);
+          const subData = subRes.data as { pagination?: { total?: number } } | undefined;
+          const userData = userRes.data as { pagination?: { total?: number } } | undefined;
+          setSubadminCount(subData?.pagination?.total ?? 0);
+          setUserCount(userData?.pagination?.total ?? 0);
         }
       } catch (err) {
         showError((err as { message?: string })?.message || 'Failed to load');
@@ -46,7 +51,7 @@ const AdminDashboard = () => {
   }, []);
 
   // Function to navigate to users page with a status filter
-  const navigateToUsers = (status?: 'active' | 'pending' | 'inactive' | 'delete') => {
+  const navigateToUsers = (status?: 'active' | 'pending' | 'inactive' | 'deleted') => {
     if (status) {
       navigate('/admin/users', { state: { statusFilter: status } });
     } else {
@@ -104,7 +109,7 @@ const AdminDashboard = () => {
           title="Deleted Users"
           value={deletedUsers}
           hint="Soft deleted users"
-          onClick={() => navigate('/admin/users', { state: { statusFilter: 'delete' } })}
+          onClick={() => navigateToUsers('deleted')}
         />
 
         <DashboardStatCard

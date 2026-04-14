@@ -6,6 +6,7 @@ import {
   updateUserProfileByAdmin,
   softDeleteUserByAdmin,
   checkDuplicateUserUsernameOrEmail,
+  USERS_PAGE_SIZE_OPTIONS,
 } from "../service/user.service";
 import {
   removeAllUserTokensForUserId,
@@ -15,12 +16,13 @@ import {
 // ─── List Users (paginated) ───────────────────────────────────────────────────
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const page   = Math.max(1, Number(req.query.page) || 1);
-    const limit  = 10;
-    const status = req.query.status as string | undefined;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limitRaw = Number(req.query.limit);
+    const deletedOnly = String(req.query.deleted ?? "") === "1";
+    const status = deletedOnly ? undefined : (req.query.status as string | undefined);
     const search = (req.query.search as string | undefined)?.trim();
 
-    const { items, total } = await getUsersPaginated(page, limit, status, search);
+    const { items, total, limit } = await getUsersPaginated(page, limitRaw, status, search, { deletedOnly });
 
     return successResponse(res, "Users fetched successfully", {
       items,
@@ -29,6 +31,7 @@ export const getUsers = async (req: Request, res: Response) => {
         limit,
         total,
         totalPages: Math.max(1, Math.ceil(total / limit)),
+        limitOptions: [...USERS_PAGE_SIZE_OPTIONS],
       },
     }, 200);
   } catch (err: any) {
@@ -115,3 +118,6 @@ export const deleteUserByAdmin = async (req: Request, res: Response) => {
     return errorResponse(res, err.message, 500);
   }
 };
+
+
+

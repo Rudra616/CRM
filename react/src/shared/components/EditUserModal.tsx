@@ -11,6 +11,7 @@ type EditUserForm = {
   email: string;
   phone: string;
   gender: Gender;
+  roleSelectValue: string;
   newPassword: string;
   confirmPassword: string;
 };
@@ -22,6 +23,7 @@ export type EditUserProfilePayload = {
   email: string;
   phone: string;
   gender: Gender;
+  role_id?: number;
 };
 
 interface EditUserModalProps {
@@ -31,6 +33,8 @@ interface EditUserModalProps {
   /** When set, shows optional new + confirm password; only calls this if user entered a new password. */
   onChangePassword?: (body: { newPassword: string; confirmPassword: string }) => Promise<void>;
   title: string;
+  /** When set, shows a role dropdown (subadmin RBAC). */
+  roleOptions?: { id: number; name: string }[];
 }
 
 const firstNameFromUser = (u: User) =>
@@ -39,12 +43,16 @@ const firstNameFromUser = (u: User) =>
 const lastNameFromUser = (u: User) =>
   u.lastname ?? (u as unknown as { last_name?: string }).last_name ?? '';
 
+const roleIdFromUser = (u: User) =>
+  u.role_id ?? (u as unknown as { role_id?: number }).role_id ?? undefined;
+
 export const EditUserModal: React.FC<EditUserModalProps> = ({
   user,
   onClose,
   onSave,
   onChangePassword,
   title,
+  roleOptions,
 }) => {
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } =
     useFormValidation<EditUserForm>();
@@ -55,6 +63,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     email: '',
     phone: '',
     gender: 'other',
+    roleSelectValue: '',
     newPassword: '',
     confirmPassword: '',
   });
@@ -63,6 +72,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
   useEffect(() => {
     if (user) {
+      const rid = roleIdFromUser(user);
       setForm({
         username: user.username ?? '',
         firstname: firstNameFromUser(user),
@@ -70,6 +80,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         email: user.email ?? '',
         phone: user.phone ?? '',
         gender: (user.gender ?? 'other') as Gender,
+        roleSelectValue: rid !== undefined && rid !== null ? String(rid) : '',
         newPassword: '',
         confirmPassword: '',
       });
@@ -105,9 +116,24 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       gender: form.gender,
     };
 
+    if (roleOptions && roleOptions.length > 0) {
+      const rid = Number(form.roleSelectValue);
+      if (!Number.isInteger(rid) || rid <= 0) {
+        showError('Select a role');
+        return;
+      }
+      profilePayload.role_id = rid;
+    }
+
     const np = form.newPassword.trim();
     const cp = form.confirmPassword.trim();
     const wantsPw = np.length > 0 || cp.length > 0;
+
+    const prevRole = roleIdFromUser(user);
+    const prevRoleStr = prevRole !== undefined && prevRole !== null ? String(prevRole) : '';
+    const roleChanged =
+      Boolean(roleOptions && roleOptions.length > 0) &&
+      (form.roleSelectValue || '') !== prevRoleStr;
 
     const profileChanged =
       profilePayload.username !== (user.username ?? '') ||
@@ -115,7 +141,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       profilePayload.lastname !== lastNameFromUser(user) ||
       profilePayload.email !== (user.email ?? '') ||
       profilePayload.phone !== (user.phone ?? '').replace(/\D/g, '').slice(0, 10) ||
-      profilePayload.gender !== (user.gender ?? 'other');
+      profilePayload.gender !== (user.gender ?? 'other') ||
+      roleChanged;
 
     const fieldResults: Record<string, { valid: boolean; message?: string }> = {
       ...validateEditUserFields(profilePayload),
@@ -265,6 +292,25 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 </select>
                 {errors.gender && <div className="invalid-feedback d-block">{errors.gender}</div>}
               </div>
+              {roleOptions && roleOptions.length > 0 && (
+                <div className="mb-2">
+                  <label className="form-label">Role *</label>
+                  <select
+                    className="form-select"
+                    value={form.roleSelectValue}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, roleSelectValue: e.target.value }));
+                    }}
+                  >
+                    <option value="">Select role</option>
+                    {roleOptions.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {enablePasswordChange && (
                 <>
                   <hr className="my-3" />

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { registerApi, createSubadminApi } from '../api/auth.api';
+import { getRolesApi, type RoleItem } from '../../admin/api/admin.api';
 import { validateRegister } from '../../../shared/utils/validation';
 import { showSuccess, showError } from '../../../shared/utils/toast';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
@@ -16,6 +17,8 @@ type RegisterForm = {
   password: string;
   confirmPassword: string;
   gender: Gender;
+  /** RBAC role id when creating a subadmin */
+  roleId: number | '';
 };
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
@@ -31,6 +34,8 @@ const Register: React.FC = () => {
 
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } = useFormValidation<RegisterForm>();
 
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+
   const [form, setForm] = useState<RegisterForm>({
     username: '',
     firstname: '',
@@ -40,7 +45,15 @@ const Register: React.FC = () => {
     password: '',
     confirmPassword: '',
     gender: '' as Gender,
+    roleId: '',
   });
+
+  useEffect(() => {
+    if (!isCreateSubadmin) return;
+    void getRolesApi()
+      .then((res) => setRoles(res.data ?? []))
+      .catch(() => setRoles([]));
+  }, [isCreateSubadmin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -61,6 +74,11 @@ const Register: React.FC = () => {
 
     try {
       if (isCreateSubadmin) {
+        const rid = Number(form.roleId);
+        if (!Number.isInteger(rid) || rid <= 0) {
+          showError('Please select a role');
+          return;
+        }
         await createSubadminApi({
           username: form.username,
           firstname: form.firstname,
@@ -69,6 +87,7 @@ const Register: React.FC = () => {
           phone: form.phone,
           password: form.password,
           gender: form.gender,
+          role_id: rid,
         });
         showSuccess('Subadmin created successfully');
         setForm({
@@ -80,6 +99,7 @@ const Register: React.FC = () => {
           password: '',
           confirmPassword: '',
           gender: 'other',
+          roleId: '',
         });
       } else {
         await registerApi({
@@ -222,6 +242,31 @@ const Register: React.FC = () => {
               </select>
               {errors.gender && <div className="invalid-feedback d-block">{errors.gender}</div>}
             </div>
+
+            {isCreateSubadmin && (
+              <div className="mb-3">
+                <label className="form-label">Role *</label>
+                <select
+                  className="form-select"
+                  value={form.roleId === '' ? '' : String(form.roleId)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      roleId: v === '' ? '' : Number(v),
+                    }));
+                  }}
+                >
+                  <option value="">Select role</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="form-text">Permissions for this subadmin come from the role you assign.</div>
+              </div>
+            )}
 
             {/* Password */}
             <div className="mb-3">

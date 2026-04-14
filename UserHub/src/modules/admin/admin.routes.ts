@@ -23,6 +23,7 @@ import {
   listModules,
   listRoles,
   savePermissionsByRole,
+  getMyPermissions
 } from "./controller/rbac.controller";
 
 // Admin self
@@ -34,7 +35,7 @@ import {
   changeAdminPassword,
   getDashboardSummary,
 } from "./controller/admin.controller";
-
+import { checkPermission } from "../../common/middleware/permission.middleware";
 // Subadmin CRUD (managed by admin)
 import {
   createSubadmin,
@@ -147,33 +148,47 @@ router.get(
   "/users",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
+    checkPermission("user", "can_view"),
+
   getUsers,
 );
 router.patch(
   "/users/:id",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(adminUpdateUserStatusSchema),
+  checkPermission("user", "can_edit"),
+
   updateUserStatus
 );
 router.put(
   "/users/:id",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(adminUpdateUserProfileSchema),
   updateUserProfileByAdminController,
 );
 router.post(
   "/users/:id/logout",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
   logoutUserByAdmin,
 );
 router.delete(
   "/users/:id",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+    checkPermission("user", "can_delete"),
+
   deleteUserByAdmin,
+);
+router.get(
+  "/me/permissions",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  getMyPermissions,
 );
 
 export default router;
+
+

@@ -10,7 +10,12 @@ export interface User {
   role: 'admin' | 'subadmin' | 'user';
   image_url?: string | null;
   gender?: Gender;
-  status?: 'active' | 'pending' | 'inactive' | 'delete';
+  status?: 'active' | 'pending' | 'inactive';
+  /** Soft-deleted users (from `user.is_delete`) */
+  is_delete?: 0 | 1;
+  /** Subadmin RBAC role from `role` table */
+  role_id?: number;
+  role_name?: string;
 }
 
 export interface Admin {

@@ -36,4 +36,4 @@ export interface RegisterRequest {
   gender?: string;
 }
 
-export type CreateSubadminRequest = RegisterRequest;
+export type CreateSubadminRequest = RegisterRequest & { role_id: number };

@@ -59,14 +59,19 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     // ── Admin / Subadmin session ──────────────────────────────────────────────
     if (adminTokenRow) {
       const adminRow = await findAdminById(Number(decoded.id));
+      
       if (!adminRow || adminRow.status !== "active") {
         clearAuthCookie(res);
         clearSessionCookies(res);
         return res.status(401).json({ success: false, message: "Session invalid" });
       }
       const numericRole = adminRoleToNumeric(adminRow.role);
-      authReq.user = { id: Number(decoded.id), role: numericRole, adminRole: adminRow.role };
-    }
+authReq.user = {
+  id: Number(decoded.id),
+  role: numericRole,
+  role_id: adminRow.role_id ?? undefined,
+  adminRole: adminRow.role,
+};    }
 
     // ── Sliding session refresh (< 6 hours left) ──────────────────────────────
     const nowSec = Math.floor(Date.now() / 1000);

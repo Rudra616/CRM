@@ -66,6 +66,7 @@ export const createSubadminApi = (
     last_name: data.lastname,
     phone: data.phone,
     gender: data.gender,
+    role_id: data.role_id,
   });
 };
 

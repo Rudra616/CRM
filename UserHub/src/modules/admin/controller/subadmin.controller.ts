@@ -6,7 +6,7 @@ import {
   findSubadminById,
   findSubadminByUsernameOrEmail,
   checkDuplicateSubadminUsernameOrEmail,
-  getAllSubadmins,
+  getSubadminsPaginated,
   insertSubadmin,
   updateSubadminById,
   updateSubadminPassword,
@@ -15,11 +15,17 @@ import {
 import {
   removeAllAdminTokensForAdminId,
 } from "../../token.service";
+import { findRoleById } from "../service/rbac.service";
 
 // ─── Create Subadmin (admin only) ─────────────────────────────────────────────
 export const createSubadmin = async (req: Request, res: Response) => {
   try {
-    const { username, password, first_name, last_name, phone, email, gender } = req.body;
+    const { username, password, first_name, last_name, phone, email, gender, role_id } = req.body;
+
+    const roleId = Number(role_id);
+    if (!Number.isInteger(roleId) || roleId <= 0) return errorResponse(res, "Invalid role", 400);
+    const roleRow = await findRoleById(roleId);
+    if (!roleRow) return errorResponse(res, "Invalid role", 400);
 
     const existing = await findSubadminByUsernameOrEmail(username, email);
     if (existing) return errorResponse(res, "Username or email already exists", 409);
@@ -33,6 +39,7 @@ export const createSubadmin = async (req: Request, res: Response) => {
       phone,
       email,
       gender: gender ?? null,
+      role_id: roleId,
     });
 
     return successResponse(res, "Subadmin created successfully", null, 201);
@@ -42,10 +49,21 @@ export const createSubadmin = async (req: Request, res: Response) => {
 };
 
 // ─── Get All Subadmins ────────────────────────────────────────────────────────
-export const getSubadmins = async (_req: Request, res: Response) => {
+export const getSubadmins = async (req: Request, res: Response) => {
   try {
-    const subadmins = await getAllSubadmins();
-    return successResponse(res, "Subadmins fetched successfully", subadmins, 200);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = 10;
+    const search = (req.query.search as string | undefined)?.trim();
+    const { items, total } = await getSubadminsPaginated(page, limit, search);
+    return successResponse(res, "Subadmins fetched successfully", {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    }, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
@@ -71,7 +89,7 @@ export const updateSubadmin: RequestHandler<{ id: string }>  = async (req, res) 
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
 
   try {
-    const { username, first_name, last_name, phone, email, gender } = req.body;
+    const { username, first_name, last_name, phone, email, gender, role_id } = req.body;
 
     const subadmin = await findSubadminById(id);
     if (!subadmin) return errorResponse(res, "Subadmin not found", 404);
@@ -79,7 +97,24 @@ export const updateSubadmin: RequestHandler<{ id: string }>  = async (req, res) 
     const isDup = await checkDuplicateSubadminUsernameOrEmail(username, email, id);
     if (isDup) return errorResponse(res, "Username or email already exists", 409);
 
-    await updateSubadminById(id, { username, first_name, last_name, phone, email, gender });
+    let roleIdUpdate: number | undefined;
+    if (role_id !== undefined && role_id !== null && role_id !== "") {
+      const rid = Number(role_id);
+      if (!Number.isInteger(rid) || rid <= 0) return errorResponse(res, "Invalid role", 400);
+      const roleRow = await findRoleById(rid);
+      if (!roleRow) return errorResponse(res, "Invalid role", 400);
+      roleIdUpdate = rid;
+    }
+
+    await updateSubadminById(id, {
+      username,
+      first_name,
+      last_name,
+      phone,
+      email,
+      gender,
+      ...(roleIdUpdate !== undefined ? { role_id: roleIdUpdate } : {}),
+    });
 
     const updated = await findSubadminById(id);
     return successResponse(res, "Subadmin updated successfully", updated, 200);

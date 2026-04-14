@@ -9,7 +9,27 @@ export type UsersPageData = {
     limit: number;
     total: number;
     totalPages: number;
+    /** Page-size choices returned by the server (use for dropdown). */
+    limitOptions?: number[];
   };
+};
+
+export type UsersListParams = {
+  page: number;
+  limit: number;
+  statusFilter?: string;
+  search?: string;
+  deletedOnly?: boolean;
+};
+
+const usersListSearchParams = (p: UsersListParams): URLSearchParams => {
+  const params = new URLSearchParams();
+  params.set('page', String(p.page));
+  params.set('limit', String(p.limit));
+  if (p.deletedOnly) params.set('deleted', '1');
+  else if (p.statusFilter && p.statusFilter !== 'all') params.set('status', p.statusFilter);
+  if (p.search?.trim()) params.set('search', p.search.trim());
+  return params;
 };
 
 export type AdminDashboardSummary = {
@@ -23,7 +43,6 @@ export type AdminDashboardSummary = {
 
 export type ModuleItem = {
   id: number;
-  key: string;
   name: string;
   status: 'active' | 'inactive';
 };
@@ -33,70 +52,30 @@ export type RoleItem = {
   name: string;
   status: 'active' | 'inactive';
 };
-export const getUsersApi = (
-  page: number,
-  limit: number,
-  statusFilter?: string,
-  search?: string
-): Promise<ApiResponse<UsersPageData>> => {
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  });
 
-  if (statusFilter && statusFilter !== 'all') {
-    params.append('status', statusFilter);
-  }
-
-  if (search && search.trim() !== '') {
-    params.append('search', search.trim());
-  }
-
-  return apiRequest<UsersPageData>('GET', `/users?${params.toString()}`);
+export type RolePermissionEntry = {
+  module_id: number;
+  can_view: 0 | 1;
+  can_add: 0 | 1;
+  can_edit: 0 | 1;
+  can_delete: 0 | 1;
 };
 
-export const getSubadminUsersApi = (
-  page: number,
-  limit: number,
-  statusFilter?: string,
-  search?: string
-): Promise<ApiResponse<UsersPageData>> => {
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  });
-
-  if (statusFilter && statusFilter !== 'all') {
-    params.append('status', statusFilter);
-  }
-  if (search && search.trim() !== '') {
-    params.append('search', search.trim());
-  }
-
-  return apiRequest<UsersPageData>('GET', `/admin/users?${params.toString()}`);
+export type RolePermissionSaveRow = {
+  module_id: number;
+  can_view: boolean;
+  can_add: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
 };
+export const getUsersApi = (p: UsersListParams): Promise<ApiResponse<UsersPageData>> =>
+  apiRequest<UsersPageData>('GET', `/users?${usersListSearchParams(p).toString()}`);
 
-export const getAdminUsersApi = (
-  page: number,
-  limit: number,
-  statusFilter?: string,
-  search?: string
-) => {
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  });
+export const getSubadminUsersApi = (p: UsersListParams): Promise<ApiResponse<UsersPageData>> =>
+  apiRequest<UsersPageData>('GET', `/admin/users?${usersListSearchParams(p).toString()}`);
 
-  if (statusFilter && statusFilter !== 'all') {
-    params.append('status', statusFilter);
-  }
-
-  if (search && search.trim() !== '') {
-    params.append('search', search.trim());
-  }
-
-  return apiRequest('GET', `/admin/users?${params.toString()}`);
-};
+export const getAdminUsersApi = (p: UsersListParams): Promise<ApiResponse<UsersPageData>> =>
+  apiRequest<UsersPageData>('GET', `/admin/users?${usersListSearchParams(p).toString()}`);
 
 export const getAdminDashboardSummaryApi = (): Promise<ApiResponse<AdminDashboardSummary>> => {
   return apiRequest<AdminDashboardSummary>(
@@ -108,7 +87,7 @@ export const getAdminDashboardSummaryApi = (): Promise<ApiResponse<AdminDashboar
 export const getModulesApi = (): Promise<ApiResponse<ModuleItem[]>> =>
   apiRequest<ModuleItem[]>('GET', '/admin/modules');
 
-export const createModuleApi = (body: { key: string; name: string }): Promise<ApiResponse<{ id: number }>> =>
+export const createModuleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
   apiRequest<{ id: number }>('POST', '/admin/modules', body);
 
 export const getRolesApi = (): Promise<ApiResponse<RoleItem[]>> =>
@@ -117,14 +96,19 @@ export const getRolesApi = (): Promise<ApiResponse<RoleItem[]>> =>
 export const createRoleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
   apiRequest<{ id: number }>('POST', '/admin/roles', body);
 
-export const getRolePermissionsApi = (roleId: number): Promise<ApiResponse<{ roleId: number; moduleIds: number[] }>> =>
-  apiRequest<{ roleId: number; moduleIds: number[] }>('GET', `/admin/roles/${roleId}/permissions`);
+export const getRolePermissionsApi = (
+  roleId: number
+): Promise<ApiResponse<{ roleId: number; permissions: RolePermissionEntry[] }>> =>
+  apiRequest<{ roleId: number; permissions: RolePermissionEntry[] }>(
+    'GET',
+    `/admin/roles/${roleId}/permissions`
+  );
 
 export const saveRolePermissionsApi = (
   roleId: number,
-  moduleIds: number[]
+  permissions: RolePermissionSaveRow[]
 ): Promise<ApiResponse<{ roleId: number }>> =>
-  apiRequest<{ roleId: number }>('PUT', `/admin/roles/${roleId}/permissions`, { moduleIds });
+  apiRequest<{ roleId: number }>('PUT', `/admin/roles/${roleId}/permissions`, { permissions });
 
 export const getAdminMyModulesApi = (): Promise<ApiResponse<{ moduleKeys: string[] }>> =>
   apiRequest<{ moduleKeys: string[] }>('GET', '/admin/me/modules');
@@ -146,8 +130,19 @@ export const getMyModulesApi = async (
   }
 };
 
-export const getSubadminsApi = (): Promise<ApiResponse<User[]>> => {
-  return apiRequest<User[]>('GET', '/admin/subadmins');
+export const getSubadminsApi = (
+  page: number,
+  limit: number,
+  search?: string
+): Promise<ApiResponse<UsersPageData>> => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (search && search.trim() !== '') {
+    params.append('search', search.trim());
+  }
+  return apiRequest<UsersPageData>('GET', `/admin/subadmins?${params.toString()}`);
 };
 
 export const getAdminProfileApi = (): Promise<ApiResponse<Admin>> => {
@@ -165,15 +160,19 @@ export const updateSubadminApi = (
   data: UpdateUserRequest
 ): Promise<ApiResponse<User>> => {
   return apiRequest<User>('PUT', `/admin/subadmins/${id}`, {
-    ...data,
-    first_name: (data as unknown as { firstname?: string }).firstname,
-    last_name: (data as unknown as { lastname?: string }).lastname,
+    username: data.username,
+    first_name: data.firstname,
+    last_name: data.lastname,
+    email: data.email,
+    phone: data.phone,
+    gender: data.gender,
+    ...(data.role_id !== undefined ? { role_id: data.role_id } : {}),
   });
 };
 
 export const updateUserStatusApi = (
   userId: string | number,
-  status: 'active' | 'pending' | 'inactive' | 'delete'
+  status: 'active' | 'pending' | 'inactive'
 ): Promise<ApiResponse<User>> => {
   return apiRequest<User>('PATCH', `/admin/users/${userId}`, { status });
 };
@@ -187,7 +186,7 @@ export const updateUserByAdminApi = (
     email: string;
     phone: string;
     gender: 'male' | 'female' | 'other';
-    status: 'active' | 'pending' | 'inactive' | 'delete';
+    status: 'active' | 'pending' | 'inactive';
   }
 ): Promise<ApiResponse<User>> => {
   return apiRequest<User>('PUT', `/admin/users/${userId}`, {
@@ -232,3 +231,23 @@ export const deleteSubadminApi = (
 ): Promise<ApiResponse<null>> => {
   return apiRequest<null>('DELETE', `/admin/subadmins/${id}`);
 };
+
+
+// Add to admin.api.ts
+
+export type PermissionEntry = {
+  can_view: boolean;
+  can_add: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+export type PermissionMap = Record<string, PermissionEntry>;
+
+export type MyPermissionsResponse = {
+  isAdmin: boolean;
+  permissions: PermissionMap;
+};
+
+export const getMyPermissionsApi = (): Promise<ApiResponse<MyPermissionsResponse>> =>
+  apiRequest<MyPermissionsResponse>('GET', '/admin/me/permissions');

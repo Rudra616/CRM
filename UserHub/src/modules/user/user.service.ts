@@ -10,7 +10,7 @@ export const findUserByUsernameOrEmail = async (
 ): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND status != 'delete'",
+      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND COALESCE(is_delete, 0) = 0",
       [username, email]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -23,9 +23,9 @@ export const findUserByUsernameOrEmail = async (
 export const findUserByUsername = async (username: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, password, first_name, last_name, phone, email, gender, image_url, status
+      `SELECT id, username, password, first_name, last_name, phone, email, gender, image_url, status, is_delete
      FROM \`user\`
-     WHERE username = ? AND status != 'delete'
+     WHERE username = ? AND COALESCE(is_delete, 0) = 0
      ORDER BY id DESC LIMIT 1`,
       [username]
     );
@@ -39,8 +39,8 @@ export const findUserByUsername = async (username: string): Promise<User | null>
 export const findUserById = async (id: number): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, status
-     FROM \`user\` WHERE id = ?`,
+      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, status, is_delete
+     FROM \`user\` WHERE id = ? AND COALESCE(is_delete, 0) = 0`,
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -53,7 +53,7 @@ export const findUserById = async (id: number): Promise<User | null> => {
 export const findUserByEmail = async (email: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id, email FROM `user` WHERE email = ? AND status != 'delete' LIMIT 1",
+      "SELECT id, email FROM `user` WHERE email = ? AND COALESCE(is_delete, 0) = 0 LIMIT 1",
       [email]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -70,7 +70,7 @@ export const checkDuplicateUsernameOrEmail = async (
 ): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND id != ? AND status != 'delete'",
+      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND id != ? AND COALESCE(is_delete, 0) = 0",
       [username, email, excludeId]
     );
     return rows.length > 0;
@@ -90,7 +90,7 @@ export const insertUser = async (
   phone: string,
   email: string,
   gender?: string | null,
-  status: "pending" | "active" | "inactive" | "delete" = "pending"
+  status: "pending" | "active" | "inactive" = "pending"
 ): Promise<number> => {
   try {
     const [result]: any = await db.query(
@@ -123,7 +123,7 @@ export const updateUserById = async (
     await db.query(
       `UPDATE \`user\`
      SET username=?, first_name=?, last_name=?, phone=?, email=?, gender=?, image_url=?
-     WHERE id=?`,
+     WHERE id=? AND COALESCE(is_delete, 0) = 0`,
       [
         data.username,
         data.first_name,
@@ -147,7 +147,7 @@ export const updateUserPassword = async (
 ): Promise<boolean> => {
   try {
     const [result]: any = await db.query(
-      "UPDATE `user` SET password = ? WHERE id = ?",
+      "UPDATE `user` SET password = ? WHERE id = ? AND COALESCE(is_delete, 0) = 0",
       [hashedPassword, userId]
     );
     return result.affectedRows > 0;
@@ -162,11 +162,11 @@ export const updateUserPassword = async (
 export const softDeleteUser = async (userId: number): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE id = ? AND status != 'delete' LIMIT 1",
+      "SELECT id FROM `user` WHERE id = ? AND COALESCE(is_delete, 0) = 0 LIMIT 1",
       [userId]
     );
     if (!rows.length) return false;
-    await db.query("UPDATE `user` SET status = 'delete' WHERE id = ?", [userId]);
+    await db.query("UPDATE `user` SET is_delete = 1 WHERE id = ?", [userId]);
     return true;
   } catch (error: unknown) {
     logServiceError("user.service", "softDeleteUser", error);

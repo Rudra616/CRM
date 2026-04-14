@@ -27,3 +27,19 @@ app.use("/api/subadmin", subadminRoutes);
 app.use("/api",       userRoutes);
 
 export default app;
+
+
+
+
+
+
+
+
+
+//11/04/2026
+// update pagination service add trim, dropdown add for page limit 5,10,50,100
+// use reuseble code for quary 
+// role_permission add coloum edit, delete,active ,inactive , delete coloum
+// module table remove key use id 
+// role table add delete coloum
+// tickit ,message  table add and apply in dasboard page 

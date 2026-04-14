@@ -7,6 +7,7 @@ export interface UpdateUserRequest {
   email: string;
   phone: string;
   gender: Gender;
+  role_id?: number;
 }
 
 export interface UpdateAdminRequest {

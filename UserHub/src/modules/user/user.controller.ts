@@ -52,9 +52,11 @@ export const loginUser = async (req: Request, res: Response) => {
     const user = await findUserByUsername(username);
     if (!user) return errorResponse(res, "User not found", 404);
 
+    if (Number((user as { is_delete?: number }).is_delete) === 1) {
+      return errorResponse(res, "This account has been removed.", 403);
+    }
     if (user.status === "pending")   return errorResponse(res, "Your account is pending approval by admin.", 403);
     if (user.status === "inactive")  return errorResponse(res, "Your account has been deactivated.", 403);
-    if (user.status === "delete")    return errorResponse(res, "This account has been deleted.", 403);
     if (user.status !== "active")    return errorResponse(res, "Your account is not active.", 403);
 
     const isMatch = await comparePassword(password, user.password);

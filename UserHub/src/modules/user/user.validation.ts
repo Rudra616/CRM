@@ -100,6 +100,10 @@ export const createSubadminSchema = Joi.object({
   phone:      phoneField,
   email:      emailField,
   gender:     genderOptional,
+  role_id: Joi.number().integer().positive().required().messages({
+    "any.required": "Role is required",
+    "number.base": "Role is required",
+  }),
 });
 
 export const updateSubadminSchema = Joi.object({
@@ -109,11 +113,14 @@ export const updateSubadminSchema = Joi.object({
   phone:      phoneField,
   email:      emailField,
   gender:     genderRequired,
+  role_id: Joi.number().integer().positive().optional().messages({
+    "number.base": "Invalid role",
+  }),
 });
 
 export const adminUpdateUserStatusSchema = Joi.object({
-  status: Joi.string().valid("active", "pending", "inactive", "delete").required().messages({
-    "any.only":    "Status must be one of: active, pending, inactive, delete",
+  status: Joi.string().valid("active", "pending", "inactive").required().messages({
+    "any.only":    "Status must be one of: active, pending, inactive",
     "string.empty":"Status is required",
     "any.required":"Status is required",
   }),
@@ -126,8 +133,8 @@ export const adminUpdateUserProfileSchema = Joi.object({
   phone:      phoneField,
   email:      emailField,
   gender:     genderRequired,
-  status: Joi.string().valid("active", "pending", "inactive", "delete").required().messages({
-    "any.only":    "Status must be one of: active, pending, inactive, delete",
+  status: Joi.string().valid("active", "pending", "inactive").required().messages({
+    "any.only":    "Status must be one of: active, pending, inactive",
     "string.empty":"Status is required",
     "any.required":"Status is required",
   }),
