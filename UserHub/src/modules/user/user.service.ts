@@ -1,9 +1,9 @@
 import db from "../../config/db";
 import { User } from "../../common/types/user";
 import { logServiceError } from "../../common/helpers/serviceError";
-
+import { RowDataPacket, ResultSetHeader } from "mysql2";
 // ─── Lookup ───────────────────────────────────────────────────────────────────
-
+let Quary = "SELECT id, username, password, first_name, last_name, phone, email, gender, image_url, status, is_delete";
 export const findUserByUsernameOrEmail = async (
   username: string,
   email: string
@@ -23,7 +23,7 @@ export const findUserByUsernameOrEmail = async (
 export const findUserByUsername = async (username: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, password, first_name, last_name, phone, email, gender, image_url, status, is_delete
+      `${Quary}
      FROM \`user\`
      WHERE username = ? AND COALESCE(is_delete, 0) = 0
      ORDER BY id DESC LIMIT 1`,
@@ -39,7 +39,7 @@ export const findUserByUsername = async (username: string): Promise<User | null>
 export const findUserById = async (id: number): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, status, is_delete
+      `${Quary}
      FROM \`user\` WHERE id = ? AND COALESCE(is_delete, 0) = 0`,
       [id]
     );

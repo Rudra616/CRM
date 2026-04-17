@@ -26,12 +26,31 @@ export const successResponse = <T>(
 
   return res.status(status).json(responseBody);
 };
+export const errorResponse = (
+  res: Response,
+  message: string,
+  status = 500,
+  devMessage?: any
+) => {
+  const payload: any = {
+    success: false,
+    message,
+  };
 
-export const errorResponse = (res: Response, message: string, status = 500) => {
+  // Only add this (main upgrade)
+  if (process.env.NODE_ENV === "development" && devMessage) {
+    payload.devMessage =
+      typeof devMessage === "object"
+        ? JSON.stringify(devMessage)
+        : devMessage;
+  }
+
+  // Keep your logging (no change)
   if (status >= 500) {
     console.error("[API ERROR RESPONSE]", { status, message });
   } else {
     console.warn("[API RESPONSE WARNING]", { status, message });
   }
-  return res.status(status).json({ success: false, message });
+
+  return res.status(status).json(payload);
 };

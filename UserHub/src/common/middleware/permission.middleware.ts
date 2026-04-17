@@ -4,7 +4,7 @@ import { AuthRequest } from "../types/AuthRequest";
 // import { getPermissionByRoleAndModule } from "../../modules/permission/service/permission.service";
 import { errorResponse } from "../utils/apiResponse";
 import { Role } from "../types/role";
-import { getPermissionByRoleAndModule } from "../service";
+import { getPermissionByRoleAndModule } from "../permission.service";
 
 /**
  * Permission middleware

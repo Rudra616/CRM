@@ -12,11 +12,11 @@ import { colors } from '../../theme/colors';
 const SIDEBAR_WIDTH = 280;
 
 const menuItemStyles = {
-  label:              { color: colors.sidebarText },
-  icon:               { color: colors.sidebarText },
-  button:             { color: colors.sidebarText, '&:hover': { backgroundColor: colors.sidebarHover } },
-  SubMenuExpandIcon:  { color: colors.sidebarText },
-  subMenuContent:     { color: colors.sidebarText, backgroundColor: colors.sidebarBg },
+  label: { color: colors.sidebarText },
+  icon: { color: colors.sidebarText },
+  button: { color: colors.sidebarText, '&:hover': { backgroundColor: colors.sidebarHover } },
+  SubMenuExpandIcon: { color: colors.sidebarText },
+  subMenuContent: { color: colors.sidebarText, backgroundColor: colors.sidebarBg },
 };
 
 interface Props {
@@ -26,9 +26,9 @@ interface Props {
 const Sidebar = ({ role }: Props) => {
   const navigate = useNavigate();
   const { collapsed, sidebarOpen, setSidebarOpen, isMobile } = useSidebar();
-  const { user }           = useAuth();
-  const { getModulePerm }  = usePermissions();
-  const username           = user?.username ?? 'User';
+  const { user } = useAuth();
+  const { getModulePerm } = usePermissions();
+  const username = user?.username ?? 'User';
 
   // ─── Subadmin: check which modules they can VIEW ──────────────────────────
   // If can_view = false for a module, don't even show that menu item.

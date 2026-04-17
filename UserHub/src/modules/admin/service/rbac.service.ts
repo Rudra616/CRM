@@ -3,8 +3,8 @@ import { logServiceError } from "../../../common/helpers/serviceError";
 
 /** Pivot table for RBAC. Set DB_ROLE_PERMISSION_TABLE if your MySQL name differs (e.g. role_permissions). */
 const ROLE_PERMISSION_TABLE = (() => {
-  const t = process.env.DB_ROLE_PERMISSION_TABLE?.trim();
-  if (t && /^[a-zA-Z0-9_]+$/.test(t)) return t;
+  // const t = process.env.DB_ROLE_PERMISSION_TABLE?.trim();
+  // if (t && /^[a-zA-Z0-9_]+$/.test(t)) return t;
   return "role_permission";
 })();
 
@@ -165,7 +165,6 @@ export const replaceRolePermissions = async (
   }
 };
 
-// Add this to your existing rbac.service.ts
 
 export type MyPermissionRow = {
   module_name: string;
@@ -175,8 +174,11 @@ export type MyPermissionRow = {
   can_delete: boolean;
 };
 
-// Different from getRolePermissions — this joins module table to get name
-// and returns booleans (not 0|1) ready for frontend
+/**
+ * 
+ * @param roleId 
+ * @returns An array of permissions for the given role ID, including module names and boolean flags for each permission type.
+ */
 export const getMyPermissionsByRoleId = async (roleId: number): Promise<MyPermissionRow[]> => {
   try {
     const [rows]: any = await db.query(
@@ -190,9 +192,9 @@ export const getMyPermissionsByRoleId = async (roleId: number): Promise<MyPermis
     );
     return rows.map((r: any) => ({
       module_name: r.module_name,
-      can_view:   r.can_view   === 1,
-      can_add:    r.can_add    === 1,
-      can_edit:   r.can_edit   === 1,
+      can_view: r.can_view === 1,
+      can_add: r.can_add === 1,
+      can_edit: r.can_edit === 1,
       can_delete: r.can_delete === 1,
     }));
   } catch (error: unknown) {

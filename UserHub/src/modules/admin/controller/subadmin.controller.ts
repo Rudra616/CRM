@@ -115,9 +115,12 @@ export const updateSubadmin: RequestHandler<{ id: string }>  = async (req, res) 
       gender,
       ...(roleIdUpdate !== undefined ? { role_id: roleIdUpdate } : {}),
     });
+    await removeAllAdminTokensForAdminId(id);
 
     const updated = await findSubadminById(id);
+    
     return successResponse(res, "Subadmin updated successfully", updated, 200);
+    
   } catch (err: any) {
     return errorResponse(res, err.message, 409);
   }

@@ -92,3 +92,28 @@ export interface UpdateAdminProfileDTO {
   gender?: "male" | "female" | "other" | null;
   image_url?: string | null;
 }
+
+
+
+
+export interface Ticket {
+  id: number;
+  user_id: number;
+  subject: string;
+  description: string;
+  status: "open" | "in_progress" | "resolved" | "closed";
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+
+
+// ─── Ticket Message ────────────────────────────────────────────────────────
+export interface TicketMessage {
+  id: number;
+  ticket_id: number;
+  sender_id: number;
+  sender_type: "user" | "admin";
+  message: string;
+  created_at?: Date;
+}

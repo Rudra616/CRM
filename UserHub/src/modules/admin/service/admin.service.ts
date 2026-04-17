@@ -1,13 +1,14 @@
 import db from "../../../config/db";
 import { Admin } from "../../../common/types/user";
 import { logServiceError } from "../../../common/helpers/serviceError";
+import { RowDataPacket } from "mysql2";
 
 // ─── Lookup ───────────────────────────────────────────────────────────────────
-
+let Quary = `SELECT id, username, first_name, last_name, phone, email, gender, image_url, role, role_id, status`
 export const findAdminByUsername = async (username: string): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT * FROM `admin` WHERE username = ? AND status = 'active' AND COALESCE(is_delete, 0) = 0",
+      `${Quary},password FROM \`admin\` WHERE username = ? AND status = 'active' AND COALESCE(is_delete, 0) = 0`,
       [username]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -20,8 +21,7 @@ export const findAdminByUsername = async (username: string): Promise<Admin | nul
 export const findAdminById = async (id: number): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, image_url, role, role_id, status
-     FROM \`admin\` WHERE id = ? AND COALESCE(is_delete, 0) = 0`,
+      `${Quary}  FROM \`admin\` WHERE id = ? AND COALESCE(is_delete, 0) = 0`,
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -38,7 +38,7 @@ export const checkDuplicateAdminUsernameOrEmail = async (
 ): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `admin` WHERE (username = ? OR email = ?) AND id != ? AND COALESCE(is_delete, 0) = 0",
+      `SELECT id FROM \`admin\` WHERE (username = ? OR email = ?) AND id != ? AND COALESCE(is_delete, 0) = 0`,
       [username, email, excludeId]
     );
     return rows.length > 0;
@@ -59,27 +59,34 @@ export const getAdminDashboardSummary = async (): Promise<{
   deletedUsers: number;
 }> => {
   try {
-    const [[userRow]]: any = await db.query(
-      `SELECT
-       SUM(COALESCE(is_delete, 0) = 0) AS total,
-       SUM(COALESCE(is_delete, 0) = 0 AND status = 'active')   AS activeUsers,
-       SUM(COALESCE(is_delete, 0) = 0 AND status = 'pending')  AS pendingUsers,
-       SUM(COALESCE(is_delete, 0) = 0 AND status = 'inactive') AS inactiveUsers,
-       SUM(COALESCE(is_delete, 0) = 1) AS deletedUsers
-     FROM \`user\``
-    );
-
+    // const [[userRow]]: any = await db.query(
+    //   `SELECT
+    //    SUM(COALESCE(is_delete, 0) = 0) AS total,
+    //    SUM(COALESCE(is_delete, 0) = 0 AND status = 'active')   AS activeUsers,
+    //    SUM(COALESCE(is_delete, 0) = 0 AND status = 'pending')  AS pendingUsers,
+    //    SUM(COALESCE(is_delete, 0) = 0 AND status = 'inactive') AS inactiveUsers,
+    //    SUM(COALESCE(is_delete, 0) = 1) AS deletedUsers
+    //  FROM \`user\``
+    // );
+  
     const [[subRow]]: any = await db.query(
-      "SELECT COUNT(*) AS subadminCount FROM `admin` WHERE role = 'subadmin' AND status = 'active' AND COALESCE(is_delete, 0) = 0"
+      `SELECT COUNT(*) AS subadminCount FROM \`admin\` WHERE role = 'subadmin' AND status = 'active' AND COALESCE(is_delete, 0) = 0`
     );
+const [result] = await db.query<RowDataPacket[]>("SELECT * FROM user");
+
+const activeUsers = result.filter(user => user.status === 'active').length;
+const pendingUsers = result.filter(user => user.status === 'pending').length;
+const inactiveUsers = result.filter(user => user.status === 'inactive').length;
+const deletedUsers = result.filter(user => user.is_delete).length;
+
 
     return {
-      userCount: Number(userRow?.total ?? 0),
-      subadminCount: Number(subRow?.subadminCount ?? 0),
-      activeUsers: Number(userRow?.activeUsers ?? 0),
-      pendingUsers: Number(userRow?.pendingUsers ?? 0),
-      inactiveUsers: Number(userRow?.inactiveUsers ?? 0),
-      deletedUsers: Number(userRow?.deletedUsers ?? 0),
+      userCount: result.length,
+      subadminCount: subRow.subadminCount,
+      activeUsers,
+      pendingUsers,
+      inactiveUsers,
+      deletedUsers,
     };
   } catch (error: unknown) {
     logServiceError("admin.service", "getAdminDashboardSummary", error);
@@ -128,7 +135,7 @@ export const updateAdminPassword = async (
 ): Promise<boolean> => {
   try {
     const [result]: any = await db.query(
-      "UPDATE `admin` SET password = ? WHERE id = ?",
+      `UPDATE \`admin\` SET password = ? WHERE id = ?`,
       [hashedPassword, adminId]
     );
     return result.affectedRows > 0;

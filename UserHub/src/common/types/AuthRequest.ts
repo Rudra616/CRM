@@ -15,7 +15,7 @@ export interface AuthRequest extends Request {
      * DB role_id (used for role_permission table)
      * Only for admin/subadmin
      */
-    role_id?: number; // ✅ ADD THIS
+    role_id?: number;
 
     /** Only populated for admin/subadmin sessions */
     adminRole?: AdminRole;

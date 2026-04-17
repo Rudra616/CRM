@@ -27,9 +27,20 @@ export const PermissionProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!user || (user.role !== 'admin' && user.role !== 'subadmin')) {
+      setIsAdmin(false);
+      setPermissions({});
       setPermLoading(false);
       return;
     }
+
+    if (user.role === 'admin') {
+      // Admin has full access; no permissions API call needed.
+      setIsAdmin(true);
+      setPermissions({});
+      setPermLoading(false);
+      return;
+    }
+
     setPermLoading(true);
     getMyPermissionsApi()
       .then((res) => {
@@ -38,7 +49,7 @@ export const PermissionProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch(() => {})
       .finally(() => setPermLoading(false));
-  }, [user?.id]); // re-fetch only when user changes
+  }, [user?.id, user?.role]); // re-fetch when user or role changes
 
   const getModulePerm = (moduleName: string): PermissionEntry => {
     if (isAdmin) {
