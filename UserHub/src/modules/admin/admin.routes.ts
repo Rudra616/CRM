@@ -14,16 +14,24 @@ import {
   createModuleSchema,
   createRoleSchema,
   updateAdminSchema,
+  updateModuleRowSchema,
   updateRolePermissionsSchema,
+  updateRoleRowSchema,
 } from "./admin.validation";
 import {
   addModule,
   addRole,
+  deleteModuleRow,
+  deleteRoleRow,
   getPermissionsByRole,
+  getMyPermissions,
   listModules,
+  listModulesTable,
   listRoles,
+  listRolesTable,
   savePermissionsByRole,
-  getMyPermissions
+  updateModuleRow,
+  updateRoleRow,
 } from "./controller/rbac.controller";
 
 // Admin self
@@ -35,7 +43,10 @@ import {
   changeAdminPassword,
   getDashboardSummary,
 } from "./controller/admin.controller";
-import { checkPermission } from "../../common/middleware/permission.middleware";
+import {
+  checkPermission,
+  checkPermissionAny,
+} from "../../common/middleware/permission.middleware";
 // Subadmin CRUD (managed by admin)
 import {
   createSubadmin,
@@ -86,6 +97,7 @@ router.get(
   "/dashboard-summary",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("user", "can_view"),
   getDashboardSummary,
 );
 
@@ -114,34 +126,101 @@ router.post(
 );
 router.delete("/subadmins/:id", authenticate, allowRoles(Role.ADMIN), deleteSubadmin);
 
-// RBAC: modules, roles, role permissions
-router.get("/modules", authenticate, allowRoles(Role.ADMIN), listModules);
+// RBAC: modules, roles, role permissions (admin + subadmin with per-module permissions)
+router.get(
+  "/modules/table",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("module", "can_view"),
+  listModulesTable
+);
+router.patch(
+  "/modules/:id",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  validateSchema(updateModuleRowSchema),
+  checkPermission("module", "can_edit"),
+  updateModuleRow
+);
+router.delete(
+  "/modules/:id",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("module", "can_delete"),
+  deleteModuleRow
+);
+router.get(
+  "/modules",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermissionAny([
+    ["module", "can_view"],
+    ["role_permission", "can_view"],
+  ]),
+  listModules
+);
 router.post(
   "/modules",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(createModuleSchema),
+  checkPermission("module", "can_add"),
   addModule
 );
-router.get("/roles", authenticate, allowRoles(Role.ADMIN), listRoles);
+
+router.get(
+  "/roles/table",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("role", "can_view"),
+  listRolesTable
+);
+router.patch(
+  "/roles/:id",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  validateSchema(updateRoleRowSchema),
+  checkPermission("role", "can_edit"),
+  updateRoleRow
+);
+router.delete(
+  "/roles/:id",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("role", "can_delete"),
+  deleteRoleRow
+);
+router.get(
+  "/roles",
+  authenticate,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermissionAny([
+    ["role", "can_view"],
+    ["role_permission", "can_view"],
+  ]),
+  listRoles
+);
 router.post(
   "/roles",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(createRoleSchema),
+  checkPermission("role", "can_add"),
   addRole
 );
 router.get(
   "/roles/:roleId/permissions",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("role_permission", "can_view"),
   getPermissionsByRole
 );
 router.put(
   "/roles/:roleId/permissions",
   authenticate,
-  allowRoles(Role.ADMIN),
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateRolePermissionsSchema),
+  checkPermission("role_permission", "can_edit"),
   savePermissionsByRole
 );
 router.get(
@@ -188,7 +267,7 @@ router.get(
   allowRoles(Role.ADMIN, Role.SUBADMIN),
   getMyPermissions,
 );
-
+ 
 export default router;
 
 

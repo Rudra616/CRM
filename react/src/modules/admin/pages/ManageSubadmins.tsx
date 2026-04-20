@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   getSubadminsApi,
   getRolesApi,
@@ -10,8 +10,10 @@ import {
 import { showSuccess, showError } from '../../../shared/utils/toast';
 import { EditUserModal, type EditUserProfilePayload } from '../../../shared/components/EditUserModal';
 import type { User } from '../../../shared/types/common.types';
+import type { UsersPageData } from '../api/admin.api';
 import { PageShell } from '../../../shared/components/PageShell';
 import { colors } from '../../../theme/colors';
+import { FaSearch, FaTimes } from 'react-icons/fa';
 
 type SubadminRow = User & {
   first_name?: string;
@@ -37,6 +39,8 @@ const mergeSubadminFromApi = (prev: User, raw: SubadminRow): User => ({
   role_name: raw.role_name ?? prev.role_name,
 });
 
+const DEFAULT_PAGE_SIZES = [5, 10, 25, 50, 100];
+
 const ManageSubadmins = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
@@ -47,27 +51,44 @@ const ManageSubadmins = () => {
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [totalRows, setTotalRows] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const rowsPerPage = 10;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [pageSizeOptions, setPageSizeOptions] = useState<number[]>(DEFAULT_PAGE_SIZES);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getSubadminsApi(currentPage, rowsPerPage, appliedSearchTerm);
-      const payload = res.data as { items: SubadminRow[]; pagination: { total: number; totalPages: number } };
-      const rows = payload?.items ?? [];
+      const payload = res.data as UsersPageData | undefined;
+      const rows = (payload?.items ?? []) as SubadminRow[];
       setUsers(rows.map((row) => mergeSubadminFromApi(row as User, row)));
-      setTotalRows(payload?.pagination?.total ?? 0);
-      setTotalPages(payload?.pagination?.totalPages ?? 1);
+      const p = payload?.pagination;
+      setTotalRows(p?.total ?? 0);
+      setTotalPages(Math.max(1, p?.totalPages ?? 1));
+      if (p?.limit != null) setRowsPerPage(p.limit);
+      if (Array.isArray(p?.limitOptions) && p.limitOptions.length > 0) {
+        setPageSizeOptions(p.limitOptions);
+      }
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load subadmins');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, rowsPerPage, appliedSearchTerm]);
 
   useEffect(() => {
     void fetchUsers();
-  }, [currentPage, appliedSearchTerm]);
+  }, [fetchUsers]);
+
+  const applySearch = () => {
+    setCurrentPage(1);
+    setAppliedSearchTerm(searchTerm.trim());
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+    setAppliedSearchTerm('');
+  };
 
   useEffect(() => {
     void getRolesApi()
@@ -125,7 +146,6 @@ const ManageSubadmins = () => {
   };
 
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
   const currentUsers = users;
 
   const theadStyle = { backgroundColor: colors.cardPrimaryBg };
@@ -140,46 +160,74 @@ const ManageSubadmins = () => {
         flush
       >
         <div className="p-3 p-md-4">
-          <div className="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
-            <div className="text-muted small">
-              Total: <span className="fw-semibold text-dark">{totalRows}</span>
-            </div>
-            <div className="d-flex gap-2 align-items-center">
-              <input
-                type="text"
-                placeholder="Search by name, username, email, phone, gender..."
-                className="form-control form-control-sm"
-                style={{ minWidth: 260 }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+          <div className="d-flex flex-column gap-3 mb-3">
+            <div className="d-flex flex-column flex-xl-row flex-xl-nowrap align-items-stretch align-items-xl-end gap-3">
+              <div className="flex-shrink-0">
+                <label htmlFor="subadmin-rows-limit" className="form-label small text-muted mb-1">
+                  Rows per page
+                </label>
+                <select
+                  id="subadmin-rows-limit"
+                  className="form-select form-select-sm"
+                  style={{ minWidth: 88 }}
+                  value={rowsPerPage}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
                     setCurrentPage(1);
-                    setAppliedSearchTerm(searchTerm.trim());
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={() => {
-                  setCurrentPage(1);
-                  setAppliedSearchTerm(searchTerm.trim());
-                }}
-              >
-                Search
-              </button>
-              {/* <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
-                onClick={() => {
-                  setSearchTerm('');
-                  setCurrentPage(1);
-                  setAppliedSearchTerm('');
-                }}
-              >
-                Clear
-              </button> */}
+                  }}
+                >
+                  {pageSizeOptions.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                <label htmlFor="subadmin-search" className="form-label small text-muted mb-1">
+                  Search
+                </label>
+                <div className="input-group input-group-sm">
+                  <span className="input-group-text bg-white border-end-0 py-1" id="subadmin-search-addon">
+                    <FaSearch className="text-secondary" size={14} aria-hidden />
+                  </span>
+                  <input
+                    id="subadmin-search"
+                    type="search"
+                    className="form-control border-start-0"
+                    placeholder="Name, username, email, phone, gender…"
+                    aria-describedby="subadmin-search-addon"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') applySearch();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary px-2"
+                    title="Search"
+                    aria-label="Search"
+                    onClick={() => applySearch()}
+                  >
+                    <FaSearch size={14} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary px-2"
+                    title="Clear search"
+                    aria-label="Clear search"
+                    onClick={() => clearSearch()}
+                  >
+                    <FaTimes size={14} aria-hidden />
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-muted small text-xl-end text-nowrap align-self-xl-center ms-xl-auto pt-1 pt-xl-0">
+                Total <span className="fw-semibold text-dark">{totalRows}</span>
+              </div>
             </div>
           </div>
           <div className="table-responsive">
@@ -236,7 +284,7 @@ const ManageSubadmins = () => {
           {totalRows > 0 && (
             <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
               <div className="text-muted small">
-                {startIndex + 1}–{Math.min(endIndex, totalRows)} of {totalRows}
+                {startIndex + 1}–{startIndex + currentUsers.length} of {totalRows}
               </div>
               <div className="d-flex align-items-center gap-2">
                 <button

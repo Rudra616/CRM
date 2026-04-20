@@ -6,45 +6,47 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$
 const phoneRegex    = /^[0-9]+$/;
 const genderOptions = ["male", "female", "other"] as const;
 
-const usernameField = Joi.string().min(3).max(50).pattern(usernameRegex).required().messages({
+const trimmedString = () => Joi.string().trim();
+
+const usernameField = trimmedString().min(3).max(50).pattern(usernameRegex).required().messages({
   "string.empty":        "Username is required",
   "string.min":          "Username must be at least 3 characters",
   "string.max":          "Username must be at most 50 characters",
   "string.pattern.base": "Username must contain only letters and numbers",
 });
 
-const firstNameField = Joi.string().min(1).max(50).pattern(nameRegex).required().messages({
+const firstNameField = trimmedString().min(1).max(50).pattern(nameRegex).required().messages({
   "string.empty":        "First name is required",
   "string.pattern.base": "First name must contain only letters",
 });
 
-const lastNameField = Joi.string().min(1).max(50).pattern(nameRegex).required().messages({
+const lastNameField = trimmedString().min(1).max(50).pattern(nameRegex).required().messages({
   "string.empty":        "Last name is required",
   "string.pattern.base": "Last name must contain only letters",
 });
 
-const phoneField = Joi.string().length(10).pattern(phoneRegex).required().messages({
+const phoneField = trimmedString().length(10).pattern(phoneRegex).required().messages({
   "string.length":       "Phone must be exactly 10 digits",
   "string.pattern.base": "Phone must contain only numbers",
 });
 
-const emailField = Joi.string().min(5).max(100).email().required().messages({
+const emailField = trimmedString().min(5).max(100).email().required().messages({
   "string.empty": "Email is required",
   "string.email": "Invalid email format",
 });
 
 const passwordField = (maxLen = 256) =>
-  Joi.string().min(8).max(maxLen).pattern(passwordRegex).required().messages({
+  trimmedString().min(8).max(maxLen).pattern(passwordRegex).required().messages({
     "string.empty":        "Password is required",
     "string.min":          "Password must be at least 8 characters",
     "string.pattern.base": "Password must contain uppercase, lowercase, number and symbol (@$!%*?&)",
   });
 
-const genderOptional = Joi.string().valid(...genderOptions).optional().allow(null, "").messages({
+const genderOptional = trimmedString().valid(...genderOptions).optional().allow(null, "").messages({
   "any.only": "Gender must be one of: male, female, other",
 });
 
-const genderRequired = Joi.string().valid(...genderOptions).required().messages({
+const genderRequired = trimmedString().valid(...genderOptions).required().messages({
   "any.only":     "Gender must be one of: male, female, other",
   "string.empty": "Gender is required",
   "any.required": "Gender is required",
@@ -63,8 +65,8 @@ export const registerSchema = Joi.object({
 });
 
 export const loginSchema = Joi.object({
-  username: Joi.string().required().messages({ "string.empty": "Username is required" }),
-  password: Joi.string().required().messages({ "string.empty": "Password is required" }),
+  username: trimmedString().required().messages({ "string.empty": "Username is required" }),
+  password: trimmedString().required().messages({ "string.empty": "Password is required" }),
 });
 
 export const updateProfileSchema = Joi.object({
@@ -77,13 +79,13 @@ export const updateProfileSchema = Joi.object({
 }).options({ allowUnknown: true });
 
 export const resetPasswordSchema = Joi.object({
-  token:       Joi.string().required().messages({ "string.empty": "Token is required" }),
+  token:       trimmedString().required().messages({ "string.empty": "Token is required" }),
   newPassword: passwordField(256),
 });
 
 export const changePasswordSchema = Joi.object({
   newPassword: passwordField(256),
-  confirmPassword: Joi.string().required().valid(Joi.ref("newPassword")).messages({
+  confirmPassword: trimmedString().required().valid(Joi.ref("newPassword")).messages({
     "any.only":    "Passwords do not match",
     "string.empty":"Please confirm your password",
     "any.required":"Please confirm your password",

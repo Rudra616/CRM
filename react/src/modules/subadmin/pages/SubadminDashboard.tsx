@@ -4,76 +4,137 @@ import { getAdminDashboardSummaryApi } from '../../admin/api/admin.api';
 import { showError } from '../../../shared/utils/toast';
 import { PageShell } from '../../../shared/components/PageShell';
 import { DashboardStatCard } from '../../../shared/components/DashboardStatCard';
+import { usePermissions } from '../../../context/PermissionContext';
 
 const SubadminDashboard: React.FC = () => {
+  const { getModulePerm, permLoading } = usePermissions();
+  const canRbModule = getModulePerm('module').can_view;
+  const canRbRole = getModulePerm('role').can_view;
+  const canRbPerm = getModulePerm('role_permission').can_view;
+  const showRbacLinks = canRbModule || canRbRole || canRbPerm;
+
+  const canViewUsers = getModulePerm('user').can_view;
+  const canViewTickets = getModulePerm('ticket').can_view;
+
+  const [statsLoading, setStatsLoading] = useState(false);
   const [userCount, setUserCount] = useState(0);
   const [activeUsers, setActiveUsers] = useState(0);
   const [pendingUsers, setPendingUsers] = useState(0);
   const [inactiveUsers, setInactiveUsers] = useState(0);
   const [deletedUsers, setDeletedUsers] = useState(0);
-  const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const fetch = async () => {
-    setLoading(true);
-    try {
-      const res = await getAdminDashboardSummaryApi();
-      const summary = res.data;
-      setUserCount(summary?.userCount ?? 0);
-      setActiveUsers(summary?.activeUsers ?? 0);
-      setPendingUsers(summary?.pendingUsers ?? 0);
-      setInactiveUsers(summary?.inactiveUsers ?? 0);
-      setDeletedUsers(summary?.deletedUsers ?? 0);
-    } catch (err) {
-      showError((err as { message?: string })?.message || 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetch();
-}, []);
- 
+  useEffect(() => {
+    if (permLoading) return;
+    if (!canViewUsers) return;
+
+    let cancelled = false;
+    setStatsLoading(true);
+    void (async () => {
+      try {
+        const res = await getAdminDashboardSummaryApi();
+        if (cancelled) return;
+        const summary = res.data;
+        setUserCount(summary?.userCount ?? 0);
+        setActiveUsers(summary?.activeUsers ?? 0);
+        setPendingUsers(summary?.pendingUsers ?? 0);
+        setInactiveUsers(summary?.inactiveUsers ?? 0);
+        setDeletedUsers(summary?.deletedUsers ?? 0);
+      } catch (err) {
+        if (!cancelled) {
+          showError((err as { message?: string })?.message || 'Failed to load');
+        }
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [permLoading, canViewUsers]);
+
+  const pageBusy = permLoading || (canViewUsers && statsLoading);
+
   return (
     <PageShell
       title="Subadmin Dashboard"
-      loading={loading}
-      loadingMessage="Loading dashboard…"
+      loading={pageBusy}
+      loadingMessage={permLoading ? 'Loading…' : 'Loading dashboard…'}
     >
-      <div className="row g-4 mb-4">
-        <DashboardStatCard
-          title="Users"
-          value={userCount}
-          hint="Total registered users"
-          colClass="col-sm-6 col-md-4"
-        />
-        <DashboardStatCard
-          title="Active Users"
-          value={activeUsers}
-          hint="Currently active users"
-          colClass="col-sm-6 col-md-4"
-        />
-        <DashboardStatCard
-          title="Pending Users"
-          value={pendingUsers}
-          hint="Users waiting approval"
-          colClass="col-sm-6 col-md-4"
-        />
-        <DashboardStatCard
-          title="Inactive Users"
-          value={inactiveUsers}
-          hint="Disabled or inactive users"
-          colClass="col-sm-6 col-md-4"
-        />
-        <DashboardStatCard
-          title="Deleted Users"
-          value={deletedUsers}
-          hint="Soft deleted users"
-          colClass="col-sm-6 col-md-4"
-        />
+      {!permLoading && canViewUsers && (
+        <div className="row g-4 mb-4">
+          <DashboardStatCard
+            title="Users"
+            value={userCount}
+            hint="Total registered users"
+            colClass="col-sm-6 col-md-4"
+          />
+          <DashboardStatCard
+            title="Active Users"
+            value={activeUsers}
+            hint="Currently active users"
+            colClass="col-sm-6 col-md-4"
+          />
+          <DashboardStatCard
+            title="Pending Users"
+            value={pendingUsers}
+            hint="Users waiting approval"
+            colClass="col-sm-6 col-md-4"
+          />
+          <DashboardStatCard
+            title="Inactive Users"
+            value={inactiveUsers}
+            hint="Disabled or inactive users"
+            colClass="col-sm-6 col-md-4"
+          />
+          <DashboardStatCard
+            title="Deleted Users"
+            value={deletedUsers}
+            hint="Soft deleted users"
+            colClass="col-sm-6 col-md-4"
+          />
+        </div>
+      )}
+
+      {!permLoading && !canViewUsers && (
+        <p className="text-muted mb-4">
+          User statistics are hidden because your role does not have permission to view the Users module.
+        </p>
+      )}
+
+      <div className="d-flex flex-wrap gap-2">
+        {canViewUsers && (
+          <Link className="btn btn-primary" to="/subadmin/users">
+            Manage Users
+          </Link>
+        )}
+        {canViewTickets && (
+          <Link className="btn btn-outline-primary" to="/subadmin/tickets">
+            Manage Tickets
+          </Link>
+        )}
       </div>
-      <Link className="btn btn-primary" to="/subadmin/users">
-        Manage Users
-      </Link>
+
+      {showRbacLinks && (
+        <div className="w-100 mt-3 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
+          <span className="small text-muted me-1">Access control:</span>
+          {canRbModule && (
+            <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/modules">
+              Modules
+            </Link>
+          )}
+          {canRbRole && (
+            <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/roles">
+              Roles
+            </Link>
+          )}
+          {canRbPerm && (
+            <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/permissions">
+              Role permissions
+            </Link>
+          )}
+        </div>
+      )}
     </PageShell>
   );
 };

@@ -148,3 +148,32 @@ export const hasActiveAdminTokenForAdminId = async (adminId: number): Promise<bo
     throw error;
   }
 };
+
+/** After role / permission matrix edits: force subadmins on this role to sign in again. */
+export const invalidateSubadminSessionsForRoleId = async (roleId: number): Promise<void> => {
+  try {
+    await db.query(
+      `DELETE at FROM admin_token AS at
+       INNER JOIN \`admin\` AS a ON a.id = at.admin_id
+       WHERE a.role = 'subadmin' AND a.role_id = ?`,
+      [roleId]
+    );
+  } catch (error: unknown) {
+    logServiceError("token.service", "invalidateSubadminSessionsForRoleId", error);
+  }
+};
+
+/** After module edits: force subadmins whose role_permission row references this module to sign in again. */
+export const invalidateSubadminSessionsForModuleId = async (moduleId: number): Promise<void> => {
+  try {
+    await db.query(
+      `DELETE at FROM admin_token AS at
+       INNER JOIN \`admin\` AS a ON a.id = at.admin_id
+       INNER JOIN role_permission rp ON rp.role_id = a.role_id AND rp.module_id = ?
+       WHERE a.role = 'subadmin'`,
+      [moduleId]
+    );
+  } catch (error: unknown) {
+    logServiceError("token.service", "invalidateSubadminSessionsForModuleId", error);
+  }
+};

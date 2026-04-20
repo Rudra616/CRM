@@ -1,8 +1,17 @@
 import { Sidebar as ProSidebar, Menu, MenuItem, SubMenu } from 'react-pro-sidebar';
 import { useNavigate } from 'react-router-dom';
 import {
-  FaTachometerAlt, FaUsers, FaUserShield, FaUserPlus,
-  FaUser, FaTimes, FaKey, FaLock,
+  FaTachometerAlt,
+  FaUsers,
+  FaUserShield,
+  FaUserPlus,
+  FaUser,
+  FaTimes,
+  FaKey,
+  FaTicketAlt,
+  FaShieldAlt,
+  FaCube,
+  FaUserTag,
 } from 'react-icons/fa';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
@@ -40,6 +49,11 @@ const Sidebar = ({ role }: Props) => {
   //
   // ⚠️  Module name must exactly match the `name` column in your `module` DB table.
   const canViewUsers = getModulePerm('user').can_view;
+  const canViewTickets = getModulePerm('ticket').can_view;
+  const canViewRbModule = getModulePerm('module').can_view;
+  const canViewRbRole = getModulePerm('role').can_view;
+  const canViewRbPerm = getModulePerm('role_permission').can_view;
+  const showSubadminAccessMenu = canViewRbModule || canViewRbRole || canViewRbPerm;
 
   const getProfilePath = () => (role === 'admin' ? '/admin/profile' : '/profile');
 
@@ -133,9 +147,23 @@ const Sidebar = ({ role }: Props) => {
                 Manage Users
               </MenuItem>
 
-              <MenuItem icon={<FaLock />} onClick={nav('/admin/permissions')}>
-                Role Permissions
-              </MenuItem>
+              <SubMenu label="Access control" icon={<FaShieldAlt />}>
+                <MenuItem icon={<FaCube />} onClick={nav('/admin/rbac/modules')}>
+                  Modules
+                </MenuItem>
+                <MenuItem icon={<FaUserTag />} onClick={nav('/admin/rbac/roles')}>
+                  Roles
+                </MenuItem>
+                <MenuItem icon={<FaShieldAlt />} onClick={nav('/admin/rbac/permissions')}>
+                  Role permissions
+                </MenuItem>
+              </SubMenu>
+
+              <SubMenu label="Tickets" icon={<FaTicketAlt />}>
+                <MenuItem icon={<FaTicketAlt />} onClick={nav('/admin/tickets')}>
+                  Manage Tickets
+                </MenuItem>
+              </SubMenu>
 
               <MenuItem icon={<FaUser />} onClick={nav('/admin/profile')}>
                 Profile
@@ -167,6 +195,32 @@ const Sidebar = ({ role }: Props) => {
                 <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/users')}>
                   Manage Users
                 </MenuItem>
+              )}
+
+              {canViewTickets && (
+                <MenuItem icon={<FaTicketAlt />} onClick={nav('/subadmin/tickets')}>
+                  Tickets
+                </MenuItem>
+              )}
+
+              {showSubadminAccessMenu && (
+                <SubMenu label="Access control" icon={<FaShieldAlt />}>
+                  {canViewRbModule && (
+                    <MenuItem icon={<FaCube />} onClick={nav('/subadmin/rbac/modules')}>
+                      Modules
+                    </MenuItem>
+                  )}
+                  {canViewRbRole && (
+                    <MenuItem icon={<FaUserTag />} onClick={nav('/subadmin/rbac/roles')}>
+                      Roles
+                    </MenuItem>
+                  )}
+                  {canViewRbPerm && (
+                    <MenuItem icon={<FaShieldAlt />} onClick={nav('/subadmin/rbac/permissions')}>
+                      Role permissions
+                    </MenuItem>
+                  )}
+                </SubMenu>
               )}
 
               {/*
@@ -202,6 +256,14 @@ const Sidebar = ({ role }: Props) => {
               <MenuItem icon={<FaTachometerAlt />} onClick={nav('/user/dashboard')}>
                 Dashboard
               </MenuItem>
+              <SubMenu label="Tickets" icon={<FaTicketAlt />}>
+                <MenuItem icon={<FaTicketAlt />} onClick={nav('/tickets/create')}>
+                  Create Ticket
+                </MenuItem>
+                <MenuItem icon={<FaTicketAlt />} onClick={nav('/tickets/my')}>
+                  My Tickets
+                </MenuItem>
+              </SubMenu>
               <MenuItem icon={<FaUser />} onClick={nav('/profile')}>
                 Profile
               </MenuItem>

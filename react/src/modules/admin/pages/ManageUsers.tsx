@@ -17,7 +17,7 @@ import { colors } from '../../../theme/colors';
 import { EditUserModal, type EditUserProfilePayload } from '../../../shared/components/EditUserModal';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
-import { FaEdit, FaSignOutAlt, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaSearch, FaSignOutAlt, FaTimes, FaTrash } from 'react-icons/fa';
 
 type StatusFilter = 'all' | 'active' | 'pending' | 'inactive' | 'deleted';
 type AccountStatus = 'active' | 'pending' | 'inactive';
@@ -140,6 +140,17 @@ const ManageUsers = () => {
     void fetchUsers();
   }, [fetchUsers]);
 
+  const applySearch = () => {
+    setCurrentPage(1);
+    setAppliedSearchTerm(searchTerm.trim());
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+    setAppliedSearchTerm('');
+  };
+
   // ─── Derived values ───────────────────────────────────────────────────────
   const limit      = pagination.limit || rowsPerPage;
   const startIndex = (pagination.page - 1) * limit;
@@ -241,81 +252,102 @@ const ManageUsers = () => {
     >
       <div className="p-3 p-md-4">
 
-        {/* ── Top controls ─────────────────────────────────────────────────── */}
-        <div className="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
-          <div className="d-flex gap-2 align-items-center flex-wrap">
-
-            {/* Status filter — admin only (subadmin never manages deleted users) */}
-            {isAdmin && (
-              <>
-                <label className="small mb-0">Filter:</label>
+        {/* Toolbar: status + rows + search + total */}
+        <div className="d-flex flex-column gap-3 mb-3">
+          <div className="d-flex flex-column flex-xl-row flex-xl-nowrap align-items-stretch align-items-xl-end gap-3">
+            <div className="d-flex flex-wrap align-items-end gap-3">
+              {isAdmin ? (
+                <div className="flex-shrink-0">
+                  <label htmlFor="user-status-filter" className="form-label small text-muted mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="user-status-filter"
+                    className="form-select form-select-sm"
+                    style={{ minWidth: 152 }}
+                    value={statusFilter}
+                    onChange={(e) => {
+                      setStatusFilter(e.target.value as StatusFilter);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {filterSelectOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <div className="flex-shrink-0">
+                <label htmlFor="user-rows-limit" className="form-label small text-muted mb-1">
+                  Rows per page
+                </label>
                 <select
+                  id="user-rows-limit"
                   className="form-select form-select-sm"
-                  style={{ maxWidth: 180 }}
-                  value={statusFilter}
+                  style={{ minWidth: 88 }}
+                  value={rowsPerPage}
                   onChange={(e) => {
-                    setStatusFilter(e.target.value as StatusFilter);
+                    setRowsPerPage(Number(e.target.value));
                     setCurrentPage(1);
                   }}
                 >
-                  {filterSelectOptions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                  {pageSizeOptions.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
                   ))}
                 </select>
-              </>
-            )}
+              </div>
+            </div>
 
-            <label className="small mb-0 ms-md-2">Rows per page:</label>
-            <select
-              className="form-select form-select-sm"
-              style={{ maxWidth: 90 }}
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-            >
-              {pageSizeOptions.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+            <div className="flex-grow-1" style={{ minWidth: 0 }}>
+              <label htmlFor="user-search" className="form-label small text-muted mb-1">
+                Search
+              </label>
+              <div className="input-group input-group-sm">
+                <span className="input-group-text bg-white border-end-0 py-1" id="user-search-addon">
+                  <FaSearch className="text-secondary" size={14} aria-hidden />
+                </span>
+                <input
+                  id="user-search"
+                  type="search"
+                  className="form-control border-start-0"
+                  placeholder="Name, username, email, gender…"
+                  aria-describedby="user-search-addon"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applySearch();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary px-2"
+                  title="Search"
+                  aria-label="Search"
+                  onClick={() => applySearch()}
+                >
+                  <FaSearch size={14} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary px-2"
+                  title="Clear search"
+                  aria-label="Clear search"
+                  onClick={() => clearSearch()}
+                >
+                  <FaTimes size={14} aria-hidden />
+                </button>
+              </div>
+            </div>
+
+            <div className="text-muted small text-xl-end text-nowrap align-self-xl-center ms-xl-auto pt-1 pt-xl-0">
+              Total{' '}
+              <span className="fw-semibold text-dark">{pagination.total}</span>
+            </div>
           </div>
-
-          <div className="text-muted small">
-            Total: <span className="fw-semibold text-dark">{pagination.total}</span>
-          </div>
-        </div>
-
-        {/* ── Search ───────────────────────────────────────────────────────── */}
-        <div className="mb-2 d-flex gap-2 align-items-center justify-content-end flex-wrap">
-          <input
-            type="text"
-            placeholder="Search by name, username, email, gender..."
-            className="form-control form-control-sm"
-            style={{ maxWidth: 320 }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setCurrentPage(1);
-                setAppliedSearchTerm(searchTerm.trim());
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            onClick={() => { setCurrentPage(1); setAppliedSearchTerm(searchTerm.trim()); }}
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-secondary"
-            onClick={() => { setSearchTerm(''); setCurrentPage(1); setAppliedSearchTerm(''); }}
-          >
-            Clear
-          </button>
         </div>
 
         {/* ── Table ────────────────────────────────────────────────────────── */}

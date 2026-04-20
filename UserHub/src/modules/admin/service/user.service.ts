@@ -7,7 +7,7 @@ import { logServiceError } from "../../../common/helpers/serviceError";
 /** Allowed `limit` query values for GET users list (shared with API response). */
 export const USERS_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100] as const;
 
-const normalizeLimit = (limit?: number) => {
+export const normalizeListPageLimit = (limit?: number) => {
   const n = Number(limit);
   if (!Number.isFinite(n) || n <= 0) return USERS_PAGE_SIZE_OPTIONS[0];
   return (USERS_PAGE_SIZE_OPTIONS as readonly number[]).includes(n)
@@ -23,7 +23,7 @@ export const getUsersPaginated = async (
   opts?: { deletedOnly?: boolean }
 ): Promise<{ items: User[]; total: number; limit: number }> => {
   try {
-    const safeLimit = normalizeLimit(limit);
+    const safeLimit = normalizeListPageLimit(limit);
     const offset = (page - 1) * safeLimit;
     const deletedOnly = Boolean(opts?.deletedOnly);
 

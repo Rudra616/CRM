@@ -4,16 +4,25 @@ import {
   createModule,
   createRole,
   getModules,
+  getModulesPaginated,
+  getMyPermissionsByRoleId,
   getRolePermissions,
   getRoles,
+  getRolesPaginated,
   replaceRolePermissions,
-  type RolePermissionInput,
+  softDeleteModuleById,
+  softDeleteRoleById,
+  updateModuleById,
+  updateRoleById,
 } from "../service/rbac.service";
-
-// Add this import at top of rbac.controller.ts
-import { getMyPermissionsByRoleId } from "../service/rbac.service";
+import type { RolePermissionInput } from "../types/rbac.types";
+import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../service/user.service";
 import { AuthRequest } from "../../../common/types/AuthRequest";
 import { Role } from "../../../common/types/role";
+import {
+  invalidateSubadminSessionsForModuleId,
+  invalidateSubadminSessionsForRoleId,
+} from "../../token.service";
  
 export const listModules = async (_req: Request, res: Response) => {
   try {
@@ -24,11 +33,66 @@ export const listModules = async (_req: Request, res: Response) => {
   }
 };
 
+export const listModulesTable = async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limitRaw = req.query.limit;
+    const limit =
+      limitRaw === undefined || limitRaw === ""
+        ? 10
+        : normalizeListPageLimit(Number(limitRaw));
+    const search = (req.query.search as string | undefined)?.trim();
+    const { items, total, limit: safeLimit } = await getModulesPaginated(page, limit, search);
+    return successResponse(
+      res,
+      "Modules fetched successfully",
+      {
+        items,
+        pagination: {
+          page,
+          limit: safeLimit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+          limitOptions: [...USERS_PAGE_SIZE_OPTIONS],
+        },
+      },
+      200
+    );
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+export const updateModuleRow = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid module ID", 400);
+    const body = req.body as { name?: string; status?: "active" | "inactive" };
+    const ok = await updateModuleById(id, body);
+    if (!ok) return errorResponse(res, "Module not found", 404);
+    await invalidateSubadminSessionsForModuleId(id);
+    return successResponse(res, "Module updated successfully", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 400);
+  }
+};
+
+export const deleteModuleRow = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid module ID", 400);
+    const ok = await softDeleteModuleById(id);
+    if (!ok) return errorResponse(res, "Module not found", 404);
+    await invalidateSubadminSessionsForModuleId(id);
+    return successResponse(res, "Module removed successfully", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
 export const addModule = async (req: Request, res: Response) => {
   try {
-    const name = String(req.body.name ?? "").trim();
-    if (!name) return errorResponse(res, "Module name is required", 400);
-
+    const name = String((req.body as { name?: string }).name ?? "");
     const id = await createModule(name);
     return successResponse(res, "Module created successfully", { id }, 201);
   } catch (err: any) {
@@ -45,11 +109,66 @@ export const listRoles = async (_req: Request, res: Response) => {
   }
 };
 
+export const listRolesTable = async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limitRaw = req.query.limit;
+    const limit =
+      limitRaw === undefined || limitRaw === ""
+        ? 10
+        : normalizeListPageLimit(Number(limitRaw));
+    const search = (req.query.search as string | undefined)?.trim();
+    const { items, total, limit: safeLimit } = await getRolesPaginated(page, limit, search);
+    return successResponse(
+      res,
+      "Roles fetched successfully",
+      {
+        items,
+        pagination: {
+          page,
+          limit: safeLimit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+          limitOptions: [...USERS_PAGE_SIZE_OPTIONS],
+        },
+      },
+      200
+    );
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+export const updateRoleRow = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid role ID", 400);
+    const body = req.body as { name?: string; status?: "active" | "inactive" };
+    const ok = await updateRoleById(id, body);
+    if (!ok) return errorResponse(res, "Role not found", 404);
+    await invalidateSubadminSessionsForRoleId(id);
+    return successResponse(res, "Role updated successfully", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 400);
+  }
+};
+
+export const deleteRoleRow = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid role ID", 400);
+    const ok = await softDeleteRoleById(id);
+    if (!ok) return errorResponse(res, "Role not found", 404);
+    await invalidateSubadminSessionsForRoleId(id);
+    return successResponse(res, "Role removed successfully", null, 200);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
 export const addRole = async (req: Request, res: Response) => {
   try {
-    const name = String(req.body.name ?? "").trim();
-    if (!name) return errorResponse(res, "Role name is required", 400);
-
+    const name = String((req.body as { name?: string }).name ?? "");
     const id = await createRole(name);
     return successResponse(res, "Role created successfully", { id }, 201);
   } catch (err: any) {
@@ -88,6 +207,8 @@ export const savePermissionsByRole = async (req: Request, res: Response) => {
 
     await replaceRolePermissions(roleId, permissions);
 
+    await invalidateSubadminSessionsForRoleId(roleId);
+
     return successResponse(res, "Role permissions saved successfully", { roleId }, 200);
   } catch (err: any) {
     console.error("[RBAC] savePermissionsByRole failed:", err);
@@ -95,7 +216,6 @@ export const savePermissionsByRole = async (req: Request, res: Response) => {
   }
 };
 
-// Add this new controller
 export const getMyPermissions = async (req: Request, res: Response) => {
   try {
     const user = (req as AuthRequest).user;

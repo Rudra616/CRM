@@ -1,6 +1,7 @@
 import db from "../../../config/db";
 import { Admin } from "../../../common/types/user";
 import { logServiceError } from "../../../common/helpers/serviceError";
+import { normalizeListPageLimit } from "./user.service";
 
 // ─── Lookup ───────────────────────────────────────────────────────────────────
 
@@ -71,56 +72,52 @@ export const getAllSubadmins = async (): Promise<Admin[]> => {
   }
 };
 
+const subadminListFrom = `
+  FROM \`admin\` a
+  LEFT JOIN role r ON r.id = a.role_id AND COALESCE(r.is_delete, 0) = 0
+`;
+
 export const getSubadminsPaginated = async (
   page: number,
   limit: number,
   search?: string
-): Promise<{ items: Admin[]; total: number }> => {
+): Promise<{ items: Admin[]; total: number; limit: number }> => {
   try {
-    const offset = (page - 1) * limit;
-    let query = `
-      SELECT a.id, a.username, a.first_name, a.last_name, a.phone, a.email, a.gender, a.image_url,
-             a.role, a.status, a.role_id, r.name AS role_name
-      FROM \`admin\` a
-      LEFT JOIN role r ON r.id = a.role_id AND COALESCE(r.is_delete, 0) = 0
-      WHERE a.role = 'subadmin' AND COALESCE(a.is_delete, 0) = 0
-    `;
-    const params: any[] = [];
+    const safeLimit = normalizeListPageLimit(limit);
+    const offset = (Math.max(1, page) - 1) * safeLimit;
 
-    if (search) {
-      query += `
-        AND (
-          a.first_name LIKE ? OR a.last_name LIKE ? OR
-          a.username LIKE ? OR a.email LIKE ? OR a.phone LIKE ? OR a.gender LIKE ? OR r.name LIKE ?
-        )
-      `;
-      const like = `%${search}%`;
-      params.push(like, like, like, like, like, like, like);
+    let where = "WHERE a.role = 'subadmin' AND COALESCE(a.is_delete, 0) = 0";
+    const whereParams: unknown[] = [];
+
+    if (search && search.trim() !== "") {
+      const like = `%${search.trim()}%`;
+      where += ` AND (
+        a.first_name LIKE ? OR a.last_name LIKE ? OR a.username LIKE ? OR a.email LIKE ? OR
+        a.phone LIKE ? OR a.gender LIKE ? OR r.name LIKE ?
+      )`;
+      whereParams.push(like, like, like, like, like, like, like);
     }
 
-    query += " ORDER BY a.id DESC LIMIT ? OFFSET ?";
-    params.push(limit, offset);
-    const [rows]: any = await db.query(query, params);
+    const [rows]: any = await db.query(
+      `SELECT a.id, a.username, a.first_name, a.last_name, a.phone, a.email, a.gender, a.image_url,
+              a.role, a.status, a.role_id, r.name AS role_name
+       ${subadminListFrom}
+       ${where}
+       ORDER BY a.id DESC
+       LIMIT ? OFFSET ?`,
+      [...whereParams, safeLimit, offset]
+    );
 
-    let countQuery = `
-      SELECT COUNT(*) AS total
-      FROM \`admin\` a
-      LEFT JOIN role r ON r.id = a.role_id AND COALESCE(r.is_delete, 0) = 0
-      WHERE a.role = 'subadmin' AND COALESCE(a.is_delete, 0) = 0
-    `;
-    const countParams: any[] = [];
-    if (search) {
-      countQuery += `
-        AND (
-          a.first_name LIKE ? OR a.last_name LIKE ? OR
-          a.username LIKE ? OR a.email LIKE ? OR a.phone LIKE ? OR a.gender LIKE ? OR r.name LIKE ?
-        )
-      `;
-      const like = `%${search}%`;
-      countParams.push(like, like, like, like, like, like, like);
-    }
-    const [countRows]: any = await db.query(countQuery, countParams);
-    return { items: rows, total: Number(countRows?.[0]?.total ?? 0) };
+    const [countRows]: any = await db.query(
+      `SELECT COUNT(*) AS total ${subadminListFrom} ${where}`,
+      whereParams
+    );
+
+    return {
+      items: rows,
+      total: Number(countRows?.[0]?.total ?? 0),
+      limit: safeLimit,
+    };
   } catch (error: unknown) {
     logServiceError("subadmin.service", "getSubadminsPaginated", error);
     throw error;
@@ -177,30 +174,31 @@ export const updateSubadminById = async (
   }
 ): Promise<void> => {
   try {
+    const sets = [
+      "username=?",
+      "first_name=?",
+      "last_name=?",
+      "phone=?",
+      "email=?",
+      "gender=?",
+    ];
+    const vals: unknown[] = [
+      data.username,
+      data.first_name,
+      data.last_name,
+      data.phone,
+      data.email,
+      data.gender ?? null,
+    ];
     if (data.role_id !== undefined) {
-      await db.query(
-        `UPDATE \`admin\`
-       SET username=?, first_name=?, last_name=?, phone=?, email=?, gender=?, role_id=?
-       WHERE id=? AND role='subadmin' AND COALESCE(is_delete, 0) = 0`,
-        [
-          data.username,
-          data.first_name,
-          data.last_name,
-          data.phone,
-          data.email,
-          data.gender ?? null,
-          data.role_id,
-          id,
-        ]
-      );
-    } else {
-      await db.query(
-        `UPDATE \`admin\`
-       SET username=?, first_name=?, last_name=?, phone=?, email=?, gender=?
-       WHERE id=? AND role='subadmin' AND COALESCE(is_delete, 0) = 0`,
-        [data.username, data.first_name, data.last_name, data.phone, data.email, data.gender ?? null, id]
-      );
+      sets.push("role_id=?");
+      vals.push(data.role_id);
     }
+    vals.push(id);
+    await db.query(
+      `UPDATE \`admin\` SET ${sets.join(", ")} WHERE id=? AND role='subadmin' AND COALESCE(is_delete, 0) = 0`,
+      vals
+    );
   } catch (error: unknown) {
     logServiceError("subadmin.service", "updateSubadminById", error);
     throw error;

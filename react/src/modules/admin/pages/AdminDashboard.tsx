@@ -116,7 +116,13 @@ const AdminDashboard = () => {
           title="Role Permissions"
           value="RBAC"
           hint="Manage role, module and permissions"
-          onClick={() => navigate('/admin/permissions')}
+          onClick={() => navigate('/admin/rbac/permissions')}
+        />
+        <DashboardStatCard
+          title="Tickets"
+          value="View"
+          hint="Review and respond to user tickets"
+          onClick={() => navigate('/admin/tickets')}
         />
       </div>
     </PageShell>

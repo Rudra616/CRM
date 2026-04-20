@@ -22,6 +22,37 @@ export type UsersListParams = {
   deletedOnly?: boolean;
 };
 
+export type RbacTableParams = {
+  page: number;
+  limit: number;
+  search?: string;
+};
+
+const rbacTableSearchParams = (p: RbacTableParams): string => {
+  const params = new URLSearchParams({
+    page: String(p.page),
+    limit: String(p.limit),
+  });
+  if (p.search?.trim()) params.set('search', p.search.trim());
+  return params.toString();
+};
+
+export type ModuleTableItem = {
+  id: number;
+  name: string;
+  status: 'active' | 'inactive';
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RoleTableItem = {
+  id: number;
+  name: string;
+  status: 'active' | 'inactive';
+  created_at?: string;
+  updated_at?: string;
+};
+
 const usersListSearchParams = (p: UsersListParams): URLSearchParams => {
   const params = new URLSearchParams();
   params.set('page', String(p.page));
@@ -90,11 +121,43 @@ export const getModulesApi = (): Promise<ApiResponse<ModuleItem[]>> =>
 export const createModuleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
   apiRequest<{ id: number }>('POST', '/admin/modules', body);
 
+export const getModulesTableApi = (
+  p: RbacTableParams
+): Promise<ApiResponse<{ items: ModuleTableItem[]; pagination: UsersPageData['pagination'] }>> =>
+  apiRequest<{ items: ModuleTableItem[]; pagination: UsersPageData['pagination'] }>(
+    'GET',
+    `/admin/modules/table?${rbacTableSearchParams(p)}`
+  );
+
+export const patchModuleApi = (
+  id: number,
+  body: { name?: string; status?: 'active' | 'inactive' }
+): Promise<ApiResponse<null>> => apiRequest<null>('PATCH', `/admin/modules/${id}`, body);
+
+export const deleteModuleApi = (id: number): Promise<ApiResponse<null>> =>
+  apiRequest<null>('DELETE', `/admin/modules/${id}`);
+
 export const getRolesApi = (): Promise<ApiResponse<RoleItem[]>> =>
   apiRequest<RoleItem[]>('GET', '/admin/roles');
 
 export const createRoleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
   apiRequest<{ id: number }>('POST', '/admin/roles', body);
+
+export const getRolesTableApi = (
+  p: RbacTableParams
+): Promise<ApiResponse<{ items: RoleTableItem[]; pagination: UsersPageData['pagination'] }>> =>
+  apiRequest<{ items: RoleTableItem[]; pagination: UsersPageData['pagination'] }>(
+    'GET',
+    `/admin/roles/table?${rbacTableSearchParams(p)}`
+  );
+
+export const patchRoleApi = (
+  id: number,
+  body: { name?: string; status?: 'active' | 'inactive' }
+): Promise<ApiResponse<null>> => apiRequest<null>('PATCH', `/admin/roles/${id}`, body);
+
+export const deleteRoleApi = (id: number): Promise<ApiResponse<null>> =>
+  apiRequest<null>('DELETE', `/admin/roles/${id}`);
 
 export const getRolePermissionsApi = (
   roleId: number
@@ -231,9 +294,6 @@ export const deleteSubadminApi = (
 ): Promise<ApiResponse<null>> => {
   return apiRequest<null>('DELETE', `/admin/subadmins/${id}`);
 };
-
-
-// Add to admin.api.ts
 
 export type PermissionEntry = {
   can_view: boolean;

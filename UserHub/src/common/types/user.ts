@@ -101,6 +101,7 @@ export interface Ticket {
   user_id: number;
   subject: string;
   description: string;
+  image_url?: string | null;
   status: "open" | "in_progress" | "resolved" | "closed";
   created_at?: Date;
   updated_at?: Date;

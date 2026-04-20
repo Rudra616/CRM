@@ -6,7 +6,6 @@ import adminRoutes from "./modules/admin/admin.routes";
 import subadminRoutes from "./modules/subadmin/subadmin.routes";
 import cookieParser from "cookie-parser";
 import { UPLOADS_ROOT } from "./config/uploads";
-import { trimBodyStrings } from "./common/middleware/trimBodyMiddleware";
 import tickitRoutes from "./modules/tickit/tickit.route";
 dotenv.config();
 
@@ -18,7 +17,6 @@ app.use(cors({
 }));
 app.use(express.json({ strict: false }));
 app.use(express.urlencoded({ extended: true }));
-app.use(trimBodyStrings);
 app.use("/uploads", express.static(UPLOADS_ROOT));
 app.use(cookieParser());
 

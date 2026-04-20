@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  createModuleApi,
-  createRoleApi,
   getModulesApi,
   getRolePermissionsApi,
   getRolesApi,
@@ -14,6 +12,8 @@ import {
 } from '../api/admin.api';
 import { PageShell } from '../../../shared/components/PageShell';
 import { showError, showSuccess } from '../../../shared/utils/toast';
+import { useAuth } from '../../../context/AuthContext';
+import { usePermissions } from '../../../context/PermissionContext';
 
 type PermFlags = {
   can_view: boolean;
@@ -49,6 +49,15 @@ const buildPermMap = (modules: ModuleItem[], rows: RolePermissionEntry[]): Recor
 };
 
 const ManagePermissions = () => {
+  const { user } = useAuth();
+  const { getModulePerm, permLoading } = usePermissions();
+  const isAdmin = user?.role === 'admin';
+  const permRp = getModulePerm('role_permission');
+  const canViewMatrix = isAdmin || permRp.can_view;
+  const canEditMatrix = isAdmin || permRp.can_edit;
+
+  const rbacBase = user?.role === 'admin' ? '/admin/rbac' : '/subadmin/rbac';
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -56,9 +65,6 @@ const ManagePermissions = () => {
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [permByModule, setPermByModule] = useState<Record<number, PermFlags>>({});
-
-  const [moduleName, setModuleName] = useState('');
-  const [roleName, setRoleName] = useState('');
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === selectedRoleId) ?? null,
@@ -102,9 +108,14 @@ const ManagePermissions = () => {
   };
 
   useEffect(() => {
+    if (permLoading) return;
+    if (!canViewMatrix) {
+      setLoading(false);
+      return;
+    }
     void loadBase();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [permLoading, canViewMatrix]);
 
   const loadPermissionsForRole = async (roleId: number, moduleList: ModuleItem[]) => {
     try {
@@ -127,43 +138,11 @@ const ManagePermissions = () => {
     await loadPermissionsForRole(roleId, modules);
   };
 
-  const onCreateModule = async (e: FormEvent) => {
-    e.preventDefault();
-    const name = moduleName.trim();
-    if (!name) {
-      showError('Module name is required');
-      return;
-    }
-
-    try {
-      await createModuleApi({ name });
-      setModuleName('');
-      showSuccess('Module created');
-      await loadBase();
-    } catch (err: unknown) {
-      showError((err as { message?: string })?.message || 'Failed to create module');
-    }
-  };
-
-  const onCreateRole = async (e: FormEvent) => {
-    e.preventDefault();
-    const name = roleName.trim().toLowerCase();
-    if (!name) {
-      showError('Role name is required');
-      return;
-    }
-
-    try {
-      await createRoleApi({ name });
-      setRoleName('');
-      showSuccess('Role created');
-      await loadBase();
-    } catch (err: unknown) {
-      showError((err as { message?: string })?.message || 'Failed to create role');
-    }
-  };
-
   const onSavePermissions = async () => {
+    if (!canEditMatrix) {
+      showError('You do not have permission to edit role permissions');
+      return;
+    }
     if (!selectedRoleId) {
       showError('Select a role first');
       return;
@@ -192,64 +171,31 @@ const ManagePermissions = () => {
     }
   };
 
+  if (!permLoading && !canViewMatrix) {
+    return (
+      <PageShell title="Role Permissions" subtitle="Assign permissions per role and module">
+        <div className="p-4 text-muted">You do not have permission to view role permissions.</div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell
       title="Role Permissions"
-      subtitle="Create modules and roles, then set view / add / edit / delete per module"
-      loading={loading}
+      subtitle="Set view / add / edit / delete per module for each role"
+      loading={permLoading || loading}
       loadingMessage="Loading permissions..."
       flush
     >
       <div className="p-3 p-md-4">
-        <div className="row g-3">
-          <div className="col-12 col-lg-6">
-            <div className="card">
-              <div className="card-header fw-semibold">Create Module</div>
-              <div className="card-body">
-                <form className="row g-2" onSubmit={onCreateModule}>
-                  <div className="col-12">
-                    <input
-                      className="form-control"
-                      placeholder="Module name (shown in UI)"
-                      value={moduleName}
-                      onChange={(e) => setModuleName(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-12">
-                    <button className="btn btn-primary" type="submit">
-                      Add Module
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-12 col-lg-6">
-            <div className="card">
-              <div className="card-header fw-semibold">Create Role</div>
-              <div className="card-body">
-                <form className="row g-2" onSubmit={onCreateRole}>
-                  <div className="col-12">
-                    <input
-                      className="form-control"
-                      placeholder="Role name (example: support)"
-                      value={roleName}
-                      onChange={(e) => setRoleName(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-12">
-                    <button className="btn btn-primary" type="submit">
-                      Add Role
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
+        <div className="alert alert-light border mb-3 small mb-4">
+          Add or rename modules and roles on the dedicated pages:{' '}
+          <Link to={`${rbacBase}/modules`}>Modules</Link>
+          <span className="mx-1">·</span>
+          <Link to={`${rbacBase}/roles`}>Roles</Link>.
         </div>
 
-        <div className="card mt-3">
+        <div className="card mt-0">
           <div className="card-header fw-semibold">Permissions by module</div>
           <div className="card-body">
             <div className="row g-3 align-items-end">
@@ -273,7 +219,7 @@ const ManagePermissions = () => {
                   className="btn btn-success"
                   type="button"
                   onClick={onSavePermissions}
-                  disabled={!selectedRoleId || saving}
+                  disabled={!selectedRoleId || saving || !canEditMatrix}
                 >
                   {saving ? 'Saving...' : 'Save Permissions'}
                 </button>
@@ -315,6 +261,7 @@ const ManagePermissions = () => {
                                 type="checkbox"
                                 className="form-check-input"
                                 checked={p[key]}
+                                disabled={!canEditMatrix}
                                 onChange={(e) => setFlag(m.id, key, e.target.checked)}
                                 aria-label={`${m.name} ${key}`}
                               />

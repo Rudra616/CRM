@@ -94,6 +94,7 @@ useEffect(() => {
     const needsUserBootstrap =
       path.startsWith('/user/') ||
       path.startsWith('/subadmin/') ||
+      path.startsWith('/tickets/') ||
       path === '/profile' ||
       path === '/change-password' ||
       path === '/users';

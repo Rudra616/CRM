@@ -44,8 +44,8 @@ export const PermissionProvider = ({ children }: { children: ReactNode }) => {
     setPermLoading(true);
     getMyPermissionsApi()
       .then((res) => {
-        setIsAdmin(res.data.isAdmin);
-        setPermissions(res.data.permissions);
+        setIsAdmin(res.data?.isAdmin ?? false);
+        setPermissions(res.data?.permissions ?? {});
       })
       .catch(() => {})
       .finally(() => setPermLoading(false));

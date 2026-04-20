@@ -12,6 +12,7 @@ import {
   updateSubadminPassword,
   deleteSubadminById,
 } from "../service/subadmin.service";
+import { USERS_PAGE_SIZE_OPTIONS } from "../service/user.service";
 import {
   removeAllAdminTokensForAdminId,
 } from "../../token.service";
@@ -52,9 +53,11 @@ export const createSubadmin = async (req: Request, res: Response) => {
 export const getSubadmins = async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = 10;
+    const limitRaw = Number(req.query.limit);
     const search = (req.query.search as string | undefined)?.trim();
-    const { items, total } = await getSubadminsPaginated(page, limit, search);
+
+    const { items, total, limit } = await getSubadminsPaginated(page, limitRaw, search);
+
     return successResponse(res, "Subadmins fetched successfully", {
       items,
       pagination: {
@@ -62,6 +65,7 @@ export const getSubadmins = async (req: Request, res: Response) => {
         limit,
         total,
         totalPages: Math.max(1, Math.ceil(total / limit)),
+        limitOptions: [...USERS_PAGE_SIZE_OPTIONS],
       },
     }, 200);
   } catch (err: any) {
