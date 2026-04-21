@@ -36,24 +36,15 @@ const Sidebar = ({ role }: Props) => {
   const navigate = useNavigate();
   const { collapsed, sidebarOpen, setSidebarOpen, isMobile } = useSidebar();
   const { user } = useAuth();
-  const { getModulePerm } = usePermissions();
+  const { getRoutePerm } = usePermissions();
   const username = user?.username ?? 'User';
 
-  // ─── Subadmin: check which modules they can VIEW ──────────────────────────
-  // If can_view = false for a module, don't even show that menu item.
-  // Admin always gets true from getModulePerm (handled in PermissionContext).
-  //
-  // Add more modules here as you create them, e.g.:
-  //   const canViewProducts = getModulePerm('product').can_view;
-  //   const canViewOrders   = getModulePerm('order').can_view;
-  //
-  // ⚠️  Module name must exactly match the `name` column in your `module` DB table.
-  const canViewUsers = getModulePerm('user').can_view;
-  const canViewTickets = getModulePerm('ticket').can_view;
-  const canViewRbModule = getModulePerm('module').can_view;
-  const canViewRbRole = getModulePerm('role').can_view;
-  const canViewRbPerm = getModulePerm('role_permission').can_view;
-  const showSubadminAccessMenu = canViewRbModule || canViewRbRole || canViewRbPerm;
+  const canView = (routePath: string): boolean => getRoutePerm(routePath).can_view;
+  const showSubadminAccessMenu = [
+    '/subadmin/rbac/modules',
+    '/subadmin/rbac/roles',
+    '/subadmin/rbac/permissions',
+  ].some(canView);
 
   const getProfilePath = () => (role === 'admin' ? '/admin/profile' : '/profile');
 
@@ -191,13 +182,13 @@ const Sidebar = ({ role }: Props) => {
                   - shown  → subadmin has can_view = 1 for module "user" in DB
                   - hidden → can_view = 0 or no permission row at all
               */}
-              {canViewUsers && (
+              {canView('/subadmin/users') && (
                 <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/users')}>
                   Manage Users
                 </MenuItem>
               )}
 
-              {canViewTickets && (
+              {canView('/subadmin/tickets') && (
                 <MenuItem icon={<FaTicketAlt />} onClick={nav('/subadmin/tickets')}>
                   Tickets
                 </MenuItem>
@@ -205,39 +196,23 @@ const Sidebar = ({ role }: Props) => {
 
               {showSubadminAccessMenu && (
                 <SubMenu label="Access control" icon={<FaShieldAlt />}>
-                  {canViewRbModule && (
+                  {canView('/subadmin/rbac/modules') && (
                     <MenuItem icon={<FaCube />} onClick={nav('/subadmin/rbac/modules')}>
                       Modules
                     </MenuItem>
                   )}
-                  {canViewRbRole && (
+                  {canView('/subadmin/rbac/roles') && (
                     <MenuItem icon={<FaUserTag />} onClick={nav('/subadmin/rbac/roles')}>
                       Roles
                     </MenuItem>
                   )}
-                  {canViewRbPerm && (
+                  {canView('/subadmin/rbac/permissions') && (
                     <MenuItem icon={<FaShieldAlt />} onClick={nav('/subadmin/rbac/permissions')}>
                       Role permissions
                     </MenuItem>
                   )}
                 </SubMenu>
               )}
-
-              {/*
-                Add more module-gated items below as you create modules:
-
-                {canViewProducts && (
-                  <MenuItem icon={<FaBox />} onClick={nav('/subadmin/products')}>
-                    Manage Products
-                  </MenuItem>
-                )}
-
-                {canViewOrders && (
-                  <MenuItem icon={<FaClipboardList />} onClick={nav('/subadmin/orders')}>
-                    Manage Orders
-                  </MenuItem>
-                )}
-              */}
 
               {/* Always visible — not module-gated */}
               <MenuItem icon={<FaUser />} onClick={nav('/profile')}>

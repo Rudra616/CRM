@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   getModulesApi,
   getRolePermissionsApi,
@@ -49,10 +49,11 @@ const buildPermMap = (modules: ModuleItem[], rows: RolePermissionEntry[]): Recor
 };
 
 const ManagePermissions = () => {
+  const location = useLocation();
   const { user } = useAuth();
-  const { getModulePerm, permLoading } = usePermissions();
+  const { getRoutePerm, permLoading } = usePermissions();
   const isAdmin = user?.role === 'admin';
-  const permRp = getModulePerm('role_permission');
+  const permRp = getRoutePerm(location.pathname);
   const canViewMatrix = isAdmin || permRp.can_view;
   const canEditMatrix = isAdmin || permRp.can_edit;
 

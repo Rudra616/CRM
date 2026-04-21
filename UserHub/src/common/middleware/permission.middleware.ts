@@ -3,6 +3,24 @@ import { AuthRequest } from "../types/AuthRequest";
 import { Role } from "../types/role";
 import { getPermissionByRoleAndModule } from "../permission.service";
 
+export type PermissionAction = "can_view" | "can_add" | "can_edit" | "can_delete";
+
+/**
+ * Shared RBAC permission check used by middleware and controllers.
+ * Keeps frontend-oriented permission APIs aligned with middleware behavior.
+ */
+export const hasPermissionForUser = async (
+  user: AuthRequest["user"] | undefined,
+  moduleName: string,
+  action: PermissionAction
+): Promise<boolean> => {
+  if (!user) return false;
+  if (user.role === Role.ADMIN) return true;
+  if (!user.role_id) return false;
+  const permission = await getPermissionByRoleAndModule(user.role_id, moduleName);
+  return Boolean(permission && permission[action] === 1);
+};
+
 /**
  * Permission middleware
  * @param moduleName - module name from DB (e.g. "user", "product")
@@ -10,7 +28,7 @@ import { getPermissionByRoleAndModule } from "../permission.service";
  */
 export const checkPermission = (
   moduleName: string,
-  action: "can_view" | "can_add" | "can_edit" | "can_delete"
+  action: PermissionAction
 ): RequestHandler => {
   return async (req, res, next) => {
     try {
@@ -37,21 +55,10 @@ export const checkPermission = (
         return res.status(403).json({ message: "No role assigned" });
       }
 
-      const permission = await getPermissionByRoleAndModule(
-        user.role_id,
-        moduleName
-      );
-
-      console.log("📊 DB Permission:", permission);
-
-      if (!permission) {
+      const allowed = await hasPermissionForUser(user, moduleName, action);
+      if (!allowed) {
         console.log("❌ No permission found");
-        return res.status(403).json({ message: "No permission setup" });
-      }
-
-      if (permission[action] !== 1) {
-        console.log("❌ Permission denied");
-        return res.status(403).json({ message: "Permission denied" });
+        return res.status(403).json({ message: "No permission setup or denied" });
       }
 
       console.log("✅ Permission granted");
@@ -63,40 +70,11 @@ export const checkPermission = (
   };
 };
 
-/** Pass if ANY of the alternatives grants the action (subadmin); admin always passes. */
-export const checkPermissionAny = (
-  alternatives: Array<
-    [string, "can_view" | "can_add" | "can_edit" | "can_delete"]
-  >
-): RequestHandler => {
-  return async (req, res, next) => {
-    try {
-      const authReq = req as AuthRequest;
-      const user = authReq.user;
 
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
 
-      if (user.role === Role.ADMIN) {
-        return next();
-      }
-
-      if (!user.role_id) {
-        return res.status(403).json({ message: "No role assigned" });
-      }
-
-      for (const [moduleName, action] of alternatives) {
-        const permission = await getPermissionByRoleAndModule(user.role_id, moduleName);
-        if (permission && permission[action] === 1) {
-          return next();
-        }
-      }
-
-      return res.status(403).json({ message: "Permission denied" });
-    } catch (err) {
-      console.log("🔥 ERROR:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-  };
+/** Skip staff-only handlers so the next `POST /message` route runs (regular ticket owners). */
+export const skipUnlessStaff: RequestHandler = (req, res, next) => {
+  const role = (req as AuthRequest).user?.role;
+  if (role === Role.ADMIN || role === Role.SUBADMIN) return next();
+  next("route");
 };

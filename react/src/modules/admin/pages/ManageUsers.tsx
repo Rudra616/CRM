@@ -29,39 +29,38 @@ const isUserRemoved = (u: User): boolean =>
 
 const ManageUsers = () => {
   const { user } = useAuth();
-  const { getModulePerm } = usePermissions();
+  const { getRoutePerm } = usePermissions();
+  const location = useLocation();
 
   // ─── Role flags ───────────────────────────────────────────────────────────
   // isAdmin  → true only for the ADMIN role (admin sees everything, no restrictions)
   // isSubadmin → true for subadmin role (respects DB permissions)
-  const isAdmin    = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
   const isSubadmin = user?.role === 'subadmin';
 
   // ─── Permissions ──────────────────────────────────────────────────────────
-  // For ADMIN: getModulePerm always returns all true (handled inside PermissionContext)
+  // For ADMIN: getRoutePerm always returns all true (handled inside PermissionContext)
   // For SUBADMIN: reads from DB via /admin/me/permissions
-  // "user" must match exactly the module.name value in your DB
-  const perm = getModulePerm('user');
+  const perm = getRoutePerm(location.pathname);
 
   // Derived convenience flags
-  const canEdit   = perm.can_edit;    // show Status column + Edit + Logout buttons
+  const canEdit = perm.can_edit;    // show Status column + Edit + Logout buttons
   const canDelete = perm.can_delete;  // show Delete button
   const hasActions = canEdit || canDelete; // show Actions column at all
 
   // ─── State ────────────────────────────────────────────────────────────────
-  const location = useLocation();
-  const [searchTerm, setSearchTerm]           = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
-  const [users, setUsers]                     = useState<User[]>([]);
-  const [loading, setLoading]                 = useState(true);
-  const [busyUserId, setBusyUserId]           = useState<string | number | null>(null);
-  const [statusDraft, setStatusDraft]         = useState<Record<string, AccountStatus>>({});
-  const [editUser, setEditUser]               = useState<User | null>(null);
-  const [currentPage, setCurrentPage]         = useState(1);
-  const [rowsPerPage, setRowsPerPage]         = useState(10);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyUserId, setBusyUserId] = useState<string | number | null>(null);
+  const [statusDraft, setStatusDraft] = useState<Record<string, AccountStatus>>({});
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [pageSizeOptions, setPageSizeOptions] = useState<number[]>(DEFAULT_PAGE_SIZES);
-  const [statusFilter, setStatusFilter]       = useState<StatusFilter>('all');
-  const [pagination, setPagination]           = useState({
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     total: 0,
@@ -70,7 +69,7 @@ const ManageUsers = () => {
 
   // ─── Fetch users ──────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
-    const deletedOnly     = statusFilter === 'deleted';
+    const deletedOnly = statusFilter === 'deleted';
     const effectiveStatus =
       statusFilter === 'all' || statusFilter === 'deleted' ? undefined : statusFilter;
 
@@ -85,21 +84,21 @@ const ManageUsers = () => {
     setLoading(true);
     try {
       let res;
-      if (isAdmin)         res = await getAdminUsersApi(params);
+      if (isAdmin) res = await getAdminUsersApi(params);
       else if (isSubadmin) res = await getSubadminUsersApi(params);
-      else                 res = await getUsersApi(params);
+      else res = await getUsersApi(params);
 
-      const data  = res.data as UsersPageData | undefined;
+      const data = res.data as UsersPageData | undefined;
       const items = data?.items ?? [];
-      const p     = data?.pagination;
+      const p = data?.pagination;
 
       setUsers(items);
 
       if (p) {
         setPagination({
-          page:       p.page,
-          limit:      p.limit,
-          total:      p.total,
+          page: p.page,
+          limit: p.limit,
+          total: p.total,
           totalPages: Math.max(1, p.totalPages),
         });
         setRowsPerPage(p.limit);
@@ -152,23 +151,23 @@ const ManageUsers = () => {
   };
 
   // ─── Derived values ───────────────────────────────────────────────────────
-  const limit      = pagination.limit || rowsPerPage;
+  const limit = pagination.limit || rowsPerPage;
   const startIndex = (pagination.page - 1) * limit;
-  const endIndex   = startIndex + users.length;
+  const endIndex = startIndex + users.length;
 
   // Dynamic colspan: base 4 cols (#, Name, Phone, Email) + optional Status + optional Action
   const colSpan =
     4 + (canEdit ? 1 : 0) + (hasActions ? 1 : 0);
 
-  const theadStyle    = { backgroundColor: colors.cardPrimaryBg };
+  const theadStyle = { backgroundColor: colors.cardPrimaryBg };
   const statusOptions: AccountStatus[] = ['active', 'pending', 'inactive'];
 
   const filterSelectOptions: { value: StatusFilter; label: string }[] = [
-    { value: 'all',      label: 'All' },
-    { value: 'active',   label: 'Active' },
-    { value: 'pending',  label: 'Pending' },
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'pending', label: 'Pending' },
     { value: 'inactive', label: 'Inactive' },
-    { value: 'deleted',  label: 'Removed' },
+    { value: 'deleted', label: 'Removed' },
   ];
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
@@ -226,8 +225,8 @@ const ManageUsers = () => {
     if (isUserRemoved(editUser)) return;
     try {
       setBusyUserId(id);
-      const status  = statusDraft[String(id)] || 'active';
-      const res     = await updateUserByAdminApi(id, { ...data, status });
+      const status = statusDraft[String(id)] || 'active';
+      const res = await updateUserByAdminApi(id, { ...data, status });
       const updated = res.data;
       setUsers((prev) =>
         prev.map((row) => (row.id === id ? { ...row, ...(updated || {}), status } : row))
@@ -378,10 +377,10 @@ const ManageUsers = () => {
 
             <tbody>
               {users.map((row, index) => {
-                const removed       = isUserRemoved(row);
+                const removed = isUserRemoved(row);
                 const currentStatus = statusDraft[String(row.id)] || row.status || 'active';
-                const firstName     = (row as unknown as { first_name?: string }).first_name ?? row.firstname ?? '';
-                const lastName      = (row as unknown as { last_name?: string }).last_name  ?? row.lastname  ?? '';
+                const firstName = (row as unknown as { first_name?: string }).first_name ?? row.firstname ?? '';
+                const lastName = (row as unknown as { last_name?: string }).last_name ?? row.lastname ?? '';
 
                 return (
                   <tr key={row.id} className={removed ? 'table-secondary' : undefined}>
@@ -400,13 +399,12 @@ const ManageUsers = () => {
                         ) : (
                           <div className="d-flex align-items-center flex-wrap gap-1">
                             {/* Badge showing current status */}
-                            <span className={`badge text-capitalize ${
-                              currentStatus === 'active'
+                            <span className={`badge text-capitalize ${currentStatus === 'active'
                                 ? 'bg-success'
                                 : currentStatus === 'pending'
                                   ? 'bg-warning text-dark'
                                   : 'bg-secondary'
-                            }`}>
+                              }`}>
                               {currentStatus}
                             </span>
 
@@ -529,9 +527,8 @@ const ManageUsers = () => {
                 <button
                   key={i}
                   type="button"
-                  className={`btn btn-sm ${
-                    pagination.page === i + 1 ? 'btn-primary' : 'btn-outline-primary'
-                  }`}
+                  className={`btn btn-sm ${pagination.page === i + 1 ? 'btn-primary' : 'btn-outline-primary'
+                    }`}
                   style={{ minWidth: 36 }}
                   onClick={() => setCurrentPage(i + 1)}
                 >

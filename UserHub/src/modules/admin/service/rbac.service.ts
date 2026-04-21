@@ -18,6 +18,7 @@ const ROLE_PERMISSION_TABLE = (() => {
   return "role_permission";
 })();
 
+
 const rp = () => `\`${ROLE_PERMISSION_TABLE}\``;
 
 export const getModules = async (): Promise<ModuleRow[]> => {

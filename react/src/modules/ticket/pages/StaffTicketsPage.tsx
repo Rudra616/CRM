@@ -11,16 +11,34 @@ import type { TicketItem, TicketMessageItem, TicketStatus } from '../types/ticke
 import { TicketMessageModal } from '../components/TicketMessageModal';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
+import { useLocation } from 'react-router-dom';
 
 const STATUS_OPTIONS: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
 
-const StaffTicketsPage = () => {
-  const { user } = useAuth();
-  const { getModulePerm } = usePermissions();
-  const ticketPerm = getModulePerm('ticket');
+const statusBadgeClass = (status: TicketStatus) => {
+  if (status === 'open') return 'bg-primary';
+  if (status === 'in_progress') return 'bg-warning text-dark';
+  if (status === 'resolved') return 'bg-success';
+  return 'bg-secondary';
+};
 
+const StaffTicketsPage = () => {
+  const location = useLocation();
+  const { user } = useAuth();
+  const { getRoutePerm } = usePermissions();
+  const ticketPerm = getRoutePerm(location.pathname);
   const canView = useMemo(() => user?.role === 'admin' || ticketPerm.can_view, [user?.role, ticketPerm.can_view]);
   const canEdit = useMemo(() => user?.role === 'admin' || ticketPerm.can_edit, [user?.role, ticketPerm.can_edit]);
+  const canMessageView = useMemo(
+    () => user?.role === 'admin' || ticketPerm.can_view,
+    [user?.role, ticketPerm.can_view]
+  );
+  const canMessageSend = useMemo(
+    () => user?.role === 'admin' || ticketPerm.can_add,
+    [user?.role, ticketPerm.can_add]
+  );
+  const showMessageColumn = canMessageSend;
+  const tableColSpan = showMessageColumn ? 7 : 6;
 
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
@@ -62,6 +80,10 @@ const StaffTicketsPage = () => {
   };
 
   const openMessages = async (ticket: TicketItem) => {
+    if (!canMessageView) {
+      showError('You do not have permission to view messages');
+      return;
+    }
     setActiveTicket(ticket);
     setModalOpen(true);
     setMessageLoading(true);
@@ -77,6 +99,10 @@ const StaffTicketsPage = () => {
 
   const sendMessage = async (message: string) => {
     if (!activeTicket) return;
+    if (!canMessageSend) {
+      showError('You do not have permission to send messages');
+      return;
+    }
     await addTicketMessageApi(activeTicket.id, message);
     const res = await getTicketMessagesApi(activeTicket.id);
     setMessages(res.data?.messages ?? []);
@@ -104,19 +130,19 @@ const StaffTicketsPage = () => {
                 <th>Status</th>
                 <th>Attachment</th>
                 <th>Created</th>
-                <th>Message</th>
+                {showMessageColumn && <th>Message</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-muted py-4">
+                  <td colSpan={tableColSpan} className="text-center text-muted py-4">
                     Loading tickets...
                   </td>
                 </tr>
               ) : tickets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-muted py-4">
+                  <td colSpan={tableColSpan} className="text-center text-muted py-4">
                     No tickets found
                   </td>
                 </tr>
@@ -130,18 +156,24 @@ const StaffTicketsPage = () => {
                       <div className="text-muted small">{ticket.description}</div>
                     </td>
                     <td style={{ minWidth: 170 }}>
-                      <select
-                        className="form-select form-select-sm text-capitalize"
-                        value={ticket.status}
-                        disabled={!canEdit || busyId === ticket.id}
-                        onChange={(e) => void updateStatus(ticket.id, e.target.value as TicketStatus)}
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {status.replace('_', ' ')}
-                          </option>
-                        ))}
-                      </select>
+                      {canEdit ? (
+                        <select
+                          className="form-select form-select-sm text-capitalize"
+                          value={ticket.status}
+                          disabled={busyId === ticket.id}
+                          onChange={(e) => void updateStatus(ticket.id, e.target.value as TicketStatus)}
+                        >
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status.replace('_', ' ')}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`badge text-capitalize ${statusBadgeClass(ticket.status)}`}>
+                          {ticket.status.replace('_', ' ')}
+                        </span>
+                      )}
                     </td>
                     <td>
                       {ticket.image_url ? (
@@ -153,16 +185,18 @@ const StaffTicketsPage = () => {
                       )}
                     </td>
                     <td>{ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '-'}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary"
-                        disabled={!canEdit}
-                        onClick={() => void openMessages(ticket)}
-                      >
-                        Open Chat
-                      </button>
-                    </td>
+                    {showMessageColumn && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          disabled={!canMessageView}
+                          onClick={() => void openMessages(ticket)}
+                        >
+                          Open Chat
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -176,7 +210,7 @@ const StaffTicketsPage = () => {
         ticket={activeTicket}
         messages={messages}
         loading={messageLoading}
-        canReply={canEdit}
+        canReply={canMessageSend}
         onClose={() => setModalOpen(false)}
         onSend={sendMessage}
       />

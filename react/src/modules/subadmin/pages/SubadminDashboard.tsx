@@ -7,14 +7,15 @@ import { DashboardStatCard } from '../../../shared/components/DashboardStatCard'
 import { usePermissions } from '../../../context/PermissionContext';
 
 const SubadminDashboard: React.FC = () => {
-  const { getModulePerm, permLoading } = usePermissions();
-  const canRbModule = getModulePerm('module').can_view;
-  const canRbRole = getModulePerm('role').can_view;
-  const canRbPerm = getModulePerm('role_permission').can_view;
-  const showRbacLinks = canRbModule || canRbRole || canRbPerm;
-
-  const canViewUsers = getModulePerm('user').can_view;
-  const canViewTickets = getModulePerm('ticket').can_view;
+  const { getRoutePerm, permLoading } = usePermissions();
+  const canView = (routePath: string): boolean => getRoutePerm(routePath).can_view;
+  const showRbacLinks = [
+    '/subadmin/rbac/modules',
+    '/subadmin/rbac/roles',
+    '/subadmin/rbac/permissions',
+  ].some(canView);
+  const canViewUsers = canView('/subadmin/users');
+  const canViewTickets = canView('/subadmin/tickets');
 
   const [statsLoading, setStatsLoading] = useState(false);
   const [userCount, setUserCount] = useState(0);
@@ -98,7 +99,7 @@ const SubadminDashboard: React.FC = () => {
 
       {!permLoading && !canViewUsers && (
         <p className="text-muted mb-4">
-          User statistics are hidden because your role does not have permission to view the Users module.
+          User statistics are not available for your account.
         </p>
       )}
 
@@ -118,17 +119,17 @@ const SubadminDashboard: React.FC = () => {
       {showRbacLinks && (
         <div className="w-100 mt-3 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
           <span className="small text-muted me-1">Access control:</span>
-          {canRbModule && (
+          {canView('/subadmin/rbac/modules') && (
             <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/modules">
               Modules
             </Link>
           )}
-          {canRbRole && (
+          {canView('/subadmin/rbac/roles') && (
             <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/roles">
               Roles
             </Link>
           )}
-          {canRbPerm && (
+          {canView('/subadmin/rbac/permissions') && (
             <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/permissions">
               Role permissions
             </Link>

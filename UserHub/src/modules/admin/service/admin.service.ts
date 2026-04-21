@@ -13,7 +13,7 @@ export const findAdminByUsername = async (username: string): Promise<Admin | nul
     );
     return rows.length > 0 ? rows[0] : null;
   } catch (error: unknown) {
-    logServiceError("admin.service", "findAdminByUsername",error);
+    logServiceError("admin.service", "findAdminByUsername", error);
     throw error;
   }
 };
@@ -68,16 +68,15 @@ export const getAdminDashboardSummary = async (): Promise<{
     //    SUM(COALESCE(is_delete, 0) = 1) AS deletedUsers
     //  FROM \`user\``
     // );
-  
+
     const [[subRow]]: any = await db.query(
       `SELECT COUNT(*) AS subadminCount FROM \`admin\` WHERE role = 'subadmin' AND status = 'active' AND COALESCE(is_delete, 0) = 0`
     );
-const [result] = await db.query<RowDataPacket[]>("SELECT * FROM user");
-
-const activeUsers = result.filter(user => user.status === 'active').length;
-const pendingUsers = result.filter(user => user.status === 'pending').length;
-const inactiveUsers = result.filter(user => user.status === 'inactive').length;
-const deletedUsers = result.filter(user => user.is_delete).length;
+    const [result] = await db.query<RowDataPacket[]>("SELECT * FROM user");
+    const activeUsers = result.filter(user => user.status === 'active').length;
+    const pendingUsers = result.filter(user => user.status === 'pending').length;
+    const inactiveUsers = result.filter(user => user.status === 'inactive').length;
+    const deletedUsers = result.filter(user => user.is_delete).length;
 
 
     return {

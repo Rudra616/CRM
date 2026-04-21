@@ -161,8 +161,8 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
       const roleId = req.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
-      if (!permission || permission.can_edit !== 1) {
-        return errorResponse(res, "Permission denied for ticket messaging", 403);
+      if (!permission || permission.can_add !== 1) {
+        return errorResponse(res, "Permission denied for sending messages", 403);
       }
     }
 
@@ -203,7 +203,7 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
       if (!permission || permission.can_view !== 1) {
-        return errorResponse(res, "Permission denied for viewing ticket messages", 403);
+        return errorResponse(res, "Permission denied for viewing messages", 403);
       }
     }
 

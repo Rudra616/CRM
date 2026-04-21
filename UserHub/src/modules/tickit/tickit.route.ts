@@ -18,9 +18,15 @@ import {
   updateOwnedTicketSchema,
   updateTicketStatusSchema,
 } from "./tickit.validation";
-import { checkPermission } from "../../common/middleware/permission.middleware";
+import { checkPermission,skipUnlessStaff } from "../../common/middleware/permission.middleware";
+import { RequestHandler } from "express";
+import { AuthRequest } from "../../common/types/AuthRequest";
 
 const router = Router();
+
+
+
+
 
 router.post(
   "/create",
@@ -53,6 +59,20 @@ router.put(
   validateSchema(updateOwnedTicketSchema),
   updateOwnedTicket
 );
-router.post("/message", authenticate, validateSchema(addTicketMessageSchema), addTicketMessage);
+router.post(
+  "/message",
+  authenticate,
+  skipUnlessStaff,
+  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  validateSchema(addTicketMessageSchema),
+  checkPermission("ticket", "can_add"),
+  addTicketMessage
+);
+router.post(
+  "/message",
+  authenticate,
+  validateSchema(addTicketMessageSchema),
+  addTicketMessage
+);
 
 export default router;

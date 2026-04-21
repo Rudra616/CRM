@@ -45,7 +45,6 @@ import {
 } from "./controller/admin.controller";
 import {
   checkPermission,
-  checkPermissionAny,
 } from "../../common/middleware/permission.middleware";
 // Subadmin CRUD (managed by admin)
 import {
@@ -153,10 +152,7 @@ router.get(
   "/modules",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermissionAny([
-    ["module", "can_view"],
-    ["role_permission", "can_view"],
-  ]),
+  checkPermission("module", "can_view"),
   listModules
 );
 router.post(
@@ -194,10 +190,7 @@ router.get(
   "/roles",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermissionAny([
-    ["role", "can_view"],
-    ["role_permission", "can_view"],
-  ]),
+  checkPermission("role", "can_view"),
   listRoles
 );
 router.post(
@@ -257,7 +250,7 @@ router.delete(
   "/users/:id",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-    checkPermission("user", "can_delete"),
+  checkPermission("user", "can_delete"),
 
   deleteUserByAdmin,
 );

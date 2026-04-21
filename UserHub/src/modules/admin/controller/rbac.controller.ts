@@ -5,7 +5,6 @@ import {
   createRole,
   getModules,
   getModulesPaginated,
-  getMyPermissionsByRoleId,
   getRolePermissions,
   getRoles,
   getRolesPaginated,
@@ -23,6 +22,7 @@ import {
   invalidateSubadminSessionsForModuleId,
   invalidateSubadminSessionsForRoleId,
 } from "../../token.service";
+import { hasPermissionForUser } from "../../../common/middleware/permission.middleware";
  
 export const listModules = async (_req: Request, res: Response) => {
   try {
@@ -243,16 +243,16 @@ export const getMyPermissions = async (req: Request, res: Response) => {
       );
     }
 
-    const rows = await getMyPermissionsByRoleId(user.role_id);
+    const modules = await getModules();
+    const permissions: Record<string, { can_view: boolean; can_add: boolean; can_edit: boolean; can_delete: boolean }> = {};
 
-    const permissions: Record<string, object> = {};
-
-    for (const row of rows) {
-      permissions[row.module_name] = {
-        can_view: row.can_view,
-        can_add: row.can_add,
-        can_edit: row.can_edit,
-        can_delete: row.can_delete,
+    for (const mod of modules) {
+      const moduleName = mod.name;
+      permissions[moduleName] = {
+        can_view: await hasPermissionForUser(user, moduleName, "can_view"),
+        can_add: await hasPermissionForUser(user, moduleName, "can_add"),
+        can_edit: await hasPermissionForUser(user, moduleName, "can_edit"),
+        can_delete: await hasPermissionForUser(user, moduleName, "can_delete"),
       };
     }
 
