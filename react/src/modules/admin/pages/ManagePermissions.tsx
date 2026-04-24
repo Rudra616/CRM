@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   getModulesApi,
   getRolePermissionsApi,
@@ -14,6 +14,7 @@ import { PageShell } from '../../../shared/components/PageShell';
 import { showError, showSuccess } from '../../../shared/utils/toast';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 type PermFlags = {
   can_view: boolean;
@@ -49,11 +50,10 @@ const buildPermMap = (modules: ModuleItem[], rows: RolePermissionEntry[]): Recor
 };
 
 const ManagePermissions = () => {
-  const location = useLocation();
   const { user } = useAuth();
-  const { getRoutePerm, permLoading } = usePermissions();
+  const { getModulePerm, permLoading } = usePermissions();
   const isAdmin = user?.role === 'admin';
-  const permRp = getRoutePerm(location.pathname);
+  const permRp = getModulePerm(PERMISSION_MODULE_KEYS.MODULE);
   const canViewMatrix = isAdmin || permRp.can_view;
   const canEditMatrix = isAdmin || permRp.can_edit;
 

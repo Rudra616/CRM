@@ -168,7 +168,7 @@ router.get(
   "/roles/table",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermission("role", "can_view"),
+  checkPermission("module", "can_view"),
   listRolesTable
 );
 router.patch(
@@ -176,21 +176,21 @@ router.patch(
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateRoleRowSchema),
-  checkPermission("role", "can_edit"),
+  checkPermission("module", "can_edit"),
   updateRoleRow
 );
 router.delete(
   "/roles/:id",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermission("role", "can_delete"),
+  checkPermission("module", "can_delete"),
   deleteRoleRow
 );
 router.get(
   "/roles",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermission("role", "can_view"),
+  checkPermission("module", "can_view"),
   listRoles
 );
 router.post(
@@ -198,14 +198,14 @@ router.post(
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(createRoleSchema),
-  checkPermission("role", "can_add"),
+  checkPermission("module", "can_add"),
   addRole
 );
 router.get(
   "/roles/:roleId/permissions",
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermission("role_permission", "can_view"),
+  checkPermission("module", "can_view"),
   getPermissionsByRole
 );
 router.put(
@@ -213,7 +213,7 @@ router.put(
   authenticate,
   allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateRolePermissionsSchema),
-  checkPermission("role_permission", "can_edit"),
+  checkPermission("module", "can_edit"),
   savePermissionsByRole
 );
 router.get(

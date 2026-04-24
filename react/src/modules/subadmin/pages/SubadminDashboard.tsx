@@ -5,17 +5,14 @@ import { showError } from '../../../shared/utils/toast';
 import { PageShell } from '../../../shared/components/PageShell';
 import { DashboardStatCard } from '../../../shared/components/DashboardStatCard';
 import { usePermissions } from '../../../context/PermissionContext';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 const SubadminDashboard: React.FC = () => {
-  const { getRoutePerm, permLoading } = usePermissions();
-  const canView = (routePath: string): boolean => getRoutePerm(routePath).can_view;
-  const showRbacLinks = [
-    '/subadmin/rbac/modules',
-    '/subadmin/rbac/roles',
-    '/subadmin/rbac/permissions',
-  ].some(canView);
-  const canViewUsers = canView('/subadmin/users');
-  const canViewTickets = canView('/subadmin/tickets');
+  const { getModulePerm, permLoading } = usePermissions();
+  const canViewUsers = getModulePerm(PERMISSION_MODULE_KEYS.USER).can_view;
+  const canViewTickets = getModulePerm(PERMISSION_MODULE_KEYS.TICKET).can_view;
+  const canViewRbac = getModulePerm(PERMISSION_MODULE_KEYS.MODULE).can_view;
+  const showRbacLinks = canViewRbac;
 
   const [statsLoading, setStatsLoading] = useState(false);
   const [userCount, setUserCount] = useState(0);
@@ -119,17 +116,17 @@ const SubadminDashboard: React.FC = () => {
       {showRbacLinks && (
         <div className="w-100 mt-3 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
           <span className="small text-muted me-1">Access control:</span>
-          {canView('/subadmin/rbac/modules') && (
+          {canViewRbac && (
             <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/modules">
               Modules
             </Link>
           )}
-          {canView('/subadmin/rbac/roles') && (
+          {canViewRbac && (
             <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/roles">
               Roles
             </Link>
           )}
-          {canView('/subadmin/rbac/permissions') && (
+          {canViewRbac && (
             <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/permissions">
               Role permissions
             </Link>

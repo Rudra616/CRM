@@ -9,14 +9,12 @@ const DEFAULT_PERM: PermissionEntry = {
 
 type PermissionContextType = {
   getModulePerm: (moduleName: string) => PermissionEntry;
-  getRoutePerm: (routePath: string) => PermissionEntry;
   isAdmin: boolean;
   permLoading: boolean;
 };
 
 const PermissionContext = createContext<PermissionContextType>({
   getModulePerm: () => DEFAULT_PERM,
-  getRoutePerm: () => DEFAULT_PERM,
   isAdmin: false,
   permLoading: true,
 });
@@ -58,57 +56,13 @@ export const PermissionProvider = ({ children }: { children: ReactNode }) => {
       // Admin bypasses everything
       return { can_view: true, can_add: true, can_edit: true, can_delete: true };
     }
-    return permissions[moduleName] ?? DEFAULT_PERM;
-  };
-
-  const normalize = (value: string): string => value.toLowerCase().replace(/[_\s-]/g, '');
-  const singular = (value: string): string => {
-    if (value.endsWith('ies') && value.length > 3) return `${value.slice(0, -3)}y`;
-    if (value.endsWith('s') && value.length > 1) return value.slice(0, -1);
-    return value;
-  };
-
-  const resolveKeyFromRoute = (routePath: string): string | null => {
-    const keys = Object.keys(permissions);
-    if (!keys.length) return null;
-
-    const routeParts = routePath
-      .split('/')
-      .map((part) => normalize(part.trim()))
-      .filter(Boolean)
-      .filter((part) => !['admin', 'subadmin', 'rbac'].includes(part));
-
-    const candidates = routeParts.flatMap((part) => {
-      const base = singular(part);
-      return [part, base];
-    });
-
-    for (const candidate of candidates) {
-      const exact = keys.find((key) => normalize(key) === candidate);
-      if (exact) return exact;
-    }
-
-    for (const candidate of candidates) {
-      const byContains = keys.find((key) => normalize(key).includes(candidate));
-      if (byContains) return byContains;
-    }
-
-    return null;
-  };
-
-  const getRoutePerm = (routePath: string): PermissionEntry => {
-    if (isAdmin) {
-      return { can_view: true, can_add: true, can_edit: true, can_delete: true };
-    }
-
-    const key = resolveKeyFromRoute(routePath);
-    if (key) return permissions[key] ?? DEFAULT_PERM;
-
-    return DEFAULT_PERM;
+    const wanted = moduleName.toLowerCase().trim();
+    const matchedKey = Object.keys(permissions).find((k) => k.toLowerCase().trim() === wanted);
+    return matchedKey ? permissions[matchedKey] : DEFAULT_PERM;
   };
 
   return (
-    <PermissionContext.Provider value={{ getModulePerm, getRoutePerm, isAdmin, permLoading }}>
+    <PermissionContext.Provider value={{ getModulePerm, isAdmin, permLoading }}>
       {children}
     </PermissionContext.Provider>
   );

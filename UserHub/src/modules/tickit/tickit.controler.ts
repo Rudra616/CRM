@@ -138,7 +138,7 @@ export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: 
     return errorResponse(res, err.message, 500);
   }
 };
-
+ 
 export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
     const { ticket_id, message } = req.body as { ticket_id: number; message: string };

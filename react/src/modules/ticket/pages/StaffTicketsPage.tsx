@@ -11,7 +11,7 @@ import type { TicketItem, TicketMessageItem, TicketStatus } from '../types/ticke
 import { TicketMessageModal } from '../components/TicketMessageModal';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
-import { useLocation } from 'react-router-dom';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 const STATUS_OPTIONS: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
 
@@ -23,10 +23,9 @@ const statusBadgeClass = (status: TicketStatus) => {
 };
 
 const StaffTicketsPage = () => {
-  const location = useLocation();
   const { user } = useAuth();
-  const { getRoutePerm } = usePermissions();
-  const ticketPerm = getRoutePerm(location.pathname);
+  const { getModulePerm } = usePermissions();
+  const ticketPerm = getModulePerm(PERMISSION_MODULE_KEYS.TICKET);
   const canView = useMemo(() => user?.role === 'admin' || ticketPerm.can_view, [user?.role, ticketPerm.can_view]);
   const canEdit = useMemo(() => user?.role === 'admin' || ticketPerm.can_edit, [user?.role, ticketPerm.can_edit]);
   const canMessageView = useMemo(

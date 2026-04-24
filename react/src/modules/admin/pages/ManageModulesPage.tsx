@@ -13,7 +13,8 @@ import { showError, showSuccess } from '../../../shared/utils/toast';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
 import { FaSearch, FaTimes } from 'react-icons/fa';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 const DEFAULT_PAGE_SIZES = [5, 10, 25, 50, 100];
 
@@ -25,10 +26,9 @@ const fmtWhen = (v?: string) => {
 
 const ManageModulesPage = () => {
   const { user } = useAuth();
-  const { getRoutePerm } = usePermissions();
-  const location = useLocation();
+  const { getModulePerm } = usePermissions();
   const isAdmin = user?.role === 'admin';
-  const perm = getRoutePerm(location.pathname);
+  const perm = getModulePerm(PERMISSION_MODULE_KEYS.MODULE);
   const canView = isAdmin || perm.can_view;
   const canAdd = isAdmin || perm.can_add;
   const canEdit = isAdmin || perm.can_edit;

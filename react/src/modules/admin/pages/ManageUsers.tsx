@@ -18,6 +18,7 @@ import { EditUserModal, type EditUserProfilePayload } from '../../../shared/comp
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
 import { FaEdit, FaSearch, FaSignOutAlt, FaTimes, FaTrash } from 'react-icons/fa';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 type StatusFilter = 'all' | 'active' | 'pending' | 'inactive' | 'deleted';
 type AccountStatus = 'active' | 'pending' | 'inactive';
@@ -29,7 +30,7 @@ const isUserRemoved = (u: User): boolean =>
 
 const ManageUsers = () => {
   const { user } = useAuth();
-  const { getRoutePerm } = usePermissions();
+  const { getModulePerm } = usePermissions();
   const location = useLocation();
 
   // ─── Role flags ───────────────────────────────────────────────────────────
@@ -39,9 +40,9 @@ const ManageUsers = () => {
   const isSubadmin = user?.role === 'subadmin';
 
   // ─── Permissions ──────────────────────────────────────────────────────────
-  // For ADMIN: getRoutePerm always returns all true (handled inside PermissionContext)
+  // For ADMIN: getModulePerm always returns all true (handled inside PermissionContext)
   // For SUBADMIN: reads from DB via /admin/me/permissions
-  const perm = getRoutePerm(location.pathname);
+  const perm = getModulePerm(PERMISSION_MODULE_KEYS.USER);
 
   // Derived convenience flags
   const canEdit = perm.can_edit;    // show Status column + Edit + Logout buttons

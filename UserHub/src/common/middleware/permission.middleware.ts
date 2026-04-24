@@ -44,24 +44,23 @@ export const checkPermission = (
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // ✅ Admin bypass
       if (user.role === Role.ADMIN) {
-        console.log("✅ Admin bypass");
+        // console.log("✅ Admin bypass");
         return next();
       }
 
       if (!user.role_id) {
-        console.log("❌ No role_id");
+        // console.log("❌ No role_id");
         return res.status(403).json({ message: "No role assigned" });
       }
 
       const allowed = await hasPermissionForUser(user, moduleName, action);
       if (!allowed) {
-        console.log("❌ No permission found");
+        // console.log("❌ No permission found");
         return res.status(403).json({ message: "No permission setup or denied" });
       }
 
-      console.log("✅ Permission granted");
+      // console.log("✅ Permission granted");
       next();
     } catch (err) {
       console.log("🔥 ERROR:", err);

@@ -17,6 +17,7 @@ import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
 import { colors } from '../../theme/colors';
+import { PERMISSION_MODULE_KEYS } from '../utils/permissionModules';
 
 const SIDEBAR_WIDTH = 280;
 
@@ -36,15 +37,14 @@ const Sidebar = ({ role }: Props) => {
   const navigate = useNavigate();
   const { collapsed, sidebarOpen, setSidebarOpen, isMobile } = useSidebar();
   const { user } = useAuth();
-  const { getRoutePerm } = usePermissions();
+  const { getModulePerm } = usePermissions();
   const username = user?.username ?? 'User';
 
-  const canView = (routePath: string): boolean => getRoutePerm(routePath).can_view;
-  const showSubadminAccessMenu = [
-    '/subadmin/rbac/modules',
-    '/subadmin/rbac/roles',
-    '/subadmin/rbac/permissions',
-  ].some(canView);
+  const canView = (moduleKey: string): boolean => getModulePerm(moduleKey).can_view;
+  const canViewUsers = canView(PERMISSION_MODULE_KEYS.USER);
+  const canViewTickets = canView(PERMISSION_MODULE_KEYS.TICKET);
+  const canViewAccessControl = canView(PERMISSION_MODULE_KEYS.MODULE);
+  const showSubadminAccessMenu = canViewAccessControl;
 
   const getProfilePath = () => (role === 'admin' ? '/admin/profile' : '/profile');
 
@@ -182,13 +182,13 @@ const Sidebar = ({ role }: Props) => {
                   - shown  → subadmin has can_view = 1 for module "user" in DB
                   - hidden → can_view = 0 or no permission row at all
               */}
-              {canView('/subadmin/users') && (
+              {canViewUsers && (
                 <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/users')}>
                   Manage Users
                 </MenuItem>
               )}
 
-              {canView('/subadmin/tickets') && (
+              {canViewTickets && (
                 <MenuItem icon={<FaTicketAlt />} onClick={nav('/subadmin/tickets')}>
                   Tickets
                 </MenuItem>
@@ -196,17 +196,17 @@ const Sidebar = ({ role }: Props) => {
 
               {showSubadminAccessMenu && (
                 <SubMenu label="Access control" icon={<FaShieldAlt />}>
-                  {canView('/subadmin/rbac/modules') && (
+                  {canViewAccessControl && (
                     <MenuItem icon={<FaCube />} onClick={nav('/subadmin/rbac/modules')}>
                       Modules
                     </MenuItem>
                   )}
-                  {canView('/subadmin/rbac/roles') && (
+                  {canViewAccessControl && (
                     <MenuItem icon={<FaUserTag />} onClick={nav('/subadmin/rbac/roles')}>
                       Roles
                     </MenuItem>
                   )}
-                  {canView('/subadmin/rbac/permissions') && (
+                  {canViewAccessControl && (
                     <MenuItem icon={<FaShieldAlt />} onClick={nav('/subadmin/rbac/permissions')}>
                       Role permissions
                     </MenuItem>
