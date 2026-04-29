@@ -17,12 +17,6 @@ const ticketDescriptionField = trimmedString().min(10).max(2000).required().mess
   "string.max": "Description must be at most 2000 characters",
 });
 
-const ticketMessageField = trimmedString().min(1).max(2000).required().messages({
-  "string.empty": "Message is required",
-  "string.min": "Message must be at least 1 character",
-  "string.max": "Message must be at most 2000 characters",
-});
-
 export const createTicketSchema = Joi.object({
   subject: ticketSubjectField,
   description: ticketDescriptionField,
@@ -41,11 +35,14 @@ export const updateTicketStatusSchema = Joi.object({
   }),
 });
 
+/** Same image rules as ticket create (handled by multer); body allows text-only, image-only, or both. */
 export const addTicketMessageSchema = Joi.object({
   ticket_id: positiveInt().required().messages({
     "any.required": "Ticket ID is required",
     "number.base": "Ticket ID must be a positive number",
   }),
-  message: ticketMessageField,
+  message: trimmedString().max(2000).allow("").optional().default("").messages({
+    "string.max": "Message must be at most 2000 characters",
+  }),
 });
 

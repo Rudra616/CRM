@@ -1,21 +1,33 @@
 import { Response, RequestHandler } from "express";
 import { successResponse, errorResponse } from "../../common/utils/apiResponse";
 import {
-  getTicketsByUserId,
+  getTicketsByUserIdPaged,
   insertTicket,
-  getAllTickets,
-  updateTicketStatusService,
+  getAllTicketsPaged,
+  
   updateTicketByOwner,
   insertTicketMessage,
   getTicketById,
   getTicketMessagesByTicketId,
+  updateTicketStatusByOwner,
+  updateTicketStatusByAdmin
 } from "./tickit.service";
 import { AuthRequest } from "../../common/types/AuthRequest";
-import { Role } from "../../common/types/role";
+import { StaffAuthLevel } from "../../common/types/role";
 import { buildImageUrl, deleteFileIfExists } from "../../common/helpers/common.helper";
 import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
 import { TicketStatus } from "./tickit.types";
+
+const TICKET_LIMIT_OPTIONS = [10, 15, 25, 50];
+const parseTicketListQuery = (q: Record<string, unknown>) => {
+  const pageRaw = Number(q.page ?? 1);
+  const reqLimit = Number(q.limit ?? 10);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const limit = TICKET_LIMIT_OPTIONS.includes(reqLimit) ? reqLimit : 10;
+  const search = String(q.search ?? "").trim();
+  return { page, limit, search };
+};
 
 export const createTicket: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -51,13 +63,25 @@ export const getUserTickets: RequestHandler = async (req: AuthRequest, res: Resp
       return errorResponse(res, "Unauthorized", 401);
     }
 
-    const tickets = await getTicketsByUserId(userId);
-    const view = tickets.map((ticket) => ({
+    const { page, limit, search } = parseTicketListQuery(req.query as Record<string, unknown>);
+    const result = await getTicketsByUserIdPaged(userId, { page, limit, search });
+    const totalPages = Math.max(1, Math.ceil(result.total / limit));
+
+    const view = result.items.map((ticket) => ({
       ...ticket,
       image_url: ticket.image_url ? buildImageUrl(req, ticket.image_url) : null,
     }));
 
-    return successResponse(res, "Tickets retrieved successfully", { tickets: view });
+    return successResponse(res, "Tickets retrieved successfully", {
+      items: view,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages,
+        limitOptions: TICKET_LIMIT_OPTIONS,
+      },
+    });
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
@@ -65,12 +89,24 @@ export const getUserTickets: RequestHandler = async (req: AuthRequest, res: Resp
 
 export const getAllTicketsByAdmin: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const tickets = await getAllTickets();
-    const view = tickets.map((ticket) => ({
+    const { page, limit, search } = parseTicketListQuery(req.query as Record<string, unknown>);
+    const result = await getAllTicketsPaged({ page, limit, search });
+    const totalPages = Math.max(1, Math.ceil(result.total / limit));
+
+    const view = result.items.map((ticket) => ({
       ...ticket,
       image_url: ticket.image_url ? buildImageUrl(req, ticket.image_url) : null,
     }));
-    return successResponse(res, "Tickets retrieved successfully", { tickets: view });
+    return successResponse(res, "Tickets retrieved successfully", {
+      items: view,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages,
+        limitOptions: TICKET_LIMIT_OPTIONS,
+      },
+    });
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
@@ -123,6 +159,11 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
 
 export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user?.id;
+    const role = req.user?.role;
+
+    if (!userId) return errorResponse(res, "Unauthorized", 401);
+
     const ticketId = Number(req.params.id);
     const { status } = req.body as { status: TicketStatus };
 
@@ -130,15 +171,39 @@ export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: 
       return errorResponse(res, "Invalid ticket ID", 400);
     }
 
-    const updated = await updateTicketStatusService(ticketId, status);
-    if (!updated) return errorResponse(res, "Ticket not found", 404);
+    const ticket = await getTicketById(ticketId);
+    if (!ticket) return errorResponse(res, "Ticket not found", 404);
+
+    let updated = false;
+
+    // 👤 USER
+    if (role === 0) {
+      if (ticket.user_id !== userId) {
+        return errorResponse(res, "Forbidden", 403);
+      }
+
+      if (ticket.status === "closed") {
+        return errorResponse(res, "Cannot change status of a closed ticket", 400);
+      }
+
+      updated = await updateTicketStatusByOwner(ticketId, userId, status);
+    } 
+    // 🛠 ADMIN
+    else {
+      updated = await updateTicketStatusByAdmin(ticketId, status);
+    }
+
+    if (!updated) {
+      return errorResponse(res, "Ticket not found or not updated", 400);
+    }
 
     return successResponse(res, "Ticket status updated successfully");
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
 };
- 
+
+
 export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
     const { ticket_id, message } = req.body as { ticket_id: number; message: string };
@@ -149,15 +214,21 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
       return errorResponse(res, "Unauthorized", 401);
     }
 
+    const text = String(message ?? "").trim();
+    const file = req.file;
+    if (!text && !file) {
+      return errorResponse(res, "Message text or an image attachment is required", 400);
+    }
+
     const ticket = await getTicketById(Number(ticket_id));
     if (!ticket) {
       return errorResponse(res, "Ticket not found", 404);
     }
 
     const isOwner = ticket.user_id === senderId;
-    const isStaff = userRole === Role.ADMIN || userRole === Role.SUBADMIN;
+    const isStaff = userRole === StaffAuthLevel.OWNER || userRole === StaffAuthLevel.DELEGATE;
 
-    if (userRole === Role.SUBADMIN) {
+    if (userRole === StaffAuthLevel.DELEGATE) {
       const roleId = req.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
@@ -169,12 +240,15 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
     if (!isOwner && !isStaff) {
       return errorResponse(res, "Forbidden: You cannot access this ticket", 403);
     }
-
+    const imagePath = file
+      ? buildStoredImagePath(req.user?.role ?? 0, senderId, file.filename)
+      : null;
     await insertTicketMessage({
       ticket_id,
       sender_id: senderId,
       sender_type: isStaff ? "admin" : "user",
-      message,
+      message: text,
+      image: imagePath,
     });
 
     return successResponse(res, "Message added to ticket successfully");
@@ -196,9 +270,10 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
     if (!ticket) return errorResponse(res, "Ticket not found", 404);
 
     const isOwner = ticket.user_id === requesterId;
-    const isStaff = requesterRole === Role.ADMIN || requesterRole === Role.SUBADMIN;
+    const isStaff =
+      requesterRole === StaffAuthLevel.OWNER || requesterRole === StaffAuthLevel.DELEGATE;
 
-    if (requesterRole === Role.SUBADMIN) {
+    if (requesterRole === StaffAuthLevel.DELEGATE) {
       const roleId = req.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
@@ -211,7 +286,10 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
       return errorResponse(res, "Forbidden: You cannot access this ticket", 403);
     }
 
-    const messages = await getTicketMessagesByTicketId(ticketId);
+    const messages = (await getTicketMessagesByTicketId(ticketId)).map((msg: any) => ({
+      ...msg,
+      image: msg.image ? buildImageUrl(req, msg.image) : null,
+    }));
     const ticketView = {
       ...ticket,
       image_url: ticket.image_url ? buildImageUrl(req, ticket.image_url) : null,

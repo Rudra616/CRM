@@ -155,7 +155,7 @@ export const invalidateSubadminSessionsForRoleId = async (roleId: number): Promi
     await db.query(
       `DELETE at FROM admin_token AS at
        INNER JOIN \`admin\` AS a ON a.id = at.admin_id
-       WHERE a.role = 'subadmin' AND a.role_id = ?`,
+       WHERE a.role_id = ?`,
       [roleId]
     );
   } catch (error: unknown) {
@@ -169,8 +169,8 @@ export const invalidateSubadminSessionsForModuleId = async (moduleId: number): P
     await db.query(
       `DELETE at FROM admin_token AS at
        INNER JOIN \`admin\` AS a ON a.id = at.admin_id
-       INNER JOIN role_permission rp ON rp.role_id = a.role_id AND rp.module_id = ?
-       WHERE a.role = 'subadmin'`,
+       INNER JOIN role_permission rp 
+         ON rp.role_id = a.role_id AND rp.module_id = ?`,
       [moduleId]
     );
   } catch (error: unknown) {

@@ -1,19 +1,9 @@
 import axios from 'axios';
-import { notifyServerDown, notifyServerRecovered } from '../utils/serverStatus';
 import {
   buildSessionEndedLoginUrl,
   clearClientAuthStorage,
   isPublicAuthPath,
 } from '../utils/authSession';
-
-function isPublicPasswordFlowUrl(url: string | undefined): boolean {
-  const u = url || '';
-  return (
-    u.includes('reset-password') ||
-    u.includes('verify-reset-token') ||
-    u.includes('forgot-password')
-  );
-}
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3000/api'),
@@ -30,20 +20,13 @@ axiosClient.interceptors.request.use((config) => {
   return config;
 });
 axiosClient.interceptors.response.use(
-  (response) => {
-    notifyServerRecovered();
-    return response;
-  },
+  (response) => response,
   async (error) => {
-    const reqUrl = error.config?.url || '';
-
     if (!error.response) {
-      if (!isPublicPasswordFlowUrl(reqUrl)) {
-        notifyServerDown();
-      }
       return Promise.reject({
         success: false,
-        message: 'Cannot connect to backend. Please check if server is running.',
+        message:
+          'Cannot connect to the server. Check that the API is running and try again.',
       });
     }
 
@@ -66,10 +49,6 @@ axiosClient.interceptors.response.use(
         window.location.replace(buildSessionEndedLoginUrl(currentPath));
         return Promise.reject(new Error('Session ended. Please sign in again.'));
       }
-    }
-
-    if (error.response?.status >= 500 && !isPublicPasswordFlowUrl(reqUrl)) {
-      notifyServerDown();
     }
 
     return Promise.reject(error.response?.data || error);

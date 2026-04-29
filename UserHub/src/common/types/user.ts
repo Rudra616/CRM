@@ -1,5 +1,3 @@
-import { AdminRole } from "./role";
-
 // ─── User (plain users, no role) ──────────────────────────────────────────────
 export interface User {
   id: number;
@@ -28,7 +26,6 @@ export interface Admin {
   email: string;
   gender?: "male" | "female" | "other" | null;
   image_url?: string | null;
-  role: AdminRole;
   role_id?: number | null;
   role_name?: string | null;
   status: "active" | "inactive";

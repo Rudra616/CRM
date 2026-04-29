@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
 import { colors } from '../../theme/colors';
 import { PERMISSION_MODULE_KEYS } from '../utils/permissionModules';
+import type { SessionGate } from '../utils/sessionGate';
 
 const SIDEBAR_WIDTH = 280;
 
@@ -30,10 +31,10 @@ const menuItemStyles = {
 };
 
 interface Props {
-  role: 'admin' | 'subadmin' | 'user';
+  gate: SessionGate;
 }
 
-const Sidebar = ({ role }: Props) => {
+const Sidebar = ({ gate }: Props) => {
   const navigate = useNavigate();
   const { collapsed, sidebarOpen, setSidebarOpen, isMobile } = useSidebar();
   const { user } = useAuth();
@@ -46,7 +47,7 @@ const Sidebar = ({ role }: Props) => {
   const canViewAccessControl = canView(PERMISSION_MODULE_KEYS.MODULE);
   const showSubadminAccessMenu = canViewAccessControl;
 
-  const getProfilePath = () => (role === 'admin' ? '/admin/profile' : '/profile');
+  const getProfilePath = () => (gate === 'owner' ? '/admin/profile' : '/profile');
 
   const nav = (path: string) => () => {
     navigate(path);
@@ -119,7 +120,7 @@ const Sidebar = ({ role }: Props) => {
 
           {/* ── ADMIN menu ────────────────────────────────────────────────── */}
           {/*    Admin sees everything — no permission checks needed here      */}
-          {role === 'admin' && (
+          {gate === 'owner' && (
             <>
               <MenuItem icon={<FaTachometerAlt />} onClick={nav('/admin/dashboard')}>
                 Dashboard
@@ -170,7 +171,7 @@ const Sidebar = ({ role }: Props) => {
           {/*    Each menu item is gated by the matching module's can_view.    */}
           {/*    Dashboard, Profile, Change Password are always visible —      */}
           {/*    they are not module-gated (no DB permission row needed).      */}
-          {role === 'subadmin' && (
+          {gate === 'delegate' && (
             <>
               {/* Always visible — not a DB-module-gated page */}
               <MenuItem icon={<FaTachometerAlt />} onClick={nav('/subadmin/dashboard')}>
@@ -226,7 +227,7 @@ const Sidebar = ({ role }: Props) => {
           )}
 
           {/* ── USER menu ─────────────────────────────────────────────────── */}
-          {role === 'user' && (
+          {gate === 'member' && (
             <>
               <MenuItem icon={<FaTachometerAlt />} onClick={nav('/user/dashboard')}>
                 Dashboard

@@ -1,6 +1,6 @@
 import { RequestHandler } from "express";
 import { AuthRequest } from "../types/AuthRequest";
-import { Role } from "../types/role";
+import { StaffAuthLevel } from "../types/role";
 import { getPermissionByRoleAndModule } from "../permission.service";
 
 export type PermissionAction = "can_view" | "can_add" | "can_edit" | "can_delete";
@@ -15,7 +15,7 @@ export const hasPermissionForUser = async (
   action: PermissionAction
 ): Promise<boolean> => {
   if (!user) return false;
-  if (user.role === Role.ADMIN) return true;
+  if (user.role === StaffAuthLevel.OWNER) return true;
   if (!user.role_id) return false;
   const permission = await getPermissionByRoleAndModule(user.role_id, moduleName);
   return Boolean(permission && permission[action] === 1);
@@ -44,7 +44,7 @@ export const checkPermission = (
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      if (user.role === Role.ADMIN) {
+      if (user.role === StaffAuthLevel.OWNER) {
         // console.log("✅ Admin bypass");
         return next();
       }
@@ -74,6 +74,6 @@ export const checkPermission = (
 /** Skip staff-only handlers so the next `POST /message` route runs (regular ticket owners). */
 export const skipUnlessStaff: RequestHandler = (req, res, next) => {
   const role = (req as AuthRequest).user?.role;
-  if (role === Role.ADMIN || role === Role.SUBADMIN) return next();
+  if (role === StaffAuthLevel.OWNER || role === StaffAuthLevel.DELEGATE) return next();
   next("route");
 };

@@ -1,12 +1,12 @@
 import path from "path";
-import { Role } from "../common/types/role";
+import { StaffAuthLevel } from "../common/types/role";
 
 /** Always `<projectRoot>/uploads` (run server from UserHub directory). */
 export const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
 
-export function uploadFolderForRole(roleId: number): string {
-  if (roleId === Role.ADMIN)    return "admin";
-  if (roleId === Role.SUBADMIN) return "subadmin";
+export function uploadFolderForRole(staffLevel: number): string {
+  if (staffLevel === StaffAuthLevel.OWNER) return "admin";
+  if (staffLevel === StaffAuthLevel.DELEGATE) return "subadmin";
   return "user";
 }
 
@@ -18,7 +18,7 @@ export function absoluteUploadFilePath(storedPath: string): string {
 }
 
 /** Relative DB path: `uploads/{folder}/{id}/{filename}`.
- *  `roleOrFolder` can be a numeric Role enum value or a plain folder string ("user", "admin", "subadmin"). */
+ *  `roleOrFolder` can be a numeric {@link StaffAuthLevel} or a folder string ("user", "admin", "subadmin"). */
 export function buildStoredImagePath(
   roleOrFolder: number | string,
   accountId: number,

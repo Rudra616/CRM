@@ -27,14 +27,14 @@ const fmtWhen = (v?: string) => {
 const ManageRolesPage = () => {
   const { user } = useAuth();
   const { getModulePerm } = usePermissions();
-  const isAdmin = user?.role === 'admin';
+  const isOwner = user?.is_main_admin;
   const perm = getModulePerm(PERMISSION_MODULE_KEYS.MODULE);
-  const canView = isAdmin || perm.can_view;
-  const canAdd = isAdmin || perm.can_add;
-  const canEdit = isAdmin || perm.can_edit;
-  const canDelete = isAdmin || perm.can_delete;
+  const canView = isOwner || perm.can_view;
+  const canAdd = isOwner || perm.can_add;
+  const canEdit = isOwner || perm.can_edit;
+  const canDelete = isOwner || perm.can_delete;
 
-  const rbacBase = user?.role === 'admin' ? '/admin/rbac' : '/subadmin/rbac';
+  const rbacBase = isOwner ? '/admin/rbac' : '/subadmin/rbac';
 
   const [rows, setRows] = useState<RoleTableItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,8 +198,8 @@ const ManageRolesPage = () => {
             </form>
           )}
 
-          <div className="d-flex flex-column gap-3 mb-3">
-            <div className="d-flex flex-column flex-xl-row flex-xl-nowrap align-items-stretch align-items-xl-end gap-3">
+          <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
+            <div className="d-flex flex-wrap align-items-end gap-2">
               <div className="flex-shrink-0">
                 <label htmlFor="role-rows-limit" className="form-label small text-muted mb-1">
                   Rows per page
@@ -221,8 +221,12 @@ const ManageRolesPage = () => {
                   ))}
                 </select>
               </div>
+              <div className="text-muted small ms-lg-1">
+                Total <span className="fw-semibold text-dark">{totalRows}</span>
+              </div>
+            </div>
 
-              <div className="flex-grow-1" style={{ minWidth: 0 }}>
+              <div style={{ width: 'min(340px, 100%)' }}>
                 <label htmlFor="role-search" className="form-label small text-muted mb-1">
                   Search
                 </label>
@@ -262,11 +266,6 @@ const ManageRolesPage = () => {
                   </button>
                 </div>
               </div>
-
-              <div className="text-muted small text-xl-end text-nowrap align-self-xl-center ms-xl-auto pt-1 pt-xl-0">
-                Total <span className="fw-semibold text-dark">{totalRows}</span>
-              </div>
-            </div>
           </div>
 
           <div className="table-responsive">

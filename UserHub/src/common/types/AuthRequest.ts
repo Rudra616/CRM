@@ -1,23 +1,20 @@
-import { Request } from "express";
-import { AdminRole } from "./role";
+import type { Request } from "express";
+import type { StaffKind } from "./role";
 
 export interface AuthRequest extends Request {
   user?: {
     id: number;
 
     /**
-     * Internal numeric role used by allowRoles() middleware.
-     * Admin = 1, Subadmin = 2, user sessions = 0
+     * Session level from JWT (`StaffAuthLevel` values for staff; `0` for member users).
+     * Not the RBAC database `role_id`.
      */
     role: number;
 
-    /**
-     * DB role_id (used for role_permission table)
-     * Only for admin/subadmin
-     */
+    /** RBAC id from `admin.role_id` — permissions via role_permission */
     role_id?: number;
 
-    /** Only populated for admin/subadmin sessions */
-    adminRole?: AdminRole;
+    /** Computed hint — not stored in DB */
+    staff_kind?: StaffKind;
   };
 }

@@ -1,6 +1,6 @@
 import { Request, Response, RequestHandler } from "express";
 import { AuthRequest } from "../../../common/types/AuthRequest";
-import { Role } from "../../../common/types/role";
+import { StaffAuthLevel } from "../../../common/types/role";
 import { successResponse, errorResponse } from "../../../common/utils/apiResponse";
 import {
   hashPassword,
@@ -19,6 +19,7 @@ import {
 } from "../service/admin.service";
 import { upsertAdminToken, removeAdminToken } from "../../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../../common/helpers/cookie.helper";
+import { isMainAdminRow, isSubadminRow } from "../../../common/utils/adminIdentity";
 
 // ─── Login (subadmin only) ────────────────────────────────────────────────────
 export const subadminLogin = async (req: Request, res: Response) => {
@@ -28,7 +29,14 @@ export const subadminLogin = async (req: Request, res: Response) => {
     const admin = await findAdminByUsername(username);
     if (!admin) return errorResponse(res, "Invalid credentials", 401);
 
-    if (admin.role !== "subadmin") return errorResponse(res, "Invalid credentials", 401);
+    if (isMainAdminRow(admin)) return errorResponse(res, "Invalid credentials", 401);
+    if (!isSubadminRow(admin)) {
+      return errorResponse(
+        res,
+        "No role assigned. Contact the main administrator.",
+        403
+      );
+    }
     if (admin.status !== "active") return errorResponse(res, "Your account is inactive.", 403);
 
     const isMatch = await comparePassword(password, admin.password);
@@ -36,7 +44,7 @@ export const subadminLogin = async (req: Request, res: Response) => {
 
     const token = signToken({
       id:       admin.id,
-      role:     Role.SUBADMIN,
+      role:     StaffAuthLevel.DELEGATE,
       username: admin.username,
     });
 
@@ -50,7 +58,8 @@ export const subadminLogin = async (req: Request, res: Response) => {
         first_name: admin.first_name,
         last_name:  admin.last_name,
         email:      admin.email,
-        role:       admin.role,
+        role:       "subadmin" as const,
+        role_id:    admin.role_id,
       },
     }, 200);
   } catch (err: any) {
@@ -76,7 +85,9 @@ export const getSubadminProfile: RequestHandler = async (req, res) => {
 
   try {
     const subadmin = await findAdminById(authReq.user.id);
-    if (!subadmin || subadmin.role !== "subadmin") return errorResponse(res, "Subadmin not found", 404);
+    if (!subadmin || isMainAdminRow(subadmin) || !isSubadminRow(subadmin)) {
+      return errorResponse(res, "Subadmin not found", 404);
+    }
 
     if (subadmin.image_url) subadmin.image_url = buildImageUrl(req, subadmin.image_url);
 
@@ -102,7 +113,7 @@ export const updateSubadminProfile: RequestHandler = async (req, res) => {
 
     if (req.file) {
       if (existing?.image_url) deleteFileIfExists(existing.image_url);
-      image_url = buildStoredImagePath(Role.SUBADMIN, authReq.user.id, req.file.filename);
+      image_url = buildStoredImagePath(StaffAuthLevel.DELEGATE, authReq.user.id, req.file.filename);
     }
 
     await updateAdminProfileService(authReq.user.id, {

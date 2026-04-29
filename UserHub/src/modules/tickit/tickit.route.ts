@@ -8,8 +8,7 @@ import {
   addTicketMessage,
   getTicketMessages,
 } from "./tickit.controler";
-import { authenticate, allowRoles } from "../../common/middleware/authMiddleware";
-import { Role } from "../../common/types/role";
+import { authenticate } from "../../common/middleware/authMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
 import {
@@ -18,9 +17,7 @@ import {
   updateOwnedTicketSchema,
   updateTicketStatusSchema,
 } from "./tickit.validation";
-import { checkPermission,skipUnlessStaff } from "../../common/middleware/permission.middleware";
-import { RequestHandler } from "express";
-import { AuthRequest } from "../../common/types/AuthRequest";
+import { checkPermission, skipUnlessStaff } from "../../common/middleware/permission.middleware";
 
 const router = Router();
 
@@ -39,7 +36,7 @@ router.get("/my-tickets", authenticate, getUserTickets);
 router.get(
   "/all",
   authenticate,
-  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("ticket", "can_view"),
   getAllTicketsByAdmin
 );
@@ -47,9 +44,15 @@ router.get("/:id/messages", authenticate, getTicketMessages);
 router.put(
   "/:id/status",
   authenticate,
-  allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateTicketStatusSchema),
+  skipUnlessStaff,
   checkPermission("ticket", "can_edit"),
+  updateTicketStatus
+);
+router.put(
+  "/:id/status",
+  authenticate,
+  validateSchema(updateTicketStatusSchema),
   updateTicketStatus
 );
 router.put(
@@ -59,11 +62,14 @@ router.put(
   validateSchema(updateOwnedTicketSchema),
   updateOwnedTicket
 );
+/** `skipUnlessStaff` must run before `uploadSingle`. Otherwise staff’s route consumes the multipart
+ *  body with multer, then `next("route")` replays the request and the second multer sees an empty
+ *  stream → "Unexpected end of form" for regular users. */
 router.post(
   "/message",
   authenticate,
   skipUnlessStaff,
-  allowRoles(Role.ADMIN, Role.SUBADMIN),
+  uploadSingle("image"),
   validateSchema(addTicketMessageSchema),
   checkPermission("ticket", "can_add"),
   addTicketMessage
@@ -71,6 +77,7 @@ router.post(
 router.post(
   "/message",
   authenticate,
+  uploadSingle("image"),
   validateSchema(addTicketMessageSchema),
   addTicketMessage
 );

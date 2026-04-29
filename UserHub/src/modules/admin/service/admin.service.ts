@@ -4,7 +4,7 @@ import { logServiceError } from "../../../common/helpers/serviceError";
 import { RowDataPacket } from "mysql2";
 
 // ─── Lookup ───────────────────────────────────────────────────────────────────
-let Quary = `SELECT id, username, first_name, last_name, phone, email, gender, image_url, role, role_id, status`
+let Quary = `SELECT id, username, first_name, last_name, phone, email, gender, image_url,role_id, status`
 export const findAdminByUsername = async (username: string): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
@@ -70,7 +70,7 @@ export const getAdminDashboardSummary = async (): Promise<{
     // );
 
     const [[subRow]]: any = await db.query(
-      `SELECT COUNT(*) AS subadminCount FROM \`admin\` WHERE role = 'subadmin' AND status = 'active' AND COALESCE(is_delete, 0) = 0`
+      `SELECT COUNT(*) AS subadminCount FROM \`admin\` WHERE status = 'active' AND COALESCE(is_delete, 0) = 0`
     );
     const [result] = await db.query<RowDataPacket[]>("SELECT * FROM user");
     const activeUsers = result.filter(user => user.status === 'active').length;

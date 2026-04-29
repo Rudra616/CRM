@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { PageShell } from '../../../shared/components/PageShell';
 import { showError, showSuccess } from '../../../shared/utils/toast';
 import { createTicketApi } from '../api/ticket.api';
@@ -10,18 +9,26 @@ const UserCreateTicketPage = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const clearForm = () => {
+    setSubject('');
+    setDescription('');
+    setImageFile(null);
+  };
+
   const submitCreate = async () => {
     if (subject.trim().length < 5 || description.trim().length < 10) {
       showError('Subject (min 5) and description (min 10) are required.');
       return;
     }
+
     try {
       setCreating(true);
-      await createTicketApi({ subject: subject.trim(), description: description.trim() }, imageFile);
+      await createTicketApi(
+        { subject: subject.trim(), description: description.trim() },
+        imageFile
+      );
       showSuccess('Ticket created successfully');
-      setSubject('');
-      setDescription('');
-      setImageFile(null);
+      clearForm();
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to create ticket');
     } finally {
@@ -35,6 +42,8 @@ const UserCreateTicketPage = () => {
       subtitle="Describe your issue; you can edit it later from My Tickets while it is open."
     >
       <div className="p-3 p-md-4">
+
+        {/* SUBJECT */}
         <div className="mb-3">
           <label className="form-label small">Subject</label>
           <input
@@ -46,6 +55,8 @@ const UserCreateTicketPage = () => {
             placeholder="Issue subject"
           />
         </div>
+
+        {/* DESCRIPTION */}
         <div className="mb-3">
           <label className="form-label small">Description</label>
           <textarea
@@ -57,8 +68,12 @@ const UserCreateTicketPage = () => {
             placeholder="Describe your issue in detail"
           />
         </div>
+
+        {/* FILE */}
         <div className="mb-3">
-          <label className="form-label small">Attachment (optional, JPG/PNG/WEBP up to 2MB)</label>
+          <label className="form-label small">
+            Attachment (optional, JPG/PNG/WEBP up to 2MB)
+          </label>
           <input
             type="file"
             className="form-control form-control-sm"
@@ -66,7 +81,9 @@ const UserCreateTicketPage = () => {
             onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
           />
         </div>
-        <div className="d-flex flex-wrap gap-2 align-items-center">
+
+        {/* ACTIONS */}
+        <div className="d-flex gap-2 align-items-center">
           <button
             type="button"
             className="btn btn-primary btn-sm"
@@ -75,9 +92,15 @@ const UserCreateTicketPage = () => {
           >
             {creating ? 'Creating...' : 'Submit Ticket'}
           </button>
-          <Link className="btn btn-outline-secondary btn-sm" to="/tickets/my">
-            Go to My Tickets
-          </Link>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            onClick={clearForm}
+            disabled={creating}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </PageShell>

@@ -180,9 +180,9 @@ export const getSubadminMyModulesApi = (): Promise<ApiResponse<{ moduleKeys: str
   apiRequest<{ moduleKeys: string[] }>('GET', '/subadmin/me/modules');
 
 export const getMyModulesApi = async (
-  role: 'admin' | 'subadmin'
+  isMainAdmin: boolean
 ): Promise<ApiResponse<{ moduleKeys: string[] }>> => {
-  if (role === 'admin') {
+  if (isMainAdmin) {
     return getAdminMyModulesApi();
   }
   try {

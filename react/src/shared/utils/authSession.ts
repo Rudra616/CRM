@@ -6,8 +6,6 @@ export const PUBLIC_AUTH_PATHS = [
   '/login',
   '/admin',
   '/admin/login',
-  '/subadmin',
-  '/subadmin/login',
   '/register',
   '/forgot-password',
   '/reset-password',
@@ -31,8 +29,12 @@ export function clearClientAuthStorage(): void {
 /**
  * Admin-area routes (after /admin/) should return to admin sign-in; everyone else to /login.
  */
+/** Staff (main admin + subadmin) share one sign-in URL. */
 export function getLoginRedirectUrl(pathname: string): string {
-  if (pathname.startsWith('/admin/')) {
+  if (
+    pathname.startsWith('/admin/') ||
+    pathname.startsWith('/subadmin/')
+  ) {
     return '/admin/login';
   }
   return '/login';

@@ -3,6 +3,7 @@ import { apiRequest } from '../../../shared/api/apiWrapper';
 import type { ApiResponse } from '../../../shared/types/common.types';
 import type {
   TicketItem,
+  TicketListResponse,
   TicketStatus,
   TicketThreadResponse,
 } from '../types/ticket.types';
@@ -33,11 +34,27 @@ export const updateMyTicketApi = async (
   return res.data;
 };
 
-export const getMyTicketsApi = (): Promise<ApiResponse<{ tickets: TicketItem[] }>> =>
-  apiRequest<{ tickets: TicketItem[] }>('GET', '/tickit/my-tickets');
+export const getMyTicketsApi = (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<ApiResponse<TicketListResponse>> =>
+  apiRequest<TicketListResponse>('GET', `/tickit/my-tickets?${new URLSearchParams({
+    page: String(params?.page ?? 1),
+    limit: String(params?.limit ?? 10),
+    search: params?.search ?? '',
+  }).toString()}`);
 
-export const getAllTicketsApi = (): Promise<ApiResponse<{ tickets: TicketItem[] }>> =>
-  apiRequest<{ tickets: TicketItem[] }>('GET', '/tickit/all');
+export const getAllTicketsApi = (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<ApiResponse<TicketListResponse>> =>
+  apiRequest<TicketListResponse>('GET', `/tickit/all?${new URLSearchParams({
+    page: String(params?.page ?? 1),
+    limit: String(params?.limit ?? 10),
+    search: params?.search ?? '',
+  }).toString()}`);
 
 export const updateTicketStatusApi = (
   ticketId: number,
@@ -50,9 +67,16 @@ export const getTicketMessagesApi = (
 ): Promise<ApiResponse<TicketThreadResponse>> =>
   apiRequest<TicketThreadResponse>('GET', `/tickit/${ticketId}/messages`);
 
-export const addTicketMessageApi = (
+export const addTicketMessageApi = async (
   ticketId: number,
-  message: string
-): Promise<ApiResponse<null>> =>
-  apiRequest<null>('POST', '/tickit/message', { ticket_id: ticketId, message });
+  message: string,
+  imageFile?: File | null
+): Promise<ApiResponse<null>> => {
+  const formData = new FormData();
+  formData.append('ticket_id', String(ticketId));
+  formData.append('message', message);
+  if (imageFile) formData.append('image', imageFile);
+  const res = await axiosClient.post<ApiResponse<null>>('/tickit/message', formData);
+  return res.data;
+};
 

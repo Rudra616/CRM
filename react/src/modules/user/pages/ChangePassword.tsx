@@ -24,8 +24,8 @@ const formPanelStyle: React.CSSProperties = {
 
 const ChangePassword = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const isSubadmin = user?.role === 'subadmin';
+  const isOwner = user?.is_main_admin;
+  const isStaff = user?.is_staff;
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -44,17 +44,13 @@ const ChangePassword = () => {
     setLoading(true);
     try {
       const body = { newPassword, confirmPassword };
-      if (isAdmin) await changeAdminPasswordApi(body);
-      else if (isSubadmin) await changeSubadminPasswordApi(body);
+      if (isOwner) await changeAdminPasswordApi(body);
+      else if (isStaff) await changeSubadminPasswordApi(body);
       else await changeUserPasswordApi(body);
       showSuccess('Password updated. Please sign in again.');
       clearClientAuthStorage();
       window.location.replace(
-        isAdmin
-          ? '/admin/login?reason=session'
-          : isSubadmin
-            ? '/subadmin/login?reason=session'
-            : '/login?reason=session'
+        isStaff ? '/admin/login?reason=session' : '/login?reason=session'
       );
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to change password');
@@ -63,7 +59,7 @@ const ChangePassword = () => {
     }
   };
 
-  const backHref = isAdmin ? '/admin/profile' : '/profile';
+  const backHref = isOwner ? '/admin/profile' : '/profile';
 
   return (
     <PageShell

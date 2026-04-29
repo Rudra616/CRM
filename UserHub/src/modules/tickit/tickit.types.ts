@@ -9,6 +9,10 @@ export interface TicketRow {
   image_url?: string | null;
   created_at?: Date;
   updated_at?: Date;
+  /** Populated on staff “all tickets” list via JOIN to `user` */
+  owner_username?: string | null;
+  owner_first_name?: string | null;
+  owner_last_name?: string | null;
 }
 
 export interface TicketMessageRow {
@@ -22,6 +26,7 @@ export interface TicketMessageRow {
 
 export interface TicketMessageView extends TicketMessageRow {
   sender_username?: string | null;
+  image?: string | null;
 }
 
 export interface CreateTicketInput {
@@ -37,5 +42,17 @@ export interface CreateTicketMessageInput {
   sender_id: number;
   sender_type: "user" | "admin";
   message: string;
+  image?: string | null;
+}
+
+export interface TicketListQuery {
+  page: number;
+  limit: number;
+  search: string;
+}
+
+export interface TicketListResult {
+  items: TicketRow[];
+  total: number;
 }
 

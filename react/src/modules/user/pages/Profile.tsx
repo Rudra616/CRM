@@ -16,11 +16,11 @@ import {
 } from '../../../shared/utils/validation';
 import { validateProfileImage } from '../../../shared/utils/imageValidation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
-import type { User, Admin, Gender } from '../../../shared/types/common.types';
-import { roleIdToRole } from '../../../shared/utils/roleUtils';
+import type { User, Admin, Gender, UserInfo } from '../../../shared/types/common.types';
 import { PageShell } from '../../../shared/components/PageShell';
 import { authLinkStyle } from '../../../shared/components/AuthPageLayout';
 import { colors } from '../../../theme/colors';
+import { MAIN_ADMIN_USERNAME } from '../../../shared/constants/adminAuth';
 
 const API_BASE = import.meta.env.DEV
   ? ''
@@ -40,7 +40,7 @@ const profileFormPanelStyle: React.CSSProperties = {
   boxShadow: '0 0.125rem 0.35rem rgba(13, 110, 253, 0.07)',
 };
 
-type ProfileData = (User & { role?: string }) | (Admin & { role?: string });
+type ProfileData = User | (Admin & Record<string, unknown>);
 type ProfileFormKeys =
   | 'username'
   | 'firstname'
@@ -59,15 +59,14 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, login } = useAuth();
-  const role = user?.role;
-  const isAdmin = role === 'admin';
-  const isSubadmin = role === 'subadmin';
+  const isOwner = user?.is_main_admin;
+  const isDelegate = user?.is_staff && !user?.is_main_admin;
 
   useEffect(() => {
-    if (isAdmin && location.pathname === '/profile') {
+    if (isOwner && location.pathname === '/profile') {
       navigate('/admin/profile', { replace: true });
     }
-  }, [isAdmin, location.pathname, navigate]);
+  }, [isOwner, location.pathname, navigate]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -83,10 +82,10 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
-      if (isAdmin) {
+      if (isOwner) {
         const res = await getAdminProfileApi();
-        if (res.data) setProfile({ ...res.data, role: 'admin' });
-      } else if (isSubadmin) {
+        if (res.data) setProfile({ ...(res.data as unknown as User) });
+      } else if (isDelegate) {
         const res = await getSubadminProfileApi();
         if (res.data) {
           const d = res.data as User & { first_name?: string; last_name?: string };
@@ -97,21 +96,24 @@ const Profile = () => {
             firstname: firstName,
             lastname: lastName,
             phone: d.phone ?? '',
-            role: 'subadmin',
             image_url: d.image_url
               ? `${d.image_url}?t=${Date.now()}`
               : d.image_url,
           });
           setGender((d.gender as Gender) ?? '');
-          login({
+          const staffSession: UserInfo = {
             id: Number(d.id),
             username: d.username,
-            role: 'subadmin',
+            email: d.email,
             firstname: firstName,
             lastname: lastName,
-            email: d.email,
             phone: d.phone ?? '',
-          });
+            is_staff: true,
+            is_main_admin: false,
+            role_id:
+              (d as unknown as { role_id?: number | null }).role_id ?? user?.role_id ?? null,
+          };
+          login(staffSession);
         }
         setProfileImage(null);
         setImageFailed(false);
@@ -123,7 +125,6 @@ const Profile = () => {
             first_name?: string;
             last_name?: string;
           };
-          const userRole = roleIdToRole(d.role ?? d.role_id);
           const firstName = d.firstname ?? d.first_name ?? '';
           const lastName = d.lastname ?? d.last_name ?? '';
 
@@ -132,7 +133,6 @@ const Profile = () => {
             ...res.data,
             firstname: firstName,
             lastname: lastName,
-            role: userRole,
             image_url: res.data.image_url
               ? res.data.image_url + `?t=${Date.now()}`
               : res.data.image_url,
@@ -143,11 +143,13 @@ const Profile = () => {
           login({
             id: Number((res.data as User).id),
             username: res.data.username,
-            role: userRole,
+            email: res.data.email,
             firstname: firstName,
             lastname: lastName,
-            email: res.data.email,
             phone: (res.data as User).phone ?? '',
+            is_staff: false,
+            is_main_admin: false,
+            role_id: d.role_id ?? undefined,
           });
         }
 
@@ -163,11 +165,18 @@ const Profile = () => {
 
   useEffect(() => {
     fetchProfile();
-  }, [isAdmin, isSubadmin]);
+  }, [isOwner, isDelegate]);
+
+  const isReservedMainAdminUsername = Boolean(
+    isOwner &&
+      profile &&
+      String(profile.username ?? '').trim().toLowerCase() === MAIN_ADMIN_USERNAME
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile) return;
     const { name, value } = e.target;
+    if (name === 'username' && isReservedMainAdminUsername) return;
     clearFieldError(name as ProfileFormKeys);
     if (name === 'firstname' || name === 'lastname') {
       setProfile({ ...profile, [name]: value.replace(/[^A-Za-z]/g, '') });
@@ -209,7 +218,7 @@ const Profile = () => {
     if (!profile || updating) return;
     resetErrors();
 
-    if (isAdmin) {
+    if (isOwner) {
       const payload = {
         username: String(profile.username ?? '').trim(),
         email: String(profile.email ?? '').trim(),
@@ -243,7 +252,7 @@ const Profile = () => {
       return;
     }
 
-    if (isSubadmin) {
+    if (isDelegate) {
       const payload = {
         username: String(profile.username ?? '').trim(),
         firstname: String((profile as User).firstname ?? '').trim(),
@@ -271,7 +280,6 @@ const Profile = () => {
             ...res.data,
             firstname: firstName,
             lastname: lastName,
-            role: 'subadmin',
             image_url: res.data.image_url
               ? res.data.image_url + `?t=${Date.now()}`
               : res.data.image_url,
@@ -281,11 +289,14 @@ const Profile = () => {
             login({
               id: user.id,
               username: res.data.username ?? profile.username ?? '',
-              role: 'subadmin',
+              email: res.data.email ?? profile.email ?? '',
               firstname: firstName,
               lastname: lastName,
-              email: res.data.email ?? profile.email ?? '',
               phone: d.phone ?? (profile as User).phone ?? '',
+              is_staff: true,
+              is_main_admin: false,
+              role_id:
+                (d as unknown as { role_id?: number | null }).role_id ?? user.role_id ?? null,
             });
           }
         }
@@ -324,7 +335,6 @@ const Profile = () => {
           first_name?: string;
           last_name?: string;
         };
-        const userRole = roleIdToRole(d.role ?? d.role_id);
         const firstName = d.firstname ?? d.first_name ?? '';
         const lastName = d.lastname ?? d.last_name ?? '';
         setProfile({
@@ -332,20 +342,20 @@ const Profile = () => {
           ...res.data,
           firstname: firstName,
           lastname: lastName,
-          role: userRole,
           image_url: res.data.image_url
             ? res.data.image_url + `?t=${Date.now()}`
             : res.data.image_url,
         }); setGender((res.data.gender as Gender) ?? gender);
-        // Update auth context
         login({
           id: Number((res.data as User).id),
           username: res.data.username,
-          role: userRole,
+          email: res.data.email,
           firstname: firstName,
           lastname: lastName,
-          email: res.data.email,
           phone: (res.data as User).phone ?? '',
+          is_staff: false,
+          is_main_admin: false,
+          role_id: d.role_id ?? undefined,
         });
       }
       showSuccess('Profile updated successfully');
@@ -457,7 +467,7 @@ const Profile = () => {
     );
   }
 
-  if (isAdmin) {
+  if (isOwner) {
     return (
       <PageShell
         title="Admin Profile"
@@ -474,7 +484,20 @@ const Profile = () => {
                 value={profile.username ?? ''}
                 onChange={handleChange}
                 placeholder="Min 3 characters"
+                disabled={isReservedMainAdminUsername}
+                readOnly={isReservedMainAdminUsername}
+                autoComplete="username"
+                title={
+                  isReservedMainAdminUsername
+                    ? 'The main administrator username is fixed for sign-in and cannot be changed here.'
+                    : undefined
+                }
               />
+              {isReservedMainAdminUsername && (
+                <div className="form-text">
+                  Main administrator username is reserved and cannot be changed (required for staff sign-in).
+                </div>
+              )}
               {errors.username && <div className="invalid-feedback d-block">{errors.username}</div>}
             </div>
             <div className="mb-2">
@@ -503,7 +526,7 @@ const Profile = () => {
     );
   }
 
-  if (isSubadmin) {
+  if (isDelegate) {
     return (
       <PageShell
         title="Subadmin Profile"

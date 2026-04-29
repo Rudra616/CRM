@@ -2,6 +2,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { FaBars, FaChevronDown, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import { sessionGate, homePathForGate } from '../utils/sessionGate';
 import { useSidebar } from '../../context/SidebarContext';
 import { colors } from '../../theme/colors';
 import styles from './Navbar.module.css';
@@ -51,28 +52,22 @@ const Navbar = () => {
   const { toggleSidebar, sidebarOpen } = useSidebar();
   const { user, isAuthenticated, logout } = useAuth();
 
-  const role = user?.role;
+  const gate = sessionGate(user);
 
-  const homePath = !user
-    ? '/'
-    : role === 'admin'
-      ? '/admin/dashboard'
-      : role === 'subadmin'
-        ? '/subadmin/dashboard'
-        : '/user/dashboard';
+  const homePath = !user ? '/' : homePathForGate(gate);
 
   const handleLogout = async () => {
     try {
       await logout();
     } finally {
-      navigate(role === 'admin' ? '/admin/login' : '/login');
+      navigate(gate === 'member' ? '/login' : '/admin/login');
     }
   };
 
   const showSidebarToggle = isAuthenticated && isDashboardRoute(location.pathname);
 
-  const profilePath = role === 'admin' ? '/admin/profile' : '/profile';
-  const passwordPath = role === 'admin' ? '/admin/change-password' : '/change-password';
+  const profilePath = gate === 'owner' ? '/admin/profile' : '/profile';
+  const passwordPath = gate === 'owner' ? '/admin/change-password' : '/change-password';
 
   return (
     <nav

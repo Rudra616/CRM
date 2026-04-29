@@ -1,6 +1,6 @@
 import { Request, Response, RequestHandler } from "express";
 import { AuthRequest } from "../../../common/types/AuthRequest";
-import { Role } from "../../../common/types/role";
+import { StaffAuthLevel } from "../../../common/types/role";
 import { successResponse, errorResponse } from "../../../common/utils/apiResponse";
 import {
   hashPassword,
@@ -20,6 +20,7 @@ import {
 } from "../service/admin.service";
 import { upsertAdminToken, removeAdminToken } from "../../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../../common/helpers/cookie.helper";
+import { isMainAdminRow } from "../../../common/utils/adminIdentity";
 
 // ─── Login (admin only) ───────────────────────────────────────────────────────
 export const adminLogin = async (req: Request, res: Response) => {
@@ -29,15 +30,16 @@ export const adminLogin = async (req: Request, res: Response) => {
     const admin = await findAdminByUsername(username);
     if (!admin) return errorResponse(res, "Invalid credentials", 401);
 
-    // Only the `admin` role can use this login endpoint
-    if (admin.role !== "admin") return errorResponse(res, "Invalid credentials", 401);
+    if (!isMainAdminRow(admin)) {
+      return errorResponse(res, "Invalid credentials", 401);
+    }
 
     const isMatch = await comparePassword(password, admin.password);
     if (!isMatch) return errorResponse(res, "Invalid credentials", 401);
 
     const token = signToken({
       id:       admin.id,
-      role:     Role.ADMIN,
+      role:     StaffAuthLevel.OWNER,
       username: admin.username,
     });
 
@@ -51,7 +53,8 @@ export const adminLogin = async (req: Request, res: Response) => {
         first_name: admin.first_name,
         last_name:  admin.last_name,
         email:      admin.email,
-        role:       admin.role,
+        role:       "admin" as const,
+        role_id:    admin.role_id ?? null,
       },
     }, 200);
   } catch (err: any) {
@@ -95,19 +98,35 @@ export const updateAdminProfile: RequestHandler = async (req, res) => {
   try {
     const { username, email, first_name, last_name, phone, gender } = req.body;
 
-    const isDup = await checkDuplicateAdminUsernameOrEmail(username, email, authReq.user.id);
+    const existing = await findAdminById(authReq.user.id);
+    if (!existing) return errorResponse(res, "Admin not found", 404);
+
+    const effectiveUsername = isMainAdminRow(existing)
+      ? existing.username
+      : String(username ?? "").trim();
+
+    const isDup = await checkDuplicateAdminUsernameOrEmail(
+      effectiveUsername,
+      email,
+      authReq.user.id
+    );
     if (isDup) return errorResponse(res, "Username or email already exists", 409);
 
-    const existing = await findAdminById(authReq.user.id);
     let image_url: string | null | undefined = existing?.image_url;
 
     if (req.file) {
       if (existing?.image_url) deleteFileIfExists(existing.image_url);
-      image_url = buildStoredImagePath(Role.ADMIN, authReq.user.id, req.file.filename);
+      image_url = buildStoredImagePath(StaffAuthLevel.OWNER, authReq.user.id, req.file.filename);
     }
 
     await updateAdminProfileService(authReq.user.id, {
-      username, email, first_name, last_name, phone, gender, image_url,
+      username: effectiveUsername,
+      email,
+      first_name,
+      last_name,
+      phone,
+      gender,
+      image_url,
     });
 
     const updated = await findAdminById(authReq.user.id);

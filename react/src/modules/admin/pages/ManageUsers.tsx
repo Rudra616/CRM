@@ -34,10 +34,9 @@ const ManageUsers = () => {
   const location = useLocation();
 
   // ─── Role flags ───────────────────────────────────────────────────────────
-  // isAdmin  → true only for the ADMIN role (admin sees everything, no restrictions)
-  // isSubadmin → true for subadmin role (respects DB permissions)
-  const isAdmin = user?.role === 'admin';
-  const isSubadmin = user?.role === 'subadmin';
+  /** Main administrator row — full access. Delegated staff uses `role_id` RBAC. */
+  const isOwner = user?.is_main_admin;
+  const isDelegate = user?.is_staff && !user?.is_main_admin;
 
   // ─── Permissions ──────────────────────────────────────────────────────────
   // For ADMIN: getModulePerm always returns all true (handled inside PermissionContext)
@@ -85,8 +84,8 @@ const ManageUsers = () => {
     setLoading(true);
     try {
       let res;
-      if (isAdmin) res = await getAdminUsersApi(params);
-      else if (isSubadmin) res = await getSubadminUsersApi(params);
+      if (isOwner) res = await getAdminUsersApi(params);
+      else if (isDelegate) res = await getSubadminUsersApi(params);
       else res = await getUsersApi(params);
 
       const data = res.data as UsersPageData | undefined;
@@ -123,7 +122,7 @@ const ManageUsers = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, rowsPerPage, isAdmin, isSubadmin, statusFilter, appliedSearchTerm]);
+  }, [currentPage, rowsPerPage, isOwner, isDelegate, statusFilter, appliedSearchTerm]);
 
   // ─── Sync statusFilter from navigation state ──────────────────────────────
   useEffect(() => {
@@ -253,10 +252,9 @@ const ManageUsers = () => {
       <div className="p-3 p-md-4">
 
         {/* Toolbar: status + rows + search + total */}
-        <div className="d-flex flex-column gap-3 mb-3">
-          <div className="d-flex flex-column flex-xl-row flex-xl-nowrap align-items-stretch align-items-xl-end gap-3">
-            <div className="d-flex flex-wrap align-items-end gap-3">
-              {isAdmin ? (
+        <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
+          <div className="d-flex flex-wrap align-items-end gap-2">
+              {isOwner ? (
                 <div className="flex-shrink-0">
                   <label htmlFor="user-status-filter" className="form-label small text-muted mb-1">
                     Status
@@ -300,9 +298,12 @@ const ManageUsers = () => {
                   ))}
                 </select>
               </div>
-            </div>
+              <div className="text-muted small ms-lg-1">
+                Total <span className="fw-semibold text-dark">{pagination.total}</span>
+              </div>
+          </div>
 
-            <div className="flex-grow-1" style={{ minWidth: 0 }}>
+            <div style={{ width: 'min(340px, 100%)' }}>
               <label htmlFor="user-search" className="form-label small text-muted mb-1">
                 Search
               </label>
@@ -342,12 +343,6 @@ const ManageUsers = () => {
                 </button>
               </div>
             </div>
-
-            <div className="text-muted small text-xl-end text-nowrap align-self-xl-center ms-xl-auto pt-1 pt-xl-0">
-              Total{' '}
-              <span className="fw-semibold text-dark">{pagination.total}</span>
-            </div>
-          </div>
         </div>
 
         {/* ── Table ────────────────────────────────────────────────────────── */}

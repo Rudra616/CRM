@@ -1,19 +1,18 @@
 import db from "../../config/db";
 import { User } from "../../common/types/user";
 import { logServiceError } from "../../common/helpers/serviceError";
-import { RowDataPacket, ResultSetHeader } from "mysql2";
 // ─── Lookup ───────────────────────────────────────────────────────────────────
 let Quary = "SELECT id, username, password, first_name, last_name, phone, email, gender, image_url, status, is_delete";
 export const findUserByUsernameOrEmail = async (
   username: string,
   email: string
-): Promise<User | null> => {
+): Promise<Array<{ id: number; username: string; email: string }>> => {
   try {
     const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE (username = ? OR email = ?) AND COALESCE(is_delete, 0) = 0",
+      "SELECT id, username, email FROM `user` WHERE (username = ? OR email = ?) AND COALESCE(is_delete, 0) != 1",
       [username, email]
     );
-    return rows.length > 0 ? rows[0] : null;
+    return rows ?? [];
   } catch (error: unknown) {
     logServiceError("user.service", "findUserByUsernameOrEmail", error);
     throw error;

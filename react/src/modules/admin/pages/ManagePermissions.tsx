@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaSearch, FaTimes } from 'react-icons/fa';
 import {
   getModulesApi,
   getRolePermissionsApi,
@@ -31,6 +32,7 @@ const emptyPerm = (): PermFlags => ({
   can_edit: false,
   can_delete: false,
 });
+const PAGE_SIZE_OPTIONS = [10, 15, 25, 50];
 
 const buildPermMap = (modules: ModuleItem[], rows: RolePermissionEntry[]): Record<number, PermFlags> => {
   const map = new Map(rows.map((p) => [p.module_id, p]));
@@ -52,12 +54,12 @@ const buildPermMap = (modules: ModuleItem[], rows: RolePermissionEntry[]): Recor
 const ManagePermissions = () => {
   const { user } = useAuth();
   const { getModulePerm, permLoading } = usePermissions();
-  const isAdmin = user?.role === 'admin';
+  const isOwner = user?.is_main_admin;
   const permRp = getModulePerm(PERMISSION_MODULE_KEYS.MODULE);
-  const canViewMatrix = isAdmin || permRp.can_view;
-  const canEditMatrix = isAdmin || permRp.can_edit;
+  const canViewMatrix = isOwner || permRp.can_view;
+  const canEditMatrix = isOwner || permRp.can_edit;
 
-  const rbacBase = user?.role === 'admin' ? '/admin/rbac' : '/subadmin/rbac';
+  const rbacBase = isOwner ? '/admin/rbac' : '/subadmin/rbac';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,11 +68,26 @@ const ManagePermissions = () => {
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [permByModule, setPermByModule] = useState<Record<number, PermFlags>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === selectedRoleId) ?? null,
     [roles, selectedRoleId]
   );
+  const filteredModules = useMemo(() => {
+    const q = appliedSearchTerm.trim().toLowerCase();
+    if (!q) return modules;
+    return modules.filter((m) => m.name.toLowerCase().includes(q) || String(m.id).includes(q));
+  }, [modules, appliedSearchTerm]);
+  const totalModules = filteredModules.length;
+  const totalPages = Math.max(1, Math.ceil(totalModules / rowsPerPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageModules = filteredModules.slice((safePage - 1) * rowsPerPage, safePage * rowsPerPage);
+  const start = totalModules === 0 ? 0 : (safePage - 1) * rowsPerPage + 1;
+  const end = Math.min(safePage * rowsPerPage, totalModules);
 
   const setFlag = (moduleId: number, key: keyof PermFlags, value: boolean) => {
     setPermByModule((prev) => ({
@@ -233,6 +250,86 @@ const ManagePermissions = () => {
               Selected role: <span className="text-dark fw-semibold">{selectedRole?.name ?? '-'}</span>
             </div>
 
+            <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
+              <div className="d-flex flex-wrap align-items-end gap-2">
+                <div className="flex-shrink-0">
+                  <label htmlFor="perm-rows-limit" className="form-label small text-muted mb-1">
+                    Rows per page
+                  </label>
+                  <select
+                    id="perm-rows-limit"
+                    className="form-select form-select-sm"
+                    style={{ minWidth: 88 }}
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {PAGE_SIZE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="text-muted small ms-lg-1">
+                  Total <span className="fw-semibold text-dark">{totalModules}</span>
+                </div>
+              </div>
+
+                <div style={{ width: 'min(340px, 100%)' }}>
+                  <label htmlFor="perm-search" className="form-label small text-muted mb-1">
+                    Search
+                  </label>
+                  <div className="input-group input-group-sm">
+                    <span className="input-group-text bg-white border-end-0 py-1" id="perm-search-addon">
+                      <FaSearch className="text-secondary" size={14} aria-hidden />
+                    </span>
+                    <input
+                      id="perm-search"
+                      type="search"
+                      className="form-control border-start-0"
+                      placeholder="Module name or id…"
+                      aria-describedby="perm-search-addon"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setCurrentPage(1);
+                          setAppliedSearchTerm(searchTerm.trim());
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary px-2"
+                      title="Search"
+                      aria-label="Search"
+                      onClick={() => {
+                        setCurrentPage(1);
+                        setAppliedSearchTerm(searchTerm.trim());
+                      }}
+                    >
+                      <FaSearch size={14} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary px-2"
+                      title="Clear search"
+                      aria-label="Clear search"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                        setAppliedSearchTerm('');
+                      }}
+                    >
+                      <FaTimes size={14} aria-hidden />
+                    </button>
+                  </div>
+              </div>
+            </div>
+
             {modules.length === 0 ? (
               <div className="text-muted">No modules found.</div>
             ) : (
@@ -248,7 +345,7 @@ const ManagePermissions = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {modules.map((m) => {
+                    {pageModules.map((m) => {
                       const p = permByModule[m.id] ?? emptyPerm();
                       return (
                         <tr key={m.id}>
@@ -273,6 +370,34 @@ const ManagePermissions = () => {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {totalModules > 0 && (
+              <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                <div className="text-muted small">
+                  {start}–{end} of {totalModules}
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Prev
+                  </button>
+                  <span className="small text-muted">
+                    Page {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>

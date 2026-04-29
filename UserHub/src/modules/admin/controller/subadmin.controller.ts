@@ -3,7 +3,7 @@ import { AuthRequest } from "../../../common/types/AuthRequest";
 import { successResponse, errorResponse } from "../../../common/utils/apiResponse";
 import { hashPassword } from "../../../common/helpers/common.helper";
 import {
-  findSubadminById,
+  findAdminById,
   findSubadminByUsernameOrEmail,
   checkDuplicateSubadminUsernameOrEmail,
   getSubadminsPaginated,
@@ -17,11 +17,16 @@ import {
   removeAllAdminTokensForAdminId,
 } from "../../token.service";
 import { findRoleById } from "../service/rbac.service";
+import { isMainAdminRow, MAIN_ADMIN_USERNAME } from "../../../common/utils/adminIdentity";
 
 // ─── Create Subadmin (admin only) ─────────────────────────────────────────────
 export const createSubadmin = async (req: Request, res: Response) => {
   try {
     const { username, password, first_name, last_name, phone, email, gender, role_id } = req.body;
+
+    if (String(username).trim().toLowerCase() === MAIN_ADMIN_USERNAME) {
+      return errorResponse(res, "Reserved username", 400);
+    }
 
     const roleId = Number(role_id);
     if (!Number.isInteger(roleId) || roleId <= 0) return errorResponse(res, "Invalid role", 400);
@@ -79,8 +84,9 @@ export const getSubadminById: RequestHandler<{ id: string }>  = async (req, res)
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
 
   try {
-    const subadmin = await findSubadminById(id);
+    const subadmin = await findAdminById(id);
     if (!subadmin) return errorResponse(res, "Subadmin not found", 404);
+    if (isMainAdminRow(subadmin)) return errorResponse(res, "Forbidden", 403);
     return successResponse(res, "Subadmin fetched", subadmin, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
@@ -95,8 +101,9 @@ export const updateSubadmin: RequestHandler<{ id: string }>  = async (req, res) 
   try {
     const { username, first_name, last_name, phone, email, gender, role_id } = req.body;
 
-    const subadmin = await findSubadminById(id);
+    const subadmin = await findAdminById(id);
     if (!subadmin) return errorResponse(res, "Subadmin not found", 404);
+    if (isMainAdminRow(subadmin)) return errorResponse(res, "Forbidden", 403);
 
     const isDup = await checkDuplicateSubadminUsernameOrEmail(username, email, id);
     if (isDup) return errorResponse(res, "Username or email already exists", 409);
@@ -121,7 +128,7 @@ export const updateSubadmin: RequestHandler<{ id: string }>  = async (req, res) 
     });
     await removeAllAdminTokensForAdminId(id);
 
-    const updated = await findSubadminById(id);
+    const updated = await findAdminById(id);
     
     return successResponse(res, "Subadmin updated successfully", updated, 200);
     
@@ -138,8 +145,9 @@ export const changeSubadminPasswordByAdmin: RequestHandler<{ id: string }>  = as
   try {
     const { newPassword } = req.body;
 
-    const subadmin = await findSubadminById(id);
+    const subadmin = await findAdminById(id);
     if (!subadmin) return errorResponse(res, "Subadmin not found", 404);
+    if (isMainAdminRow(subadmin)) return errorResponse(res, "Forbidden", 403);
 
     const hashedPassword = await hashPassword(newPassword);
     const updated = await updateSubadminPassword(id, hashedPassword);
@@ -160,7 +168,10 @@ export const deleteSubadmin: RequestHandler<{ id: string }>  = async (req, res) 
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
 
   try {
-    // Revoke sessions before deleting
+    const row = await findAdminById(id);
+    if (!row) return errorResponse(res, "Subadmin not found", 404);
+    if (isMainAdminRow(row)) return errorResponse(res, "Forbidden", 403);
+
     await removeAllAdminTokensForAdminId(id);
 
     const deleted = await deleteSubadminById(id);

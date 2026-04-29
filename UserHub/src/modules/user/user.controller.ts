@@ -33,7 +33,13 @@ export const registerUser = async (req: Request, res: Response) => {
     const { username, password, first_name, last_name, phone, email, gender } = req.body;
 
     const existing = await findUserByUsernameOrEmail(username, email);
-    if (existing) return errorResponse(res, "Username or email already exists", 409);
+    if (existing.length > 0) {
+      if (existing.some((u) => u.email === email))
+        return errorResponse(res, "Email already registered", 409);
+      if (existing.some((u) => u.username === username))
+        return errorResponse(res, "Username already taken", 409);
+      return errorResponse(res, "Username or email already exists", 409);
+    }
 
     const hashedPassword = await hashPassword(password);
     await insertUser(username, hashedPassword, first_name, last_name, phone, email, gender, "pending");

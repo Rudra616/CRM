@@ -1,17 +1,22 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import type { RoleString } from '../utils/roleUtils';
+import {
+  sessionGate,
+  homePathForGate,
+  type SessionGate,
+} from '../utils/sessionGate';
 import { getLoginRedirectUrl } from '../utils/authSession';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  roles?: RoleString[];
+  /** Allowed session kinds — empty means any authenticated user. */
+  gates?: SessionGate[];
   loginPath?: string;
 }
 
 export const ProtectedRoute = ({
   children,
-  roles = [],
+  gates = [],
   loginPath = '/login',
 }: ProtectedRouteProps) => {
   const location = useLocation();
@@ -21,29 +26,17 @@ export const ProtectedRoute = ({
     loginPath !== '/login' ? loginPath : getLoginRedirectUrl(location.pathname);
 
   if (isLoading) {
-    return <div>Loading...</div>; 
+    return <div>Loading...</div>;
   }
 
   if (!isAuthenticated || !user) {
     return <Navigate to={signInPath} state={{ from: location }} replace />;
   }
 
-  const role = user.role;
+  const gate = sessionGate(user);
 
-
-  if (roles.length > 0 && !roles.includes(role)) {
-    return (
-      <Navigate
-        to={
-          role === 'admin'
-            ? '/admin/dashboard'
-            : role === 'subadmin'
-              ? '/subadmin/dashboard'
-              : '/user/dashboard'
-        }
-        replace
-      />
-    );
+  if (gates.length > 0 && !gates.includes(gate)) {
+    return <Navigate to={homePathForGate(gate)} replace />;
   }
 
   return <>{children}</>;

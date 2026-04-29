@@ -11,10 +11,7 @@ import {
 } from "../../modules/token.service";
 import { findUserById } from "../../modules/user/user.service";
 import { findAdminById } from "../../modules/admin/service/admin.service";
-import { Role, AdminRole } from "../types/role";
-
-const adminRoleToNumeric = (role: AdminRole): number =>
-  role === "admin" ? Role.ADMIN : Role.SUBADMIN;
+import { adminRowToStaffAuthLevel, staffKindFromRow } from "../utils/adminIdentity";
 
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authReq = req as AuthRequest;
@@ -65,13 +62,14 @@ export const authenticate: RequestHandler = async (req, res, next) => {
         clearSessionCookies(res);
         return res.status(401).json({ success: false, message: "Session invalid" });
       }
-      const numericRole = adminRoleToNumeric(adminRow.role);
-authReq.user = {
-  id: Number(decoded.id),
-  role: numericRole,
-  role_id: adminRow.role_id ?? undefined,
-  adminRole: adminRow.role,
-};    }
+      const staffLevel = adminRowToStaffAuthLevel(adminRow);
+      authReq.user = {
+        id: Number(decoded.id),
+        role: staffLevel,
+        role_id: adminRow.role_id ?? undefined,
+        staff_kind: staffKindFromRow(adminRow),
+      };
+    }
 
     // ── Sliding session refresh (< 6 hours left) ──────────────────────────────
     const nowSec = Math.floor(Date.now() / 1000);
@@ -103,12 +101,12 @@ authReq.user = {
   }
 };
 
-export const allowRoles = (...roles: number[]): RequestHandler => {
-  return (req, res, next) => {
-    const authReq = req as AuthRequest;
-    if (!authReq.user || !roles.includes(authReq.user.role)) {
-      return res.status(403).json({ success: false, message: "Forbidden" });
-    }
-    next();
-  };
-};
+// export const allowRoles = (...roles: number[]): RequestHandler => {
+//   return (req, res, next) => {
+//     const authReq = req as AuthRequest;
+//     if (!authReq.user || !roles.includes(authReq.user.role)) {
+//       return res.status(403).json({ success: false, message: "Forbidden" });
+//     }
+//     next();
+//   };
+// };

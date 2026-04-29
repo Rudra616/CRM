@@ -3,6 +3,8 @@ import { logServiceError } from "../../common/helpers/serviceError";
 import {
   CreateTicketInput,
   CreateTicketMessageInput,
+  TicketListQuery,
+  TicketListResult,
   TicketMessageView,
   TicketRow,
   TicketStatus,
@@ -43,6 +45,44 @@ export const getTicketsByUserId = async (userId: number): Promise<TicketRow[]> =
   }
 };
 
+export const getTicketsByUserIdPaged = async (
+  userId: number,
+  q: TicketListQuery
+): Promise<TicketListResult> => {
+  try {
+    const page = Math.max(1, q.page);
+    const limit = Math.max(1, q.limit);
+    const offset = (page - 1) * limit;
+    const search = q.search.trim();
+    const like = `%${search}%`;
+
+    const where = search
+      ? "WHERE user_id = ? AND (subject LIKE ? OR description LIKE ? OR status LIKE ?)"
+      : "WHERE user_id = ?";
+    const args = search ? [userId, like, like, like] : [userId];
+
+    const [countRows]: any = await db.query(
+      `SELECT COUNT(*) AS total FROM \`ticket\` ${where}`,
+      args
+    );
+    const total = Number(countRows?.[0]?.total ?? 0);
+
+    const [rows]: any = await db.query(
+      `SELECT id, user_id, subject, description, status, image_url, created_at, updated_at
+       FROM \`ticket\`
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...args, limit, offset]
+    );
+
+    return { items: rows as TicketRow[], total };
+  } catch (error: unknown) {
+    logServiceError("tickit.service", "getTicketsByUserIdPaged", error);
+    throw error;
+  }
+};
+
 export const getAllTickets = async (): Promise<TicketRow[]> => {
   try {
     const [rows]: any = await db.query(
@@ -57,21 +97,59 @@ export const getAllTickets = async (): Promise<TicketRow[]> => {
   }
 };
 
-export const updateTicketStatusService = async (
-  ticketId: number,
-  status: TicketStatus
-): Promise<boolean> => {
+export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketListResult> => {
   try {
-    const [result]: any = await db.query(
-      "UPDATE `ticket` SET status = ? WHERE id = ?",
-      [status, ticketId]
+    const page = Math.max(1, q.page);
+    const limit = Math.max(1, q.limit);
+    const offset = (page - 1) * limit;
+    const search = q.search.trim();
+    const like = `%${search}%`;
+
+    const from = `FROM \`ticket\` t
+      LEFT JOIN \`user\` u ON u.id = t.user_id AND COALESCE(u.is_delete, 0) = 0`;
+
+    const where = search
+      ? `WHERE (
+      t.subject LIKE ? OR t.description LIKE ? OR t.status LIKE ?
+      OR CAST(t.id AS CHAR) LIKE ? OR CAST(t.user_id AS CHAR) LIKE ?
+      OR u.username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?
+    )`
+      : "";
+    const args = search ? [like, like, like, like, like, like, like, like] : [];
+
+    const [countRows]: any = await db.query(
+      `SELECT COUNT(*) AS total ${from} ${where}`,
+      args
     );
-    return result.affectedRows > 0;
+    const total = Number(countRows?.[0]?.total ?? 0);
+
+    const [rows]: any = await db.query(
+      `SELECT
+         t.id,
+         t.user_id,
+         t.subject,
+         t.description,
+         t.status,
+         t.image_url,
+         t.created_at,
+         t.updated_at,
+         u.username AS owner_username,
+         u.first_name AS owner_first_name,
+         u.last_name AS owner_last_name
+       ${from}
+       ${where}
+       ORDER BY t.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...args, limit, offset]
+    );
+
+    return { items: rows as TicketRow[], total };
   } catch (error: unknown) {
-    logServiceError("tickit.service", "updateTicketStatusService", error);
+    logServiceError("tickit.service", "getAllTicketsPaged", error);
     throw error;
   }
 };
+
 
 export const updateTicketByOwner = async (
   ticketId: number,
@@ -106,8 +184,9 @@ export const insertTicketMessage = async (
 ): Promise<number> => {
   try {
     const [result]: any = await db.query(
-      `INSERT INTO \`ticket_message\` (ticket_id, sender_id, sender_type, message) VALUES (?, ?, ?, ?)`,
-      [messageData.ticket_id, messageData.sender_id, messageData.sender_type, messageData.message]
+      `INSERT INTO \`ticket_message\` (ticket_id, sender_id, sender_type, message,image) VALUES (?, ?, ?, ?, ?)`,
+      [messageData.ticket_id, messageData.sender_id, messageData.sender_type, messageData.message,messageData.image ?? null,
+]
     );
     return result.insertId;
   } catch (error: unknown) {
@@ -141,6 +220,7 @@ export const getTicketMessagesByTicketId = async (
               tm.sender_id,
               tm.sender_type,
               tm.message,
+              tm.image,
               tm.created_at,
               CASE
                 WHEN tm.sender_type = 'admin' THEN a.username
@@ -158,4 +238,37 @@ export const getTicketMessagesByTicketId = async (
     logServiceError("tickit.service", "getTicketMessagesByTicketId", error);
     throw error;
   }
+};
+export const updateTicketStatusByOwner = async (
+  ticketId: number,
+  userId: number,
+  status: TicketStatus
+): Promise<boolean> => {
+  const [result]: any = await db.query(
+    `
+    UPDATE ticket
+    SET status = ?
+    WHERE id = ?
+    AND user_id = ?
+    AND status != 'closed'
+    `,
+    [status, ticketId, userId]
+  );
+
+  return result.affectedRows > 0;
+};
+export const updateTicketStatusByAdmin = async (
+  ticketId: number,
+  status: TicketStatus
+): Promise<boolean> => {
+  const [result]: any = await db.query(
+    `
+    UPDATE ticket
+    SET status = ?
+    WHERE id = ?
+    `,
+    [status, ticketId]
+  );
+
+  return result.affectedRows > 0;
 };

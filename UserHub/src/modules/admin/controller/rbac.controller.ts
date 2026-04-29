@@ -17,7 +17,7 @@ import {
 import type { RolePermissionInput } from "../types/rbac.types";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../service/user.service";
 import { AuthRequest } from "../../../common/types/AuthRequest";
-import { Role } from "../../../common/types/role";
+import { StaffAuthLevel } from "../../../common/types/role";
 import {
   invalidateSubadminSessionsForModuleId,
   invalidateSubadminSessionsForRoleId,
@@ -225,7 +225,7 @@ export const getMyPermissions = async (req: Request, res: Response) => {
     }
 
     // Admin shortcut
-    if (user.role === Role.ADMIN) {
+    if (user.role === StaffAuthLevel.OWNER) {
       return successResponse(
         res,
         "Permissions fetched",

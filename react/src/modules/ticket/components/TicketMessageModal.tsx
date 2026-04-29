@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { TicketItem, TicketMessageItem } from '../types/ticket.types';
+import { TicketChatBubble } from './TicketChatBubble';
+import { TicketChatComposer } from './TicketChatComposer';
 
 type Props = {
   open: boolean;
@@ -7,14 +9,10 @@ type Props = {
   messages: TicketMessageItem[];
   loading: boolean;
   canReply: boolean;
+  /** Staff ticket queue vs member “my tickets” — affects labels (Customer vs You). */
+  viewerIsStaff: boolean;
   onClose: () => void;
-  onSend: (message: string) => Promise<void>;
-};
-
-const formatDateTime = (value?: string): string => {
-  if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  onSend: (message: string, image?: File | null) => Promise<void>;
 };
 
 export const TicketMessageModal = ({
@@ -23,126 +21,122 @@ export const TicketMessageModal = ({
   messages,
   loading,
   canReply,
+  viewerIsStaff,
   onClose,
   onSend,
 }: Props) => {
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
+  const title = useMemo(() => {
+    if (!ticket) return 'Ticket conversation';
+    return `#${ticket.id} · ${ticket.subject}`;
+  }, [ticket]);
 
   useEffect(() => {
-    if (!open) setDraft('');
-  }, [open]);
-
-  const title = useMemo(() => {
-    if (!ticket) return 'Ticket Messages';
-    return `Ticket #${ticket.id} - ${ticket.subject}`;
-  }, [ticket]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (open) window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
-  const submit = async () => {
-    const text = draft.trim();
-    if (!text) return;
-    try {
-      setSending(true);
-      await onSend(text);
-      setDraft('');
-    } finally {
-      setSending(false);
-    }
-  };
-
   return (
     <div
+      className="d-flex align-items-center justify-content-center"
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.45)',
+        background: 'rgba(15, 23, 42, 0.55)',
         zIndex: 1200,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         padding: 16,
       }}
       onClick={onClose}
+      role="presentation"
     >
       <div
-        className="card shadow-sm"
-        style={{ width: 'min(860px, 100%)', maxHeight: '90vh' }}
+        className="card shadow-lg border-0 d-flex flex-column overflow-hidden"
+        style={{
+          width: 'min(720px, 100%)',
+          maxHeight: '92vh',
+          borderRadius: 16,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <strong className="small">{title}</strong>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>
+        <div
+          className="d-flex justify-content-between align-items-center text-white px-3 py-3"
+          style={{
+            background: 'linear-gradient(120deg, #1e3a5f 0%, #0f766e 100%)',
+          }}
+        >
+          <div>
+                <div className="small mb-0" style={{ opacity: 0.85 }}>
+                  Ticket thread
+                </div>
+            <strong className="d-block" style={{ fontSize: '0.95rem' }}>
+              {title}
+            </strong>
+          </div>
+          <button type="button" className="btn btn-sm btn-light" onClick={onClose}>
             Close
           </button>
         </div>
-        <div className="card-body d-flex flex-column gap-3" style={{ overflowY: 'auto' }}>
+
+        <div
+          className="flex-grow-1 d-flex flex-column"
+          style={{ minHeight: 0, background: '#f1f5f9' }}
+        >
           {ticket && (
-            <div className="border rounded p-2 bg-light">
-              <div className="small fw-semibold">{ticket.subject}</div>
-              <div className="small text-muted">{ticket.description}</div>
-              {ticket.image_url ? (
-                <img
-                  src={ticket.image_url}
-                  alt="Ticket attachment"
-                  className="mt-2 rounded border"
-                  style={{ maxHeight: 180, maxWidth: '100%', objectFit: 'cover' }}
-                />
-              ) : null}
+            <div className="px-3 pt-3">
+              <div
+                className="rounded-3 p-3 bg-white border"
+                style={{ borderColor: '#e2e8f0' }}
+              >
+                <div className="small fw-semibold text-secondary text-uppercase" style={{ fontSize: 10 }}>
+                  Original request
+                </div>
+                <div className="fw-semibold small mt-1">{ticket.subject}</div>
+                <div className="small text-muted mt-1" style={{ whiteSpace: 'pre-wrap' }}>
+                  {ticket.description}
+                </div>
+              </div>
             </div>
           )}
 
-          {loading ? (
-            <p className="small text-muted mb-0">Loading messages...</p>
-          ) : messages.length === 0 ? (
-            <p className="small text-muted mb-0">No messages yet.</p>
+          <div
+            className="flex-grow-1 px-3 py-2"
+            style={{
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              minHeight: 220,
+            }}
+          >
+            {loading ? (
+              <p className="small text-muted mb-0 align-self-center my-auto">Loading messages…</p>
+            ) : messages.length === 0 ? (
+              <p className="small text-muted mb-0 align-self-center my-auto">
+                No messages yet — say hello below.
+              </p>
+            ) : (
+              messages.map((msg) => (
+                <TicketChatBubble key={msg.id} msg={msg} viewerIsStaff={viewerIsStaff} />
+              ))
+            )}
+          </div>
+
+          {canReply ? (
+            <TicketChatComposer
+              key={ticket?.id ?? 'new'}
+              onSend={(text, image) => onSend(text, image)}
+            />
           ) : (
-            <div className="d-flex flex-column gap-2">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`p-2 rounded border ${msg.sender_type === 'admin' ? 'bg-light' : ''}`}
-                >
-                  <div className="d-flex justify-content-between small">
-                    <span className="fw-semibold">
-                      {msg.sender_type === 'admin' ? 'Support/Admin' : 'User'}
-                      {msg.sender_username ? ` (${msg.sender_username})` : ''}
-                    </span>
-                    <span className="text-muted">{formatDateTime(msg.created_at)}</span>
-                  </div>
-                  <div className="small mt-1" style={{ whiteSpace: 'pre-wrap' }}>
-                    {msg.message}
-                  </div>
-                </div>
-              ))}
+            <div className="border-top bg-light px-3 py-2 small text-muted text-center">
+              Replying is disabled for this view.
             </div>
           )}
         </div>
-        {canReply ? (
-          <div className="card-footer">
-            <div className="d-flex gap-2">
-              <textarea
-                className="form-control form-control-sm"
-                rows={3}
-                placeholder="Write a message..."
-                value={draft}
-                maxLength={2000}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn btn-primary btn-sm align-self-end"
-                disabled={sending || draft.trim().length === 0}
-                onClick={() => void submit()}
-              >
-                {sending ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
 };
-

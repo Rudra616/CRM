@@ -20,7 +20,7 @@ export interface SubadminLoginResponse {
     id: number;
     username: string;
     email: string;
-    role: 'subadmin';
+    role_id: number;
     first_name?: string;
     last_name?: string;
   };

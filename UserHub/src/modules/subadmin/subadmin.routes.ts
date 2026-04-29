@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { Role } from "../../common/types/role";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
-import { authenticate, allowRoles } from "../../common/middleware/authMiddleware";
+import { authenticate } from "../../common/middleware/authMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
 import {
   loginSchema,
@@ -20,11 +19,13 @@ const router = Router();
 // Subadmin self
 router.post("/login", validateSchema(loginSchema), subadminLogin);
 router.post("/logout", subadminLogout);
-router.get("/profile", authenticate, allowRoles(Role.SUBADMIN), getSubadminProfile);
+router.get("/profile", authenticate, 
+  // allowRoles(Role.SUBADMIN), 
+  getSubadminProfile);
 router.put(
   "/profile",
   authenticate,
-  allowRoles(Role.SUBADMIN),
+  // allowRoles(Role.SUBADMIN),
   uploadSingle("image"),
   validateSchema(updateAdminSchema),
   updateSubadminProfile,
@@ -32,7 +33,7 @@ router.put(
 router.post(
   "/change-password",
   authenticate,
-  allowRoles(Role.SUBADMIN),
+      // allowRoles(Role.SUBADMIN),
   validateSchema(changePasswordSchema),
   changeSubadminPassword,
 );
