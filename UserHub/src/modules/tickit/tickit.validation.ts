@@ -1,6 +1,6 @@
 import Joi from "joi";
 
-const TICKET_STATUS = ["open", "in_progress", "resolved", "closed"] as const;
+const TICKET_STATUS = ["open", "closed"] as const;
 
 const trimmedString = () => Joi.string().trim();
 const positiveInt = () => Joi.number().integer().positive();
@@ -31,7 +31,7 @@ export const updateOwnedTicketSchema = Joi.object({
 export const updateTicketStatusSchema = Joi.object({
   status: trimmedString().valid(...TICKET_STATUS).required().messages({
     "string.empty": "Status is required",
-    "any.only": "Status must be one of: open, in_progress, resolved, closed",
+    "any.only": "Status must be one of: open, closed",
   }),
 });
 

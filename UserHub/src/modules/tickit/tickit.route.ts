@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   createTicket,
   getUserTickets,
+  getMyTicketUnreadSummaryHandler,
+  getStaffTicketUnreadSummaryHandler,
   getAllTicketsByAdmin,
   updateOwnedTicket,
   updateTicketStatus,
@@ -33,10 +35,17 @@ router.post(
   createTicket
 );
 router.get("/my-tickets", authenticate, getUserTickets);
+router.get("/my-unread-summary", authenticate, getMyTicketUnreadSummaryHandler);
+/** Staff unread badge — requires ticket can_add (same as sending messages); subadmins without Add get no request from client. */
 router.get(
-  "/all",
+  "/staff-unread-summary",
   authenticate,
-  // allowRoles(Role.ADMIN, Role.SUBADMIN),
+  checkPermission("ticket", "can_add"),
+  getStaffTicketUnreadSummaryHandler
+);
+router.get(
+  "/",
+  authenticate,
   checkPermission("ticket", "can_view"),
   getAllTicketsByAdmin
 );

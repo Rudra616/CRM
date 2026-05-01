@@ -13,6 +13,9 @@ const SubadminDashboard: React.FC = () => {
   const canViewTickets = getModulePerm(PERMISSION_MODULE_KEYS.TICKET).can_view;
   const canViewRbac = getModulePerm(PERMISSION_MODULE_KEYS.MODULE).can_view;
   const showRbacLinks = canViewRbac;
+  const subadminPerm = getModulePerm(PERMISSION_MODULE_KEYS.SUBADMIN);
+  const canViewSubadmins = subadminPerm.can_view;
+  const canAddSubadmin = subadminPerm.can_add;
 
   const [statsLoading, setStatsLoading] = useState(false);
   const [userCount, setUserCount] = useState(0);
@@ -85,20 +88,20 @@ const SubadminDashboard: React.FC = () => {
             hint="Disabled or inactive users"
             colClass="col-sm-6 col-md-4"
           />
-          <DashboardStatCard
+          {/* <DashboardStatCard
             title="Deleted Users"
             value={deletedUsers}
             hint="Soft deleted users"
             colClass="col-sm-6 col-md-4"
-          />
+          /> */}
         </div>
       )}
 
-      {!permLoading && !canViewUsers && (
+      {/* {!permLoading && !canViewUsers && (
         <p className="text-muted mb-4">
           User statistics are not available for your account.
         </p>
-      )}
+      )} */}
 
       <div className="d-flex flex-wrap gap-2">
         {canViewUsers && (
@@ -109,6 +112,16 @@ const SubadminDashboard: React.FC = () => {
         {canViewTickets && (
           <Link className="btn btn-outline-primary" to="/subadmin/tickets">
             Manage Tickets
+          </Link>
+        )}
+        {canAddSubadmin && (
+          <Link className="btn btn-outline-primary" to="/subadmin/create-subadmin">
+            Create Subadmin
+          </Link>
+        )}
+        {canViewSubadmins && (
+          <Link className="btn btn-outline-primary" to="/subadmin/subadmins">
+            Manage Subadmins
           </Link>
         )}
       </div>

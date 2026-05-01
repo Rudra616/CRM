@@ -19,6 +19,7 @@ import { usePermissions } from '../../context/PermissionContext';
 import { colors } from '../../theme/colors';
 import { PERMISSION_MODULE_KEYS } from '../utils/permissionModules';
 import type { SessionGate } from '../utils/sessionGate';
+import { useTicketUnread } from '../../context/TicketUnreadContext';
 
 const SIDEBAR_WIDTH = 280;
 
@@ -40,12 +41,17 @@ const Sidebar = ({ gate }: Props) => {
   const { user } = useAuth();
   const { getModulePerm } = usePermissions();
   const username = user?.username ?? 'User';
+  const { summary } = useTicketUnread();
+  const ticketsWithUnread = summary.ticketsWithUnread;
 
   const canView = (moduleKey: string): boolean => getModulePerm(moduleKey).can_view;
   const canViewUsers = canView(PERMISSION_MODULE_KEYS.USER);
   const canViewTickets = canView(PERMISSION_MODULE_KEYS.TICKET);
   const canViewAccessControl = canView(PERMISSION_MODULE_KEYS.MODULE);
   const showSubadminAccessMenu = canViewAccessControl;
+
+  const subadminPerm = getModulePerm(PERMISSION_MODULE_KEYS.SUBADMIN);
+  const showDelegateSubadminMenu = subadminPerm.can_view || subadminPerm.can_add;
 
   const getProfilePath = () => (gate === 'owner' ? '/admin/profile' : '/profile');
 
@@ -153,7 +159,17 @@ const Sidebar = ({ gate }: Props) => {
 
               <SubMenu label="Tickets" icon={<FaTicketAlt />}>
                 <MenuItem icon={<FaTicketAlt />} onClick={nav('/admin/tickets')}>
-                  Manage Tickets
+                  <span className="d-inline-flex align-items-center gap-2">
+                    Manage Tickets
+                    {ticketsWithUnread > 0 ? (
+                      <span
+                        className="badge rounded-pill bg-danger"
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        {ticketsWithUnread > 99 ? '99+' : ticketsWithUnread}
+                      </span>
+                    ) : null}
+                  </span>
                 </MenuItem>
               </SubMenu>
 
@@ -191,8 +207,33 @@ const Sidebar = ({ gate }: Props) => {
 
               {canViewTickets && (
                 <MenuItem icon={<FaTicketAlt />} onClick={nav('/subadmin/tickets')}>
-                  Tickets
+                  <span className="d-inline-flex align-items-center gap-2">
+                    Tickets
+                    {ticketsWithUnread > 0 ? (
+                      <span
+                        className="badge rounded-pill bg-danger"
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        {ticketsWithUnread > 99 ? '99+' : ticketsWithUnread}
+                      </span>
+                    ) : null}
+                  </span>
                 </MenuItem>
+              )}
+
+              {showDelegateSubadminMenu && (
+                <SubMenu label="Subadmin" icon={<FaUserShield />}>
+                  {subadminPerm.can_add && (
+                    <MenuItem icon={<FaUserPlus />} onClick={nav('/subadmin/create-subadmin')}>
+                      Create Subadmin
+                    </MenuItem>
+                  )}
+                  {subadminPerm.can_view && (
+                    <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/subadmins')}>
+                      Manage Subadmins
+                    </MenuItem>
+                  )}
+                </SubMenu>
               )}
 
               {showSubadminAccessMenu && (
@@ -237,7 +278,17 @@ const Sidebar = ({ gate }: Props) => {
                   Create Ticket
                 </MenuItem>
                 <MenuItem icon={<FaTicketAlt />} onClick={nav('/tickets/my')}>
-                  My Tickets
+                  <span className="d-inline-flex align-items-center gap-2">
+                    My Tickets
+                    {ticketsWithUnread > 0 ? (
+                      <span
+                        className="badge rounded-pill bg-danger"
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        {ticketsWithUnread > 99 ? '99+' : ticketsWithUnread}
+                      </span>
+                    ) : null}
+                  </span>
                 </MenuItem>
               </SubMenu>
               <MenuItem icon={<FaUser />} onClick={nav('/profile')}>

@@ -7,6 +7,9 @@ import { showSuccess, showError } from '../../../shared/utils/toast';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import type { Gender } from '../../../shared/types/common.types';
 import { AuthPageLayout, authLinkStyle } from '../../../shared/components/AuthPageLayout';
+import { useAuth } from '../../../context/AuthContext';
+import { usePermissions } from '../../../context/PermissionContext';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 type RegisterForm = {
   username: string;
@@ -30,7 +33,16 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isCreateSubadmin = location.pathname === '/admin/create-subadmin';
+  const { user } = useAuth();
+  const { getModulePerm, permLoading } = usePermissions();
+  const isCreateSubadmin =
+    location.pathname === '/admin/create-subadmin' ||
+    location.pathname === '/subadmin/create-subadmin';
+  const isDelegateStaff = Boolean(user?.is_staff && !user?.is_main_admin);
+  const canCreateSubadminByRbac = getModulePerm(PERMISSION_MODULE_KEYS.SUBADMIN).can_add;
+  const backToSubadminsPath = location.pathname.startsWith('/subadmin')
+    ? '/subadmin/subadmins'
+    : '/admin/subadmins';
 
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } = useFormValidation<RegisterForm>();
 
@@ -64,6 +76,11 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     resetErrors();
+
+    if (isCreateSubadmin && isDelegateStaff && !canCreateSubadminByRbac) {
+      showError('You do not have permission to create subadmins');
+      return;
+    }
 
     const validationResults = validateRegister(form, { requireConfirmPassword: true });
     const hasErrors = Object.values(validationResults).some((r) => !r.valid);
@@ -119,6 +136,21 @@ const Register: React.FC = () => {
       showError(isCreateSubadmin ? (msg ?? 'Failed to create subadmin') : (msg ?? 'Registration failed'));
     }
   };
+
+  if (isCreateSubadmin && isDelegateStaff && !permLoading && !canCreateSubadminByRbac) {
+    return (
+      <AuthPageLayout
+        title="Access denied"
+        subtitle="You cannot create subadmin accounts"
+        maxWidth={480}
+      >
+        <p className="text-muted small mb-0">
+          Ask an administrator to grant your role the <strong>subadmin</strong> module with <strong>Add</strong>{' '}
+          permission.
+        </p>
+      </AuthPageLayout>
+    );
+  }
 
   return (
     <AuthPageLayout
@@ -304,7 +336,7 @@ const Register: React.FC = () => {
             </button>
 
             {isCreateSubadmin ? (
-              <Link to="/admin/subadmins" className="btn btn-outline-secondary w-100">
+              <Link to={backToSubadminsPath} className="btn btn-outline-secondary w-100">
                 Back to subadmins
               </Link>
             ) : (

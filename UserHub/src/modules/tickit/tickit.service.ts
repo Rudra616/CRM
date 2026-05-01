@@ -3,6 +3,8 @@ import { logServiceError } from "../../common/helpers/serviceError";
 import {
   CreateTicketInput,
   CreateTicketMessageInput,
+  OwnerTicketUnreadSummary,
+  StaffTicketUnreadSummary,
   TicketListQuery,
   TicketListResult,
   TicketMessageView,
@@ -57,26 +59,46 @@ export const getTicketsByUserIdPaged = async (
     const like = `%${search}%`;
 
     const where = search
-      ? "WHERE user_id = ? AND (subject LIKE ? OR description LIKE ? OR status LIKE ?)"
-      : "WHERE user_id = ?";
+      ? "WHERE t.user_id = ? AND (t.subject LIKE ? OR t.description LIKE ? OR t.status LIKE ?)"
+      : "WHERE t.user_id = ?";
     const args = search ? [userId, like, like, like] : [userId];
 
     const [countRows]: any = await db.query(
-      `SELECT COUNT(*) AS total FROM \`ticket\` ${where}`,
+      `SELECT COUNT(*) AS total FROM \`ticket\` t ${where}`,
       args
     );
     const total = Number(countRows?.[0]?.total ?? 0);
 
     const [rows]: any = await db.query(
-      `SELECT id, user_id, subject, description, status, image_url, created_at, updated_at
-       FROM \`ticket\`
+      `SELECT
+         t.id,
+         t.user_id,
+         t.subject,
+         t.description,
+         t.status,
+         t.image_url,
+         t.created_at,
+         t.updated_at,
+         (
+           SELECT COUNT(*)
+           FROM \`ticket_message\` tm
+           WHERE tm.ticket_id = t.id
+             AND tm.sender_type = 'admin'
+             AND tm.is_read_by_user = 0
+         ) AS unread_from_admin_count
+       FROM \`ticket\` t
        ${where}
-       ORDER BY created_at DESC
+       ORDER BY t.created_at DESC
        LIMIT ? OFFSET ?`,
       [...args, limit, offset]
     );
 
-    return { items: rows as TicketRow[], total };
+    const items = (rows as TicketRow[]).map((row: TicketRow & { unread_from_admin_count?: unknown }) => ({
+      ...row,
+      unread_from_admin_count: Number(row.unread_from_admin_count ?? 0),
+    }));
+
+    return { items, total };
   } catch (error: unknown) {
     logServiceError("tickit.service", "getTicketsByUserIdPaged", error);
     throw error;
@@ -133,6 +155,13 @@ export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketList
          t.image_url,
          t.created_at,
          t.updated_at,
+         (
+           SELECT COUNT(*)
+           FROM \`ticket_message\` tm
+           WHERE tm.ticket_id = t.id
+             AND tm.sender_type = 'user'
+             AND tm.is_read_by_admin = 0
+         ) AS unread_from_user_count,
          u.username AS owner_username,
          u.first_name AS owner_first_name,
          u.last_name AS owner_last_name
@@ -143,7 +172,12 @@ export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketList
       [...args, limit, offset]
     );
 
-    return { items: rows as TicketRow[], total };
+    const items = (rows as TicketRow[]).map((row: TicketRow & { unread_from_user_count?: unknown }) => ({
+      ...row,
+      unread_from_user_count: Number(row.unread_from_user_count ?? 0),
+    }));
+
+    return { items, total };
   } catch (error: unknown) {
     logServiceError("tickit.service", "getAllTicketsPaged", error);
     throw error;
@@ -183,10 +217,20 @@ export const insertTicketMessage = async (
   messageData: CreateTicketMessageInput
 ): Promise<number> => {
   try {
+    const isReadByUser = messageData.sender_type === "admin" ? 0 : 1;
+    const isReadByAdmin = messageData.sender_type === "user" ? 0 : 1;
     const [result]: any = await db.query(
-      `INSERT INTO \`ticket_message\` (ticket_id, sender_id, sender_type, message,image) VALUES (?, ?, ?, ?, ?)`,
-      [messageData.ticket_id, messageData.sender_id, messageData.sender_type, messageData.message,messageData.image ?? null,
-]
+      `INSERT INTO \`ticket_message\` (ticket_id, sender_id, sender_type, message, image, is_read_by_user, is_read_by_admin)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        messageData.ticket_id,
+        messageData.sender_id,
+        messageData.sender_type,
+        messageData.message,
+        messageData.image ?? null,
+        isReadByUser,
+        isReadByAdmin,
+      ]
     );
     return result.insertId;
   } catch (error: unknown) {
@@ -215,12 +259,14 @@ export const getTicketMessagesByTicketId = async (
 ): Promise<TicketMessageView[]> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT tm.id,
+       `SELECT tm.id,
               tm.ticket_id,
               tm.sender_id,
               tm.sender_type,
               tm.message,
               tm.image,
+              tm.is_read_by_user,
+              tm.is_read_by_admin,
               tm.created_at,
               CASE
                 WHEN tm.sender_type = 'admin' THEN a.username
@@ -239,6 +285,89 @@ export const getTicketMessagesByTicketId = async (
     throw error;
   }
 };
+
+/** Mark all admin messages on this ticket as read by the ticket owner (opens chat). */
+export const markAdminMessagesReadByOwner = async (
+  ticketId: number,
+  ownerUserId: number
+): Promise<void> => {
+  try {
+    await db.query(
+      `UPDATE \`ticket_message\` tm
+       INNER JOIN \`ticket\` t ON t.id = tm.ticket_id AND t.user_id = ?
+       SET tm.is_read_by_user = 1
+       WHERE tm.ticket_id = ?
+         AND tm.sender_type = 'admin'`,
+      [ownerUserId, ticketId]
+    );
+  } catch (error: unknown) {
+    logServiceError("tickit.service", "markAdminMessagesReadByOwner", error);
+    throw error;
+  }
+};
+
+/** Mark all user messages on this ticket as read by staff (opens chat). */
+export const markUserMessagesReadByStaff = async (ticketId: number): Promise<void> => {
+  try {
+    await db.query(
+      `UPDATE \`ticket_message\`
+       SET is_read_by_admin = 1
+       WHERE ticket_id = ?
+         AND sender_type = 'user'`,
+      [ticketId]
+    );
+  } catch (error: unknown) {
+    logServiceError("tickit.service", "markUserMessagesReadByStaff", error);
+    throw error;
+  }
+};
+
+export const getOwnerTicketUnreadSummary = async (
+  userId: number
+): Promise<OwnerTicketUnreadSummary> => {
+  try {
+    const [rows]: any = await db.query(
+      `SELECT
+         COUNT(*) AS unread_message_count,
+         COUNT(DISTINCT tm.ticket_id) AS tickets_with_unread
+       FROM \`ticket_message\` tm
+       INNER JOIN \`ticket\` t ON t.id = tm.ticket_id AND t.user_id = ?
+       WHERE tm.sender_type = 'admin'
+         AND tm.is_read_by_user = 0`,
+      [userId]
+    );
+    const row = rows?.[0];
+    return {
+      unread_message_count: Number(row?.unread_message_count ?? 0),
+      tickets_with_unread: Number(row?.tickets_with_unread ?? 0),
+    };
+  } catch (error: unknown) {
+    logServiceError("tickit.service", "getOwnerTicketUnreadSummary", error);
+    throw error;
+  }
+};
+
+export const getStaffTicketUnreadSummary = async (): Promise<StaffTicketUnreadSummary> => {
+  try {
+    const [rows]: any = await db.query(
+      `SELECT
+         COUNT(*) AS unread_message_count,
+         COUNT(DISTINCT tm.ticket_id) AS tickets_with_unread
+       FROM \`ticket_message\` tm
+       WHERE tm.sender_type = 'user'
+         AND tm.is_read_by_admin = 0`
+    );
+    const row = rows?.[0];
+    return {
+      unread_message_count: Number(row?.unread_message_count ?? 0),
+      tickets_with_unread: Number(row?.tickets_with_unread ?? 0),
+    };
+  } catch (error: unknown) {
+    logServiceError("tickit.service", "getStaffTicketUnreadSummary", error);
+    throw error;
+  }
+};
+
 export const updateTicketStatusByOwner = async (
   ticketId: number,
   userId: number,

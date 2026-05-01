@@ -2,15 +2,11 @@ import type { TicketItem, TicketStatus } from '../types/ticket.types';
 
 export const STATUS_OPTIONS: TicketStatus[] = [
   'open',
-  'in_progress',
-  'resolved',
   'closed',
 ];
 
 export const statusBadgeClass = (status: TicketStatus): string => {
   if (status === 'open') return 'bg-primary';
-  if (status === 'in_progress') return 'bg-warning text-dark';
-  if (status === 'resolved') return 'bg-success';
   return 'bg-secondary';
 };
 

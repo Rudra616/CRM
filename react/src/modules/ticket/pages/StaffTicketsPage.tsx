@@ -13,10 +13,14 @@ import { formatTicketOwner, STATUS_OPTIONS, statusBadgeClass } from '../utils/ti
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
+import { useTicketUnread } from '../../../context/TicketUnreadContext';
+import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
-const PAGE_SIZE_OPTIONS = [10, 15, 25, 50];
+const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
 const StaffTicketsPage = () => {
+  const { refreshTicketUnread } = useTicketUnread();
   const { user } = useAuth();
   const { getModulePerm } = usePermissions();
   const ticketPerm = getModulePerm(PERMISSION_MODULE_KEYS.TICKET);
@@ -50,9 +54,10 @@ const StaffTicketsPage = () => {
   const [messageLoading, setMessageLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const loadTickets = async () => {
+  const loadTickets = async (options?: { silent?: boolean }) => {
     if (!canView) return;
-    setLoading(true);
+    const silent = options?.silent ?? false;
+    if (!silent) setLoading(true);
     try {
       const res = await getAllTicketsApi({
         page: currentPage,
@@ -67,9 +72,11 @@ const StaffTicketsPage = () => {
         setLimitOptions(res.data.pagination.limitOptions);
       }
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || 'Failed to load tickets');
+      if (!silent) {
+        showError((err as { message?: string })?.message || 'Failed to load tickets');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -104,6 +111,7 @@ const StaffTicketsPage = () => {
     try {
       const res = await getTicketMessagesApi(ticket.id);
       setMessages(res.data?.messages ?? []);
+      setActiveTicket(res.data?.ticket ?? ticket);
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load ticket messages');
     } finally {
@@ -117,10 +125,23 @@ const StaffTicketsPage = () => {
       showError('You do not have permission to send messages');
       return;
     }
+    if (activeTicket.status === 'closed') {
+      showError('Cannot send message: ticket is closed');
+      return;
+    }
     try {
       await addTicketMessageApi(activeTicket.id, message, image);
       const res = await getTicketMessagesApi(activeTicket.id);
       setMessages(res.data?.messages ?? []);
+      if (res.data?.ticket) {
+        setActiveTicket((t) => (t ? { ...t, ...res.data!.ticket } : t));
+      }
+      setTickets((prev) =>
+        prev.map((row) =>
+          row.id === activeTicket.id ? { ...row, unread_from_user_count: 0 } : row
+        )
+      );
+      await refreshTicketUnread();
       showSuccess('Reply sent');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to send reply');
@@ -138,55 +159,28 @@ const StaffTicketsPage = () => {
   return (
     <PageShell title="Manage Tickets" subtitle="Review, update status, and reply to ticket messages">
       <div className="p-3 p-md-4">
-        {/* Shared list toolbar pattern: left = rows + total, right = compact search. */}
-        <div className="d-flex flex-column flex-lg-row gap-2 gap-lg-3 align-items-lg-end justify-content-between mb-3">
-          <div className="d-flex flex-wrap gap-2 align-items-end">
-            <div>
-              <label className="form-label small text-muted mb-1">Rows per page</label>
-              <select
-                className="form-select form-select-sm"
-                value={rowsPerPage}
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-              >
-                {limitOptions.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="text-muted small">
-              Total: <strong>{total}</strong>
-            </div>
-          </div>
-          <div className="d-flex gap-2" style={{ width: 'min(320px, 100%)' }}>
-            <input
-              className="form-control form-control-sm"
-              placeholder="Search subject, status, name, @username…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setCurrentPage(1);
-                  setAppliedSearchTerm(searchTerm.trim());
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={() => {
-                setCurrentPage(1);
-                setAppliedSearchTerm(searchTerm.trim());
-              }}
-            >
-              Search
-            </button>
-          </div>
-        </div>
+        <ListTableToolbar
+          rowsPerPage={rowsPerPage}
+          pageSizeOptions={limitOptions}
+          totalRows={total}
+          searchTerm={searchTerm}
+          searchPlaceholder="Search subject, status, name, @username…"
+          searchId="staff-ticket-search"
+          onRowsPerPageChange={(next) => {
+            setRowsPerPage(next);
+            setCurrentPage(1);
+          }}
+          onSearchTermChange={setSearchTerm}
+          onApplySearch={() => {
+            setCurrentPage(1);
+            setAppliedSearchTerm(searchTerm.trim());
+          }}
+          onClearSearch={() => {
+            setSearchTerm('');
+            setCurrentPage(1);
+            setAppliedSearchTerm('');
+          }}
+        />
 
         <div className="table-responsive">
           <table className="table table-bordered table-striped align-middle mb-0">
@@ -222,7 +216,16 @@ const StaffTicketsPage = () => {
                       <div className="small fw-semibold">{formatTicketOwner(ticket)}</div>
                     </td>
                     <td>
-                      <div className="fw-semibold small">{ticket.subject}</div>
+                      <div className="fw-semibold small d-flex align-items-center gap-2 flex-wrap">
+                        <span>{ticket.subject}</span>
+                        {/* {Number(ticket.unread_from_user_count ?? 0) > 0 ? (
+                          <span className="badge rounded-pill bg-danger" title="Unread user messages">
+                            {Number(ticket.unread_from_user_count) > 99
+                              ? '99+'
+                              : ticket.unread_from_user_count}
+                          </span>
+                        ) : null} */}
+                      </div>
                       <div className="text-muted small">{ticket.description}</div>
                     </td>
                     <td style={{ minWidth: 170 }}>
@@ -259,11 +262,21 @@ const StaffTicketsPage = () => {
                       <td>
                         <button
                           type="button"
-                          className="btn btn-sm rounded-pill px-3 btn-outline-primary"
+                          className="btn btn-sm rounded-pill px-3 btn-outline-primary position-relative"
                           disabled={!canMessageView}
                           onClick={() => void openMessages(ticket)}
                         >
                           Open chat
+                          {Number(ticket.unread_from_user_count ?? 0) > 0 ? (
+                            <span
+                              className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              {Number(ticket.unread_from_user_count) > 99
+                                ? '99+'
+                                : ticket.unread_from_user_count}
+                            </span>
+                          ) : null}
                         </button>
                       </td>
                     )}
@@ -306,7 +319,7 @@ const StaffTicketsPage = () => {
         ticket={activeTicket}
         messages={messages}
         loading={messageLoading}
-        canReply={canMessageSend}
+        canReply={canMessageSend && activeTicket?.status !== 'closed'}
         viewerIsStaff
         onClose={() => setModalOpen(false)}
         onSend={sendMessage}

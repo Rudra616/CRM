@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
+import { TicketUnreadProvider } from '../../context/TicketUnreadContext';
 import { sessionGate } from '../utils/sessionGate';
 
 const SIDEBAR_WIDTH = 280;
@@ -18,20 +19,22 @@ const DashboardLayout = ({ children }: Props) => {
   const content = children ?? <Outlet />;
 
   return (
-    <div style={{ display: 'flex', marginTop: 56 }}>
-      <Sidebar gate={gate} />
+    <TicketUnreadProvider gate={gate}>
+      <div style={{ display: 'flex', marginTop: 56 }}>
+        <Sidebar gate={gate} />
 
-      <div
-        style={{
-          flex: 1,
-          padding: '20px',
-          marginLeft: isMobile ? 0 : collapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH,
-          width: '100%',
-        }}
-      >
-        {content}
+        <div
+          style={{
+            flex: 1,
+            padding: '20px',
+            marginLeft: isMobile ? 0 : collapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH,
+            width: '100%',
+          }}
+        >
+          {content}
+        </div>
       </div>
-    </div>
+    </TicketUnreadProvider>
   );
 };
 

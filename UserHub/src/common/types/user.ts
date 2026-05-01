@@ -99,7 +99,7 @@ export interface Ticket {
   subject: string;
   description: string;
   image_url?: string | null;
-  status: "open" | "in_progress" | "resolved" | "closed";
+  status: "open" | "closed";
   created_at?: Date;
   updated_at?: Date;
 }

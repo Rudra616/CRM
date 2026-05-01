@@ -92,6 +92,15 @@ export const insertUser = async (
   status: "pending" | "active" | "inactive" = "pending"
 ): Promise<number> => {
   try {
+    await db.query(
+      `UPDATE \`user\`
+       SET username = CONCAT(username, '_deleted_', id),
+           email = CONCAT(id, '_deleted_', email)
+       WHERE (username = ? OR email = ?)
+         AND COALESCE(is_delete, 0) = 1`,
+      [username, email]
+    );
+
     const [result]: any = await db.query(
       `INSERT INTO \`user\` (username, password, first_name, last_name, phone, email, gender, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

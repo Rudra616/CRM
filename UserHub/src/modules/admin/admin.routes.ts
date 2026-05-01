@@ -102,33 +102,42 @@ router.get(
 router.post(
   "/subadmins",
   authenticate,
-  // allowRoles(Role.ADMIN),
   validateSchema(createSubadminSchema),
+  checkPermission("subadmin", "can_add"),
   createSubadmin,
 );
-router.get("/subadmins", authenticate, 
-  // allowRoles(Role.ADMIN), 
-  getSubadmins);
-router.get("/subadmins/:id", authenticate,
-  //  allowRoles(Role.ADMIN), 
-   getSubadminById);
+router.get(
+  "/subadmins",
+  authenticate,
+  checkPermission("subadmin", "can_view"),
+  getSubadmins
+);
+router.get(
+  "/subadmins/:id",
+  authenticate,
+  checkPermission("subadmin", "can_view"),
+  getSubadminById
+);
 router.put(
   "/subadmins/:id",
   authenticate,
-  // allowRoles(Role.ADMIN),
   validateSchema(updateSubadminSchema),
+  checkPermission("subadmin", "can_edit"),
   updateSubadmin,
 );
 router.post(
   "/subadmins/:id/change-password",
   authenticate,
-  // allowRoles(Role.ADMIN),
   validateSchema(changePasswordSchema),
+  checkPermission("subadmin", "can_edit"),
   changeSubadminPasswordByAdmin,
 );
-router.delete("/subadmins/:id", authenticate, 
-  // allowRoles(Role.ADMIN),
- deleteSubadmin);
+router.delete(
+  "/subadmins/:id",
+  authenticate,
+  checkPermission("subadmin", "can_delete"),
+  deleteSubadmin
+);
 
 // RBAC: modules, roles, role permissions (admin + subadmin with per-module permissions)
 router.get(

@@ -105,12 +105,12 @@ const AdminDashboard = () => {
           onClick={() => navigateToUsers('inactive')}
         />
 
-        <DashboardStatCard
+        {/* <DashboardStatCard
           title="Deleted Users"
           value={deletedUsers}
           hint="Soft deleted users"
           onClick={() => navigateToUsers('deleted')}
-        />
+        /> */}
 
         <DashboardStatCard
           title="Role Permissions"

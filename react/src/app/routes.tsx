@@ -61,6 +61,8 @@ export const AppRoutes = () => (
       <Route path="/subadmin/rbac/modules" element={<ProtectedRoute gates={['delegate']}><ManageModulesPage /></ProtectedRoute>} />
       <Route path="/subadmin/rbac/roles" element={<ProtectedRoute gates={['delegate']}><ManageRolesPage /></ProtectedRoute>} />
       <Route path="/subadmin/rbac/permissions" element={<ProtectedRoute gates={['delegate']}><ManagePermissions /></ProtectedRoute>} />
+      <Route path="/subadmin/subadmins" element={<ProtectedRoute gates={['delegate']}><ManageSubadmins /></ProtectedRoute>} />
+      <Route path="/subadmin/create-subadmin" element={<ProtectedRoute gates={['delegate']}><Register /></ProtectedRoute>} />
 
       {/* User routes */}
       <Route path="/user/dashboard" element={<ProtectedRoute gates={['member']}><UserDashboard /></ProtectedRoute>} />

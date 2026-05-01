@@ -12,11 +12,12 @@ import { colors } from '../../../theme/colors';
 import { showError, showSuccess } from '../../../shared/utils/toast';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
-import { FaSearch, FaTimes } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
+import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
-const DEFAULT_PAGE_SIZES = [5, 10, 25, 50, 100];
+const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
 
 const fmtWhen = (v?: string) => {
   if (!v) return '—';
@@ -82,7 +83,7 @@ const ManageModulesPage = () => {
 
   const applySearch = () => {
     setCurrentPage(1);
-    setAppliedSearchTerm(searchTerm);
+    setAppliedSearchTerm(searchTerm.trim());
   };
 
   const clearSearch = () => {
@@ -198,75 +199,21 @@ const ManageModulesPage = () => {
             </form>
           )}
 
-          <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
-            <div className="d-flex flex-wrap align-items-end gap-2">
-              <div className="flex-shrink-0">
-                <label htmlFor="module-rows-limit" className="form-label small text-muted mb-1">
-                  Rows per page
-                </label>
-                <select
-                  id="module-rows-limit"
-                  className="form-select form-select-sm"
-                  style={{ minWidth: 88 }}
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  {pageSizeOptions.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="text-muted small ms-lg-1">
-                Total <span className="fw-semibold text-dark">{totalRows}</span>
-              </div>
-            </div>
-
-              <div style={{ width: 'min(340px, 100%)' }}>
-                <label htmlFor="module-search" className="form-label small text-muted mb-1">
-                  Search
-                </label>
-                <div className="input-group input-group-sm">
-                  <span className="input-group-text bg-white border-end-0 py-1" id="module-search-addon">
-                    <FaSearch className="text-secondary" size={14} aria-hidden />
-                  </span>
-                  <input
-                    id="module-search"
-                    type="search"
-                    className="form-control border-start-0"
-                    placeholder="Module name…"
-                    aria-describedby="module-search-addon"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') applySearch();
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-primary px-2"
-                    title="Search"
-                    aria-label="Search"
-                    onClick={() => applySearch()}
-                  >
-                    <FaSearch size={14} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary px-2"
-                    title="Clear search"
-                    aria-label="Clear search"
-                    onClick={() => clearSearch()}
-                  >
-                    <FaTimes size={14} aria-hidden />
-                  </button>
-                </div>
-              </div>
-          </div>
+          <ListTableToolbar
+            rowsPerPage={rowsPerPage}
+            pageSizeOptions={pageSizeOptions}
+            totalRows={totalRows}
+            searchTerm={searchTerm}
+            searchPlaceholder="Module name..."
+            searchId="module-search"
+            onRowsPerPageChange={(next) => {
+              setRowsPerPage(next);
+              setCurrentPage(1);
+            }}
+            onSearchTermChange={setSearchTerm}
+            onApplySearch={applySearch}
+            onClearSearch={clearSearch}
+          />
 
           <div className="table-responsive">
             <table className="table table-bordered table-striped align-middle mb-0">

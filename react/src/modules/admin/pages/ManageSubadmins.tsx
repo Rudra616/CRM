@@ -13,7 +13,10 @@ import type { User } from '../../../shared/types/common.types';
 import type { UsersPageData } from '../api/admin.api';
 import { PageShell } from '../../../shared/components/PageShell';
 import { colors } from '../../../theme/colors';
-import { FaSearch, FaTimes } from 'react-icons/fa';
+import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import { usePermissions } from '../../../context/PermissionContext';
+import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 
 type SubadminRow = User & {
   first_name?: string;
@@ -39,9 +42,15 @@ const mergeSubadminFromApi = (prev: User, raw: SubadminRow): User => ({
   role_name: raw.role_name ?? prev.role_name,
 });
 
-const DEFAULT_PAGE_SIZES = [5, 10, 25, 50, 100];
+const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
 
 const ManageSubadmins = () => {
+  const { getModulePerm, permLoading } = usePermissions();
+  const subPerm = getModulePerm(PERMISSION_MODULE_KEYS.SUBADMIN);
+  const canViewPage = subPerm.can_view;
+  const canEdit = subPerm.can_edit;
+  const canDelete = subPerm.can_delete;
+
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +85,13 @@ const ManageSubadmins = () => {
   }, [currentPage, rowsPerPage, appliedSearchTerm]);
 
   useEffect(() => {
+    if (permLoading) return;
+    if (!canViewPage) {
+      setLoading(false);
+      return;
+    }
     void fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers, permLoading, canViewPage]);
 
   const applySearch = () => {
     setCurrentPage(1);
@@ -91,13 +105,15 @@ const ManageSubadmins = () => {
   };
 
   useEffect(() => {
+    if (permLoading || !canEdit) return;
     void getRolesApi()
       .then((res) => setRoles(res.data ?? []))
       .catch(() => setRoles([]));
-  }, []);
+  }, [permLoading, canEdit]);
 
   const handleSave = async (data: EditUserProfilePayload) => {
     if (!editUser) return;
+    if (!canEdit) return;
     try {
       const res = await updateSubadminApi(editUser.id, {
         username: data.username,
@@ -124,11 +140,13 @@ const ManageSubadmins = () => {
 
   const handleChangePassword = async (body: { newPassword: string; confirmPassword: string }) => {
     if (!editUser) return;
+    if (!canEdit) return;
     await changeSubadminPasswordApi(editUser.id, body);
     showSuccess('Subadmin password updated');
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDelete) return;
     if (!confirm('Delete this subadmin?')) return;
     try {
       await deleteSubadminApi(id);
@@ -150,85 +168,39 @@ const ManageSubadmins = () => {
 
   const theadStyle = { backgroundColor: colors.cardPrimaryBg };
 
+  if (!permLoading && !canViewPage) {
+    return (
+      <PageShell title="Manage Subadmins" subtitle="Subadmin accounts">
+        <div className="p-3 p-md-4 text-muted">You do not have permission to view subadmins.</div>
+      </PageShell>
+    );
+  }
+
   return (
     <>
       <PageShell
         title="Manage Subadmins"
         subtitle="Edit or remove subadmin accounts"
-        loading={loading}
-        loadingMessage="Loading subadmins…"
+        loading={permLoading || loading}
+        loadingMessage={permLoading ? 'Loading…' : 'Loading subadmins…'}
         flush
       >
         <div className="p-3 p-md-4">
-          <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
-            <div className="d-flex flex-wrap align-items-end gap-2">
-              <div className="flex-shrink-0">
-                <label htmlFor="subadmin-rows-limit" className="form-label small text-muted mb-1">
-                  Rows per page
-                </label>
-                <select
-                  id="subadmin-rows-limit"
-                  className="form-select form-select-sm"
-                  style={{ minWidth: 88 }}
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  {pageSizeOptions.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="text-muted small ms-lg-1">
-                Total <span className="fw-semibold text-dark">{totalRows}</span>
-              </div>
-            </div>
-
-              <div style={{ width: 'min(340px, 100%)' }}>
-                <label htmlFor="subadmin-search" className="form-label small text-muted mb-1">
-                  Search
-                </label>
-                <div className="input-group input-group-sm">
-                  <span className="input-group-text bg-white border-end-0 py-1" id="subadmin-search-addon">
-                    <FaSearch className="text-secondary" size={14} aria-hidden />
-                  </span>
-                  <input
-                    id="subadmin-search"
-                    type="search"
-                    className="form-control border-start-0"
-                    placeholder="Name, username, email, phone, gender…"
-                    aria-describedby="subadmin-search-addon"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') applySearch();
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-primary px-2"
-                    title="Search"
-                    aria-label="Search"
-                    onClick={() => applySearch()}
-                  >
-                    <FaSearch size={14} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary px-2"
-                    title="Clear search"
-                    aria-label="Clear search"
-                    onClick={() => clearSearch()}
-                  >
-                    <FaTimes size={14} aria-hidden />
-                  </button>
-                </div>
-              </div>
-          </div>
+          <ListTableToolbar
+            rowsPerPage={rowsPerPage}
+            pageSizeOptions={pageSizeOptions}
+            totalRows={totalRows}
+            searchTerm={searchTerm}
+            searchPlaceholder="Name, username, email, phone, gender..."
+            searchId="subadmin-search"
+            onRowsPerPageChange={(next) => {
+              setRowsPerPage(next);
+              setCurrentPage(1);
+            }}
+            onSearchTermChange={setSearchTerm}
+            onApplySearch={applySearch}
+            onClearSearch={clearSearch}
+          />
           <div className="table-responsive">
             <table className="table table-bordered table-striped align-middle mb-0">
               <thead style={theadStyle}>
@@ -255,16 +227,21 @@ const ManageSubadmins = () => {
                     </td>
                     <td>
                       <div className="d-flex flex-wrap gap-1">
-                        <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditUser(user)}>
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleDelete(String(user.id))}
-                        >
-                          Delete
-                        </button>
+                        {canEdit && (
+                          <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditUser(user)}>
+                            Edit
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDelete(String(user.id))}
+                          >
+                            Delete
+                          </button>
+                        )}
+                        {!canEdit && !canDelete && <span className="text-muted small">—</span>}
                       </div>
                     </td>
                   </tr>
@@ -319,7 +296,7 @@ const ManageSubadmins = () => {
         </div>
       </PageShell>
 
-      {editUser && (
+      {editUser && canEdit && (
         <EditUserModal
           user={editUser}
           title="Edit Subadmin"

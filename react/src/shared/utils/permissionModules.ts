@@ -3,6 +3,8 @@ export const PERMISSION_MODULE_KEYS = {
   TICKET: 'ticket',
   MESSAGE: 'message',
   MODULE: 'module',
+  /** Subadmin accounts CRUD — must match `module.name` in DB (e.g. seed `subadmin`). */
+  SUBADMIN: 'subadmin',
 } as const;
 
 export type PermissionModuleKey =

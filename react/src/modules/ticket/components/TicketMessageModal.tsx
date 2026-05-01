@@ -27,7 +27,7 @@ export const TicketMessageModal = ({
 }: Props) => {
   const title = useMemo(() => {
     if (!ticket) return 'Ticket conversation';
-    return `#${ticket.id} · ${ticket.subject}`;
+    return `${ticket.subject}`;
   }, [ticket]);
 
   useEffect(() => {
@@ -92,9 +92,9 @@ export const TicketMessageModal = ({
                 style={{ borderColor: '#e2e8f0' }}
               >
                 <div className="small fw-semibold text-secondary text-uppercase" style={{ fontSize: 10 }}>
-                  Original request
+                  Description
                 </div>
-                <div className="fw-semibold small mt-1">{ticket.subject}</div>
+                {/* <div className="fw-semibold small mt-1">{ticket.subject}</div> */}
                 <div className="small text-muted mt-1" style={{ whiteSpace: 'pre-wrap' }}>
                   {ticket.description}
                 </div>

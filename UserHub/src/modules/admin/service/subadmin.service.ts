@@ -8,10 +8,11 @@ import { normalizeListPageLimit } from "./user.service";
 export const findAdminById = async (id: number): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, image_url,
-              status, role_id
-       FROM \`admin\`
-       WHERE id = ? AND COALESCE(is_delete, 0) = 0`,
+      `SELECT a.id, a.username, a.first_name, a.last_name, a.phone, a.email, a.gender, a.image_url,
+              a.status, a.role_id, r.name AS role_name
+       FROM \`admin\` a
+       LEFT JOIN \`role\` r ON r.id = a.role_id
+       WHERE a.id = ? AND COALESCE(a.is_delete, 0) = 0`,
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -70,7 +71,8 @@ export const getAllAdmins = async (): Promise<Admin[]> => {
   }
 };
 
-const subadminListFrom = `FROM \`admin\` a`;
+const subadminListFrom = `FROM \`admin\` a
+LEFT JOIN \`role\` r ON r.id = a.role_id`;
 export const getSubadminsPaginated = async (
   page: number,
   limit: number,
@@ -94,7 +96,7 @@ export const getSubadminsPaginated = async (
 
     const [rows]: any = await db.query(
       `SELECT a.id, a.username, a.first_name, a.last_name, a.phone, a.email, a.gender, a.image_url,
-              a.status, a.role_id
+              a.status, a.role_id, r.name AS role_name
        ${subadminListFrom}
        ${where}
        ORDER BY a.id DESC
@@ -131,6 +133,15 @@ export const insertSubadmin = async (data: {
   role_id: number;
 }): Promise<number> => {
   try {
+    await db.query(
+      `UPDATE \`admin\`
+       SET username = CONCAT(username, '_deleted_', id),
+           email = CONCAT(id, '_deleted_', email)
+       WHERE (username = ? OR email = ?)
+         AND COALESCE(is_delete, 0) = 1`,
+      [data.username, data.email]
+    );
+
     const [result]: any = await db.query(
       `INSERT INTO \`admin\`
        (username, password, first_name, last_name, phone, email, gender, role_id, status)

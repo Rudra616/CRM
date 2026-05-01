@@ -12,12 +12,16 @@ import {
 import type { TicketItem, TicketMessageItem, TicketStatus } from '../types/ticket.types';
 import { STATUS_OPTIONS } from '../utils/ticketDisplay';
 import { TicketMessageModal } from '../components/TicketMessageModal';
+import { useTicketUnread } from '../../../context/TicketUnreadContext';
+import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
 const editableStatus = (status: TicketItem['status']) =>
-  status === 'open' || status === 'in_progress';
-const PAGE_SIZE_OPTIONS = [10, 15, 25, 50];
+  status === 'open';
+const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
 const UserMyTicketsPage = () => {
+  const { refreshTicketUnread } = useTicketUnread();
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,8 +45,9 @@ const UserMyTicketsPage = () => {
   const [savingEdit, setSavingEdit] = useState(false);
   const [statusBusyId, setStatusBusyId] = useState<number | null>(null);
 
-  const loadTickets = async () => {
-    setLoading(true);
+  const loadTickets = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) setLoading(true);
     try {
       const res = await getMyTicketsApi({
         page: currentPage,
@@ -56,10 +61,13 @@ const UserMyTicketsPage = () => {
       if (res.data?.pagination?.limitOptions?.length) {
         setLimitOptions(res.data.pagination.limitOptions);
       }
+      void refreshTicketUnread();
     } catch (err: unknown) {
-      showError((err as { message?: string })?.message || 'Failed to load tickets');
+      if (!silent) {
+        showError((err as { message?: string })?.message || 'Failed to load tickets');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -77,6 +85,7 @@ const UserMyTicketsPage = () => {
     try {
       const res = await getTicketMessagesApi(ticket.id);
       setMessages(res.data?.messages ?? []);
+      setActiveTicket(res.data?.ticket ?? ticket);
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to load ticket messages');
     } finally {
@@ -86,10 +95,20 @@ const UserMyTicketsPage = () => {
 
   const sendMessage = async (message: string, image?: File | null) => {
     if (!activeTicket) return;
+    if (activeTicket.status === 'closed') {
+      showError('Cannot send message: ticket is closed');
+      return;
+    }
     try {
       await addTicketMessageApi(activeTicket.id, message, image);
       const res = await getTicketMessagesApi(activeTicket.id);
       setMessages(res.data?.messages ?? []);
+      setTickets((prev) =>
+        prev.map((row) =>
+          row.id === activeTicket.id ? { ...row, unread_from_admin_count: 0 } : row
+        )
+      );
+      await refreshTicketUnread();
       showSuccess('Message sent');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to send message');
@@ -164,55 +183,28 @@ const UserMyTicketsPage = () => {
           </Link>
         </div>
 
-        {/* Shared list toolbar pattern: left = rows + total, right = compact search. */}
-        <div className="d-flex flex-column flex-lg-row gap-2 gap-lg-3 align-items-lg-end justify-content-between">
-          <div className="d-flex flex-wrap gap-2 align-items-end">
-            <div>
-              <label className="form-label small text-muted mb-1">Rows per page</label>
-              <select
-                className="form-select form-select-sm"
-                value={rowsPerPage}
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-              >
-                {limitOptions.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="text-muted small">
-              Total: <strong>{total}</strong>
-            </div>
-          </div>
-          <div className="d-flex gap-2" style={{ width: 'min(320px, 100%)' }}>
-            <input
-              className="form-control form-control-sm"
-              placeholder="Search tickets..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setCurrentPage(1);
-                  setAppliedSearchTerm(searchTerm.trim());
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={() => {
-                setCurrentPage(1);
-                setAppliedSearchTerm(searchTerm.trim());
-              }}
-            >
-              Search
-            </button>
-          </div>
-        </div>
+        <ListTableToolbar
+          rowsPerPage={rowsPerPage}
+          pageSizeOptions={limitOptions}
+          totalRows={total}
+          searchTerm={searchTerm}
+          searchPlaceholder="Search tickets..."
+          searchId="my-ticket-search"
+          onRowsPerPageChange={(next) => {
+            setRowsPerPage(next);
+            setCurrentPage(1);
+          }}
+          onSearchTermChange={setSearchTerm}
+          onApplySearch={() => {
+            setCurrentPage(1);
+            setAppliedSearchTerm(searchTerm.trim());
+          }}
+          onClearSearch={() => {
+            setSearchTerm('');
+            setCurrentPage(1);
+            setAppliedSearchTerm('');
+          }}
+        />
 
         <div className="table-responsive">
           <table className="table table-bordered table-striped align-middle mb-0">
@@ -245,7 +237,19 @@ const UserMyTicketsPage = () => {
                   <tr key={ticket.id}>
                     <td>{(currentPage - 1) * rowsPerPage + idx + 1}</td>
                     <td>
-                      <div className="fw-semibold small">{ticket.subject}</div>
+                      <div className="fw-semibold small d-flex align-items-center gap-2 flex-wrap">
+                        <span>{ticket.subject}</span>
+                        {Number(ticket.unread_from_admin_count ?? 0) > 0 ? (
+                          <span
+                            className="badge rounded-pill bg-danger"
+                            title="Unread messages from support"
+                          >
+                            {Number(ticket.unread_from_admin_count) > 99
+                              ? '99+'
+                              : ticket.unread_from_admin_count}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-muted small">{ticket.description}</div>
                     </td>
                     <td style={{ minWidth: 170 }}>
@@ -283,10 +287,20 @@ const UserMyTicketsPage = () => {
                       <div className="d-flex flex-wrap gap-1">
                         <button
                           type="button"
-                          className="btn btn-sm rounded-pill px-3 btn-outline-primary"
+                          className="btn btn-sm rounded-pill px-3 btn-outline-primary position-relative"
                           onClick={() => void openMessages(ticket)}
                         >
                           Open chat
+                          {Number(ticket.unread_from_admin_count ?? 0) > 0 ? (
+                            <span
+                              className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              {Number(ticket.unread_from_admin_count) > 99
+                                ? '99+'
+                                : ticket.unread_from_admin_count}
+                            </span>
+                          ) : null}
                         </button>
                         <button
                           type="button"
@@ -295,7 +309,7 @@ const UserMyTicketsPage = () => {
                           title={
                             editableStatus(ticket.status)
                               ? 'Edit subject and description'
-                              : 'Closed or resolved tickets cannot be edited'
+                              : 'Closed tickets cannot be edited'
                           }
                           onClick={() => openEdit(ticket)}
                         >
@@ -342,7 +356,7 @@ const UserMyTicketsPage = () => {
         ticket={activeTicket}
         messages={messages}
         loading={messageLoading}
-        canReply
+        canReply={activeTicket?.status !== 'closed'}
         viewerIsStaff={false}
         onClose={() => setModalOpen(false)}
         onSend={sendMessage}

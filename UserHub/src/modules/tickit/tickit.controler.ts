@@ -4,13 +4,16 @@ import {
   getTicketsByUserIdPaged,
   insertTicket,
   getAllTicketsPaged,
-  
   updateTicketByOwner,
   insertTicketMessage,
   getTicketById,
   getTicketMessagesByTicketId,
+  getOwnerTicketUnreadSummary,
+  markAdminMessagesReadByOwner,
+  markUserMessagesReadByStaff,
+  getStaffTicketUnreadSummary,
   updateTicketStatusByOwner,
-  updateTicketStatusByAdmin
+  updateTicketStatusByAdmin,
 } from "./tickit.service";
 import { AuthRequest } from "../../common/types/AuthRequest";
 import { StaffAuthLevel } from "../../common/types/role";
@@ -18,13 +21,13 @@ import { buildImageUrl, deleteFileIfExists } from "../../common/helpers/common.h
 import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
 import { TicketStatus } from "./tickit.types";
+import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../admin/service/user.service";
 
-const TICKET_LIMIT_OPTIONS = [10, 15, 25, 50];
 const parseTicketListQuery = (q: Record<string, unknown>) => {
   const pageRaw = Number(q.page ?? 1);
-  const reqLimit = Number(q.limit ?? 10);
+  const reqLimit = Number(q.limit ?? USERS_PAGE_SIZE_OPTIONS[0]);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
-  const limit = TICKET_LIMIT_OPTIONS.includes(reqLimit) ? reqLimit : 10;
+  const limit = normalizeListPageLimit(reqLimit);
   const search = String(q.search ?? "").trim();
   return { page, limit, search };
 };
@@ -56,6 +59,39 @@ export const createTicket: RequestHandler = async (req: AuthRequest, res: Respon
   }
 };
 
+/** Plain user: totals for sidebar badge (unread admin messages across own tickets). */
+export const getMyTicketUnreadSummaryHandler: RequestHandler = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return errorResponse(res, "Unauthorized", 401);
+
+    const summary = await getOwnerTicketUnreadSummary(userId);
+    return successResponse(res, "Unread summary retrieved successfully", summary);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+/** Staff: totals for sidebar badge (unread user messages across all tickets). */
+export const getStaffTicketUnreadSummaryHandler: RequestHandler = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const userRole = req.user?.role;
+    const isStaff = userRole === StaffAuthLevel.OWNER || userRole === StaffAuthLevel.DELEGATE;
+    if (!isStaff) return errorResponse(res, "Forbidden", 403);
+
+    const summary = await getStaffTicketUnreadSummary();
+    return successResponse(res, "Unread summary retrieved successfully", summary);
+  } catch (err: any) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
 export const getUserTickets: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -79,7 +115,7 @@ export const getUserTickets: RequestHandler = async (req: AuthRequest, res: Resp
         limit,
         total: result.total,
         totalPages,
-        limitOptions: TICKET_LIMIT_OPTIONS,
+        limitOptions: [...USERS_PAGE_SIZE_OPTIONS],
       },
     });
   } catch (err: any) {
@@ -104,7 +140,7 @@ export const getAllTicketsByAdmin: RequestHandler = async (req: AuthRequest, res
         limit,
         total: result.total,
         totalPages,
-        limitOptions: TICKET_LIMIT_OPTIONS,
+        limitOptions: [...USERS_PAGE_SIZE_OPTIONS],
       },
     });
   } catch (err: any) {
@@ -112,7 +148,7 @@ export const getAllTicketsByAdmin: RequestHandler = async (req: AuthRequest, res
   }
 };
 
-/** Plain user only: edit own ticket subject/description (and optional new image) while open/in_progress */
+/** Plain user only: edit own ticket subject/description (and optional new image) while open. */
 export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -133,8 +169,8 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
     const ticket = await getTicketById(ticketId);
     if (!ticket) return errorResponse(res, "Ticket not found", 404);
     if (ticket.user_id !== userId) return errorResponse(res, "Forbidden", 403);
-    if (ticket.status === "resolved" || ticket.status === "closed") {
-      return errorResponse(res, "Cannot edit a resolved or closed ticket", 400);
+    if (ticket.status === "closed") {
+      return errorResponse(res, "Cannot edit a closed ticket", 400);
     }
 
     let imageUrl: string | null | undefined = undefined;
@@ -224,6 +260,9 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
     if (!ticket) {
       return errorResponse(res, "Ticket not found", 404);
     }
+    if (ticket.status === "closed") {
+      return errorResponse(res, "Cannot send message on closed ticket", 400);
+    }
 
     const isOwner = ticket.user_id === senderId;
     const isStaff = userRole === StaffAuthLevel.OWNER || userRole === StaffAuthLevel.DELEGATE;
@@ -250,6 +289,12 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
       message: text,
       image: imagePath,
     });
+    if (isOwner) {
+      await markAdminMessagesReadByOwner(Number(ticket_id), senderId);
+    }
+    if (isStaff) {
+      await markUserMessagesReadByStaff(Number(ticket_id));
+    }
 
     return successResponse(res, "Message added to ticket successfully");
   } catch (err: any) {

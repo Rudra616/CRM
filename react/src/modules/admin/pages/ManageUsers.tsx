@@ -17,13 +17,15 @@ import { colors } from '../../../theme/colors';
 import { EditUserModal, type EditUserProfilePayload } from '../../../shared/components/EditUserModal';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
-import { FaEdit, FaSearch, FaSignOutAlt, FaTimes, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaSignOutAlt, FaTrash } from 'react-icons/fa';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
+import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
 type StatusFilter = 'all' | 'active' | 'pending' | 'inactive' | 'deleted';
 type AccountStatus = 'active' | 'pending' | 'inactive';
 
-const DEFAULT_PAGE_SIZES = [5, 10, 25, 50, 100];
+const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
 
 const isUserRemoved = (u: User): boolean =>
   Number((u as { is_delete?: number }).is_delete) === 1;
@@ -251,99 +253,46 @@ const ManageUsers = () => {
     >
       <div className="p-3 p-md-4">
 
-        {/* Toolbar: status + rows + search + total */}
-        <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
-          <div className="d-flex flex-wrap align-items-end gap-2">
-              {isOwner ? (
-                <div className="flex-shrink-0">
-                  <label htmlFor="user-status-filter" className="form-label small text-muted mb-1">
-                    Status
-                  </label>
-                  <select
-                    id="user-status-filter"
-                    className="form-select form-select-sm"
-                    style={{ minWidth: 152 }}
-                    value={statusFilter}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value as StatusFilter);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    {filterSelectOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
+        <ListTableToolbar
+          rowsPerPage={rowsPerPage}
+          pageSizeOptions={pageSizeOptions}
+          totalRows={pagination.total}
+          searchTerm={searchTerm}
+          searchPlaceholder="Name, username, email, gender..."
+          searchId="user-search"
+          onRowsPerPageChange={(next) => {
+            setRowsPerPage(next);
+            setCurrentPage(1);
+          }}
+          onSearchTermChange={setSearchTerm}
+          onApplySearch={applySearch}
+          onClearSearch={clearSearch}
+          leftExtra={
+            isOwner ? (
               <div className="flex-shrink-0">
-                <label htmlFor="user-rows-limit" className="form-label small text-muted mb-1">
-                  Rows per page
+                <label htmlFor="user-status-filter" className="form-label small text-muted mb-1">
+                  Status
                 </label>
                 <select
-                  id="user-rows-limit"
+                  id="user-status-filter"
                   className="form-select form-select-sm"
-                  style={{ minWidth: 88 }}
-                  value={rowsPerPage}
+                  style={{ minWidth: 152 }}
+                  value={statusFilter}
                   onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
+                    setStatusFilter(e.target.value as StatusFilter);
                     setCurrentPage(1);
                   }}
                 >
-                  {pageSizeOptions.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
+                  {filterSelectOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
               </div>
-              <div className="text-muted small ms-lg-1">
-                Total <span className="fw-semibold text-dark">{pagination.total}</span>
-              </div>
-          </div>
-
-            <div style={{ width: 'min(340px, 100%)' }}>
-              <label htmlFor="user-search" className="form-label small text-muted mb-1">
-                Search
-              </label>
-              <div className="input-group input-group-sm">
-                <span className="input-group-text bg-white border-end-0 py-1" id="user-search-addon">
-                  <FaSearch className="text-secondary" size={14} aria-hidden />
-                </span>
-                <input
-                  id="user-search"
-                  type="search"
-                  className="form-control border-start-0"
-                  placeholder="Name, username, email, gender…"
-                  aria-describedby="user-search-addon"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') applySearch();
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary px-2"
-                  title="Search"
-                  aria-label="Search"
-                  onClick={() => applySearch()}
-                >
-                  <FaSearch size={14} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary px-2"
-                  title="Clear search"
-                  aria-label="Clear search"
-                  onClick={() => clearSearch()}
-                >
-                  <FaTimes size={14} aria-hidden />
-                </button>
-              </div>
-            </div>
-        </div>
+            ) : null
+          }
+        />
 
         {/* ── Table ────────────────────────────────────────────────────────── */}
         <div className="table-responsive">
