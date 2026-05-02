@@ -55,7 +55,7 @@ export const getTicketsByUserIdPaged = async (
     const page = Math.max(1, q.page);
     const limit = Math.max(1, q.limit);
     const offset = (page - 1) * limit;
-    const search = q.search.trim();
+    const search = q.search;
     const like = `%${search}%`;
 
     const where = search
@@ -124,7 +124,7 @@ export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketList
     const page = Math.max(1, q.page);
     const limit = Math.max(1, q.limit);
     const offset = (page - 1) * limit;
-    const search = q.search.trim();
+    const search = q.search;
     const like = `%${search}%`;
 
     const from = `FROM \`ticket\` t

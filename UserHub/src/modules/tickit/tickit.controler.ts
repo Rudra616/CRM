@@ -16,7 +16,6 @@ import {
   updateTicketStatusByAdmin,
 } from "./tickit.service";
 import { AuthRequest } from "../../common/types/AuthRequest";
-import { StaffAuthLevel } from "../../common/types/role";
 import { buildImageUrl, deleteFileIfExists } from "../../common/helpers/common.helper";
 import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
@@ -28,7 +27,7 @@ const parseTicketListQuery = (q: Record<string, unknown>) => {
   const reqLimit = Number(q.limit ?? USERS_PAGE_SIZE_OPTIONS[0]);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
   const limit = normalizeListPageLimit(reqLimit);
-  const search = String(q.search ?? "").trim();
+  const search = String(q.search ?? "");
   return { page, limit, search };
 };
 
@@ -37,12 +36,12 @@ export const createTicket: RequestHandler = async (req: AuthRequest, res: Respon
     const { subject, description } = req.body as { subject: string; description: string };
     const userId = req.user?.id;
 
-    if (!userId) {
+    if (!userId || !req.user) {
       return errorResponse(res, "Unauthorized", 401);
     }
 
     const imageUrl = req.file
-      ? buildStoredImagePath(req.user?.role ?? 0, userId, req.file.filename)
+      ? buildStoredImagePath(req.user, userId, req.file.filename)
       : null;
 
     const ticketId = await insertTicket({
@@ -81,9 +80,7 @@ export const getStaffTicketUnreadSummaryHandler: RequestHandler = async (
   res: Response
 ) => {
   try {
-    const userRole = req.user?.role;
-    const isStaff = userRole === StaffAuthLevel.OWNER || userRole === StaffAuthLevel.DELEGATE;
-    if (!isStaff) return errorResponse(res, "Forbidden", 403);
+    if (!req.user?.is_staff) return errorResponse(res, "Forbidden", 403);
 
     const summary = await getStaffTicketUnreadSummary();
     return successResponse(res, "Unread summary retrieved successfully", summary);
@@ -154,8 +151,7 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
     const userId = req.user?.id;
     if (!userId) return errorResponse(res, "Unauthorized", 401);
 
-    // Only end-user sessions (role 0) use this endpoint; admins use staff tools.
-    if (req.user?.role !== 0) {
+    if (req.user?.is_staff) {
       return errorResponse(res, "Forbidden", 403);
     }
 
@@ -176,7 +172,7 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
     let imageUrl: string | null | undefined = undefined;
     if (req.file) {
       if (ticket.image_url) deleteFileIfExists(ticket.image_url);
-      imageUrl = buildStoredImagePath(req.user?.role ?? 0, userId, req.file.filename);
+      imageUrl = buildStoredImagePath(req.user!, userId, req.file.filename);
     }
 
     const updated = await updateTicketByOwner(ticketId, userId, {
@@ -196,7 +192,7 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
 export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const role = req.user?.role;
+    const isStaff = Boolean(req.user?.is_staff);
 
     if (!userId) return errorResponse(res, "Unauthorized", 401);
 
@@ -213,7 +209,7 @@ export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: 
     let updated = false;
 
     // 👤 USER
-    if (role === 0) {
+    if (!isStaff) {
       if (ticket.user_id !== userId) {
         return errorResponse(res, "Forbidden", 403);
       }
@@ -244,8 +240,6 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
   try {
     const { ticket_id, message } = req.body as { ticket_id: number; message: string };
     const senderId = req.user?.id;
-    const userRole = req.user?.role;
-
     if (!senderId) {
       return errorResponse(res, "Unauthorized", 401);
     }
@@ -265,9 +259,9 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
     }
 
     const isOwner = ticket.user_id === senderId;
-    const isStaff = userRole === StaffAuthLevel.OWNER || userRole === StaffAuthLevel.DELEGATE;
+    const isStaff = Boolean(req.user?.is_staff);
 
-    if (userRole === StaffAuthLevel.DELEGATE) {
+    if (isStaff && !req.user?.is_main_admin) {
       const roleId = req.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
@@ -280,7 +274,7 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
       return errorResponse(res, "Forbidden: You cannot access this ticket", 403);
     }
     const imagePath = file
-      ? buildStoredImagePath(req.user?.role ?? 0, senderId, file.filename)
+      ? buildStoredImagePath(req.user!, senderId, file.filename)
       : null;
     await insertTicketMessage({
       ticket_id,
@@ -306,7 +300,6 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
   try {
     const ticketId = Number(req.params.id);
     const requesterId = req.user?.id;
-    const requesterRole = req.user?.role;
 
     if (!requesterId) return errorResponse(res, "Unauthorized", 401);
     if (!ticketId || Number.isNaN(ticketId)) return errorResponse(res, "Invalid ticket ID", 400);
@@ -315,10 +308,9 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
     if (!ticket) return errorResponse(res, "Ticket not found", 404);
 
     const isOwner = ticket.user_id === requesterId;
-    const isStaff =
-      requesterRole === StaffAuthLevel.OWNER || requesterRole === StaffAuthLevel.DELEGATE;
+    const isStaff = Boolean(req.user?.is_staff);
 
-    if (requesterRole === StaffAuthLevel.DELEGATE) {
+    if (isStaff && !req.user?.is_main_admin) {
       const roleId = req.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");

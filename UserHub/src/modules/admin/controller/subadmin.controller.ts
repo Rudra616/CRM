@@ -59,7 +59,7 @@ export const getSubadmins = async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limitRaw = Number(req.query.limit);
-    const search = (req.query.search as string | undefined)?.trim();
+    const search = (req.query.search as string | undefined);
 
     const { items, total, limit } = await getSubadminsPaginated(page, limitRaw, search);
 

@@ -82,7 +82,6 @@ export const loginUser = async (req: Request, res: Response) => {
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,
-        role: "user",
         gender: user.gender,
         status: user.status,
       },

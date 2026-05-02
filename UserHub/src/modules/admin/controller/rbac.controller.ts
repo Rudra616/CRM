@@ -17,7 +17,6 @@ import {
 import type { RolePermissionInput } from "../types/rbac.types";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../service/user.service";
 import { AuthRequest } from "../../../common/types/AuthRequest";
-import { StaffAuthLevel } from "../../../common/types/role";
 import {
   invalidateSubadminSessionsForModuleId,
   invalidateSubadminSessionsForRoleId,
@@ -41,7 +40,7 @@ export const listModulesTable = async (req: Request, res: Response) => {
       limitRaw === undefined || limitRaw === ""
         ? 10
         : normalizeListPageLimit(Number(limitRaw));
-    const search = (req.query.search as string | undefined)?.trim();
+    const search = (req.query.search as string | undefined);
     const { items, total, limit: safeLimit } = await getModulesPaginated(page, limit, search);
     return successResponse(
       res,
@@ -117,7 +116,7 @@ export const listRolesTable = async (req: Request, res: Response) => {
       limitRaw === undefined || limitRaw === ""
         ? 10
         : normalizeListPageLimit(Number(limitRaw));
-    const search = (req.query.search as string | undefined)?.trim();
+    const search = (req.query.search as string | undefined);
     const { items, total, limit: safeLimit } = await getRolesPaginated(page, limit, search);
     return successResponse(
       res,
@@ -224,8 +223,8 @@ export const getMyPermissions = async (req: Request, res: Response) => {
       return errorResponse(res, "Unauthorized", 401);
     }
 
-    // Admin shortcut
-    if (user.role === StaffAuthLevel.OWNER) {
+    // Main admin (reserved username) — full access; no RBAC matrix.
+    if (user.is_main_admin) {
       return successResponse(
         res,
         "Permissions fetched",

@@ -44,9 +44,3 @@ export const sendPasswordResetEmail = async (
     html: buildResetEmail(toEmail, resetUrl),   // your existing email template
   });
 };
-// ─── Role ─────────────────────────────────────────────────────────────────────
-
-export const roleLabel = (roleId: number): string => {
-  const map: Record<number, string> = { 1: "admin", 2: "subadmin", 3: "user" };
-  return map[roleId] ?? "user";
-};

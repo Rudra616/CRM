@@ -1,18 +1,18 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { UPLOADS_ROOT, uploadFolderForRole } from "../../config/uploads";
+import { UPLOADS_ROOT, uploadFolderForSession } from "../../config/uploads";
 
 const storage = multer.diskStorage({
   destination: (req: any, _file, cb) => {
     const userId = req.user?.id;
-    const role = req.user?.role;
+    const user = req.user;
 
-    if (!userId || role == null || role === undefined) {
-      return cb(new Error("Missing user ID or role"), "" as unknown as string);
+    if (!userId || !user) {
+      return cb(new Error("Missing user or user ID"), "" as unknown as string);
     }
 
-    const dir = path.join(UPLOADS_ROOT, uploadFolderForRole(Number(role)), String(userId));
+    const dir = path.join(UPLOADS_ROOT, uploadFolderForSession(user), String(userId));
 
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

@@ -1,13 +1,16 @@
 import path from "path";
-import { StaffAuthLevel } from "../common/types/role";
 
 /** Always `<projectRoot>/uploads` (run server from UserHub directory). */
 export const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
 
-export function uploadFolderForRole(staffLevel: number): string {
-  if (staffLevel === StaffAuthLevel.OWNER) return "admin";
-  if (staffLevel === StaffAuthLevel.DELEGATE) return "subadmin";
-  return "user";
+export type UploadAccountFolder = "user" | "admin" | "subadmin";
+
+export function uploadFolderForSession(user: {
+  is_staff?: boolean;
+  is_main_admin?: boolean;
+}): UploadAccountFolder {
+  if (!user.is_staff) return "user";
+  return user.is_main_admin ? "admin" : "subadmin";
 }
 
 /** `uploads/admin/1/file.png` → absolute path on disk */
@@ -17,14 +20,15 @@ export function absoluteUploadFilePath(storedPath: string): string {
   return path.join(UPLOADS_ROOT, ...withoutPrefix.split("/").filter(Boolean));
 }
 
-/** Relative DB path: `uploads/{folder}/{id}/{filename}`.
- *  `roleOrFolder` can be a numeric {@link StaffAuthLevel} or a folder string ("user", "admin", "subadmin"). */
+/** Relative DB path: `uploads/{folder}/{id}/{filename}`. */
 export function buildStoredImagePath(
-  roleOrFolder: number | string,
+  folderOrSession: UploadAccountFolder | { is_staff?: boolean; is_main_admin?: boolean },
   accountId: number,
   filename: string
 ): string {
   const folder =
-    typeof roleOrFolder === "string" ? roleOrFolder : uploadFolderForRole(roleOrFolder);
+    typeof folderOrSession === "string"
+      ? folderOrSession
+      : uploadFolderForSession(folderOrSession);
   return `uploads/${folder}/${accountId}/${filename}`;
 }

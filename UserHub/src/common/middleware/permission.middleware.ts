@@ -1,6 +1,5 @@
 import { RequestHandler } from "express";
 import { AuthRequest } from "../types/AuthRequest";
-import { StaffAuthLevel } from "../types/role";
 import { getPermissionByRoleAndModule } from "../permission.service";
 
 export type PermissionAction = "can_view" | "can_add" | "can_edit" | "can_delete";
@@ -15,8 +14,8 @@ export const hasPermissionForUser = async (
   action: PermissionAction
 ): Promise<boolean> => {
   if (!user) return false;
-  if (user.role === StaffAuthLevel.OWNER) return true;
-  if (!user.role_id) return false;
+  if (user.is_main_admin) return true;
+  if (!user.is_staff || !user.role_id) return false;
   const permission = await getPermissionByRoleAndModule(user.role_id, moduleName);
   return Boolean(permission && permission[action] === 1);
 };
@@ -35,35 +34,25 @@ export const checkPermission = (
       const authReq = req as AuthRequest;
       const user = authReq.user;
 
-      console.log("🔐 USER:", user);
-      console.log("📦 MODULE:", moduleName);
-      console.log("⚙️ ACTION:", action);
-
       if (!user) {
-        console.log("❌ No user");
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      if (user.role === StaffAuthLevel.OWNER) {
-        // console.log("✅ Admin bypass");
+      if (user.is_main_admin) {
         return next();
       }
 
-      if (!user.role_id) {
-        // console.log("❌ No role_id");
+      if (!user.is_staff || !user.role_id) {
         return res.status(403).json({ message: "No role assigned" });
       }
 
       const allowed = await hasPermissionForUser(user, moduleName, action);
       if (!allowed) {
-        // console.log("❌ No permission found");
         return res.status(403).json({ message: "No permission setup or denied" });
       }
 
-      // console.log("✅ Permission granted");
       next();
     } catch (err) {
-      console.log("🔥 ERROR:", err);
       return res.status(500).json({ message: "Server error" });
     }
   };
@@ -73,7 +62,6 @@ export const checkPermission = (
 
 /** Skip staff-only handlers so the next `POST /message` route runs (regular ticket owners). */
 export const skipUnlessStaff: RequestHandler = (req, res, next) => {
-  const role = (req as AuthRequest).user?.role;
-  if (role === StaffAuthLevel.OWNER || role === StaffAuthLevel.DELEGATE) return next();
+  if ((req as AuthRequest).user?.is_staff) return next();
   next("route");
 };

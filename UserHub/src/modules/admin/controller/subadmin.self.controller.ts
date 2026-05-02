@@ -1,6 +1,5 @@
 import { Request, Response, RequestHandler } from "express";
 import { AuthRequest } from "../../../common/types/AuthRequest";
-import { StaffAuthLevel } from "../../../common/types/role";
 import { successResponse, errorResponse } from "../../../common/utils/apiResponse";
 import {
   hashPassword,
@@ -44,7 +43,6 @@ export const subadminLogin = async (req: Request, res: Response) => {
 
     const token = signToken({
       id:       admin.id,
-      role:     StaffAuthLevel.DELEGATE,
       username: admin.username,
     });
 
@@ -58,7 +56,6 @@ export const subadminLogin = async (req: Request, res: Response) => {
         first_name: admin.first_name,
         last_name:  admin.last_name,
         email:      admin.email,
-        role:       "subadmin" as const,
         role_id:    admin.role_id,
       },
     }, 200);
@@ -113,7 +110,11 @@ export const updateSubadminProfile: RequestHandler = async (req, res) => {
 
     if (req.file) {
       if (existing?.image_url) deleteFileIfExists(existing.image_url);
-      image_url = buildStoredImagePath(StaffAuthLevel.DELEGATE, authReq.user.id, req.file.filename);
+      image_url = buildStoredImagePath(
+        { is_staff: true, is_main_admin: false },
+        authReq.user.id,
+        req.file.filename
+      );
     }
 
     await updateAdminProfileService(authReq.user.id, {

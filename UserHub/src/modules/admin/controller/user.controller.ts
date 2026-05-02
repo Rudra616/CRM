@@ -20,7 +20,7 @@ export const getUsers = async (req: Request, res: Response) => {
     const limitRaw = Number(req.query.limit);
     const deletedOnly = String(req.query.deleted ?? "") === "1";
     const status = deletedOnly ? undefined : (req.query.status as string | undefined);
-    const search = (req.query.search as string | undefined)?.trim();
+    const search = (req.query.search as string | undefined);
 
     const { items, total, limit } = await getUsersPaginated(page, limitRaw, status, search, { deletedOnly });
 

@@ -11,7 +11,7 @@ import {
 } from "../../modules/token.service";
 import { findUserById } from "../../modules/user/user.service";
 import { findAdminById } from "../../modules/admin/service/admin.service";
-import { adminRowToStaffAuthLevel, staffKindFromRow } from "../utils/adminIdentity";
+import { isMainAdminRow, staffKindFromRow } from "../utils/adminIdentity";
 
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authReq = req as AuthRequest;
@@ -26,7 +26,6 @@ export const authenticate: RequestHandler = async (req, res, next) => {
   try {
     const decoded = verifyToken(token) as {
       id: number;
-      role?: number | string;
       exp?: number;
       username?: string;
     };
@@ -49,8 +48,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
         clearSessionCookies(res);
         return res.status(401).json({ success: false, message: "Session invalid" });
       }
-      // Plain users do not have admin/subadmin role permissions.
-      authReq.user = { id: Number(decoded.id), role: 0 };
+      authReq.user = { id: Number(decoded.id), is_staff: false };
     }
 
     // ── Admin / Subadmin session ──────────────────────────────────────────────
@@ -62,10 +60,11 @@ export const authenticate: RequestHandler = async (req, res, next) => {
         clearSessionCookies(res);
         return res.status(401).json({ success: false, message: "Session invalid" });
       }
-      const staffLevel = adminRowToStaffAuthLevel(adminRow);
+      const main = isMainAdminRow(adminRow);
       authReq.user = {
         id: Number(decoded.id),
-        role: staffLevel,
+        is_staff: true,
+        is_main_admin: main,
         role_id: adminRow.role_id ?? undefined,
         staff_kind: staffKindFromRow(adminRow),
       };
@@ -77,12 +76,10 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     const shouldRefresh = expSec > 0 && expSec - nowSec <= 6 * 60 * 60;
 
     if (shouldRefresh && authReq.user) {
-      // Users: no role in JWT. Admins/subadmins: include numeric role.
       const payload: Record<string, unknown> = {
         id: authReq.user.id,
         username: decoded.username ?? "",
       };
-      if (adminTokenRow) payload.role = authReq.user.role;
 
       const refreshedToken = signToken(payload);
       if (adminTokenRow) {

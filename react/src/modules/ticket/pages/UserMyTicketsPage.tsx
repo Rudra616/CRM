@@ -323,26 +323,35 @@ const UserMyTicketsPage = () => {
             </tbody>
           </table>
         </div>
-        <div className="d-flex justify-content-between align-items-center">
-          <div className="small text-muted">
-            Showing {start}-{end} of {total}
+        <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+          <div className="text-muted small">
+            {start}-{end} of {total}
+            <span className="ms-1">(page {currentPage} of {totalPages})</span>
           </div>
-          <div className="d-flex align-items-center gap-2">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
             <button
               type="button"
-              className="btn btn-sm btn-outline-secondary"
-                disabled={currentPage <= 1}
+              className="btn btn-sm btn-outline-primary"
+              disabled={currentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             >
               Prev
             </button>
-            <span className="small text-muted">
-                Page {currentPage} / {totalPages}
-            </span>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`btn btn-sm ${currentPage === i + 1 ? 'btn-primary' : 'btn-outline-primary'}`}
+                style={{ minWidth: 36 }}
+                onClick={() => setCurrentPage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
             <button
               type="button"
-              className="btn btn-sm btn-outline-secondary"
-                disabled={currentPage >= totalPages}
+              className="btn btn-sm btn-outline-primary"
+              disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             >
               Next

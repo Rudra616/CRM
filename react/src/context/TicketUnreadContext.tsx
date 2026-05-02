@@ -43,32 +43,21 @@ export const TicketUnreadProvider = ({
     unreadMessageCount: 0,
   });
 
-  const refreshTicketUnread = useCallback(async () => {
-    if (gate !== 'member' && gate !== 'owner' && gate !== 'delegate') return;
-
-    if (gate === 'member') {
-      try {
-        const res = await getMyTicketUnreadSummaryApi();
-        if (res.data) {
-          setSummary({
-            ticketsWithUnread: res.data.tickets_with_unread ?? 0,
-            unreadMessageCount: res.data.unread_message_count ?? 0,
-          });
-        }
-      } catch {
-        setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
+  const loadMemberSummary = useCallback(async () => {
+    try {
+      const res = await getMyTicketUnreadSummaryApi();
+      if (res.data) {
+        setSummary({
+          ticketsWithUnread: res.data.tickets_with_unread ?? 0,
+          unreadMessageCount: res.data.unread_message_count ?? 0,
+        });
       }
-      return;
+    } catch {
+      setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
     }
+  }, []);
 
-    if (gate === 'delegate') {
-      if (permLoading) return;
-      if (!ticketCanAdd) {
-        setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
-        return;
-      }
-    }
-
+  const loadStaffSummary = useCallback(async () => {
     try {
       const res = await getStaffTicketUnreadSummaryApi();
       if (res.data) {
@@ -80,11 +69,47 @@ export const TicketUnreadProvider = ({
     } catch {
       setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
     }
-  }, [gate, permLoading, ticketCanAdd]);
+  }, []);
+
+  const refreshTicketUnread = useCallback(async () => {
+    if (gate !== 'member' && gate !== 'owner' && gate !== 'delegate') return;
+
+    if (gate === 'member') {
+      await loadMemberSummary();
+      return;
+    }
+
+    if (gate === 'delegate') {
+      if (permLoading) return;
+      if (!ticketCanAdd) {
+        setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
+        return;
+      }
+    }
+
+    await loadStaffSummary();
+  }, [gate, permLoading, ticketCanAdd, loadMemberSummary, loadStaffSummary]);
+
+  /** Owner path must not key off PermissionContext (permLoading/ticketCanAdd) or staff-unread-summary fires twice on admin load. */
+  useEffect(() => {
+    if (gate !== 'owner') return;
+    void loadStaffSummary();
+  }, [gate, loadStaffSummary]);
 
   useEffect(() => {
-    void refreshTicketUnread();
-  }, [refreshTicketUnread]);
+    if (gate !== 'member') return;
+    void loadMemberSummary();
+  }, [gate, loadMemberSummary]);
+
+  useEffect(() => {
+    if (gate !== 'delegate') return;
+    if (permLoading) return;
+    if (!ticketCanAdd) {
+      setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
+      return;
+    }
+    void loadStaffSummary();
+  }, [gate, permLoading, ticketCanAdd, loadStaffSummary]);
 
   const value = useMemo(
     () => ({ summary, refreshTicketUnread }),
