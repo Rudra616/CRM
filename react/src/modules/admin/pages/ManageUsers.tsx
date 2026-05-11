@@ -309,8 +309,7 @@ const ManageUsers = () => {
                   - ADMIN     → always visible (getModulePerm returns all true for admin)
                   - SUBADMIN  → visible only if DB permission can_edit = 1
                 */}
-                {canEdit && <th>Status</th>}
-
+                  {(canView || canEdit) && <th>Status</th>}
                 {/*
                   Action column:
                   - ADMIN     → always visible

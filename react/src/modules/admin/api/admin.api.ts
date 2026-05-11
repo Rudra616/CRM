@@ -237,7 +237,7 @@ export const updateUserStatusApi = (
   userId: string | number,
   status: 'active' | 'pending' | 'inactive'
 ): Promise<ApiResponse<User>> => {
-  return apiRequest<User>('PATCH', `/admin/users/${userId}`, { status });
+  return apiRequest<User>('PATCH', `/admin/user/status/${userId}`, { status });
 };
 
 export const updateUserByAdminApi = (
@@ -252,7 +252,7 @@ export const updateUserByAdminApi = (
     status: 'active' | 'pending' | 'inactive';
   }
 ): Promise<ApiResponse<User>> => {
-  return apiRequest<User>('PUT', `/admin/users/${userId}`, {
+  return apiRequest<User>('PUT', `/admin/user/${userId}`, {
     username: data.username,
     first_name: data.firstname,
     last_name: data.lastname,
@@ -266,13 +266,13 @@ export const updateUserByAdminApi = (
 export const adminLogoutUserApi = (
   userId: string | number
 ): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('POST', `/admin/users/${userId}/logout`);
+  return apiRequest<null>('POST', `/admin/user/${userId}/logout`);
 };
 
 export const adminDeleteUserApi = (
   userId: string | number
 ): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('DELETE', `/admin/users/${userId}`);
+  return apiRequest<null>('DELETE', `/admin/user/${userId}`);
 };
 
 export const changeAdminPasswordApi = (body: {

@@ -89,7 +89,7 @@ export const updateUserStatusService = async (
     );
 
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, status, is_delete
+      `SELECT id, username, status
      FROM \`user\` WHERE id = ?`,
       [userId]
     );
@@ -112,13 +112,12 @@ export const updateUserProfileByAdmin = async (
     phone: string;
     email: string;
     gender?: string | null;
-    status: string;
   }
 ): Promise<User | null> => {
   try {
     await db.query(
       `UPDATE \`user\`
-     SET username=?, first_name=?, last_name=?, phone=?, email=?, gender=?, status=?
+     SET username=?, first_name=?, last_name=?, phone=?, email=?, gender=?
      WHERE id=? AND COALESCE(is_delete, 0) = 0`,
       [
         data.username,
@@ -127,13 +126,12 @@ export const updateUserProfileByAdmin = async (
         data.phone,
         data.email,
         data.gender ?? null,
-        data.status,
         userId,
       ]
     );
 
     const [rows]: any = await db.query(
-      `SELECT id, username, first_name, last_name, phone, email, gender, status, is_delete
+      `SELECT id, username, first_name, last_name, phone, email, gender, is_delete
      FROM \`user\` WHERE id = ?`,
       [userId]
     );

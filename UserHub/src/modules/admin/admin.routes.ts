@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
-import { authenticate } from "../../common/middleware/authMiddleware";
+import { authenticate, requireStaffSession } from "../../common/middleware/authMiddleware";
 import { loginSchema, changePasswordSchema } from "../user/user.validation";
 import {
   createSubadminSchema,
@@ -41,20 +41,17 @@ import {
   updateAdminProfile,
   changeAdminPassword,
   getDashboardSummary,
-} from "./controller/admin.controller";
-import {
-  checkPermission,
-} from "../../common/middleware/permission.middleware";
-// Subadmin CRUD (managed by admin)
-import {
   createSubadmin,
   getSubadmins,
   getSubadminById,
   updateSubadmin,
   deleteSubadmin,
   changeSubadminPasswordByAdmin,
-} from "./controller/subadmin.controller";
-
+} from "./controller/admin.controller";
+import {
+  checkPermission,
+} from "../../common/middleware/permission.middleware";
+// Subadmin CRUD (managed by admin)
 // User management
 import {
   getUsers,
@@ -73,12 +70,14 @@ router.post("/logout", adminLogout);
 router.get(
   "/profile",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN),
   getAdminProfile
 );
 router.put(
   "/profile",
   authenticate,
+  requireStaffSession,
     // allowRoles(Role.ADMIN),
   uploadSingle("image"),
   validateSchema(updateAdminSchema),
@@ -87,6 +86,7 @@ router.put(
 router.post(
   "/change-password",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN),
   validateSchema(changePasswordSchema),
   changeAdminPassword,
@@ -94,6 +94,7 @@ router.post(
 router.get(
   "/dashboard-summary",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("user", "can_view"),
   getDashboardSummary,
@@ -102,6 +103,7 @@ router.get(
 router.post(
   "/subadmins",
   authenticate,
+  requireStaffSession,
   validateSchema(createSubadminSchema),
   checkPermission("subadmin", "can_add"),
   createSubadmin,
@@ -109,18 +111,21 @@ router.post(
 router.get(
   "/subadmins",
   authenticate,
+  requireStaffSession,
   checkPermission("subadmin", "can_view"),
   getSubadmins
 );
 router.get(
   "/subadmins/:id",
   authenticate,
+  requireStaffSession,
   checkPermission("subadmin", "can_view"),
   getSubadminById
 );
 router.put(
   "/subadmins/:id",
   authenticate,
+  requireStaffSession,
   validateSchema(updateSubadminSchema),
   checkPermission("subadmin", "can_edit"),
   updateSubadmin,
@@ -128,6 +133,7 @@ router.put(
 router.post(
   "/subadmins/:id/change-password",
   authenticate,
+  requireStaffSession,
   validateSchema(changePasswordSchema),
   checkPermission("subadmin", "can_edit"),
   changeSubadminPasswordByAdmin,
@@ -135,6 +141,7 @@ router.post(
 router.delete(
   "/subadmins/:id",
   authenticate,
+  requireStaffSession,
   checkPermission("subadmin", "can_delete"),
   deleteSubadmin
 );
@@ -143,6 +150,7 @@ router.delete(
 router.get(
   "/modules/table",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_view"),
   listModulesTable
@@ -150,6 +158,7 @@ router.get(
 router.patch(
   "/modules/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateModuleRowSchema),
   checkPermission("module", "can_edit"),
@@ -158,6 +167,7 @@ router.patch(
 router.delete(
   "/modules/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_delete"),
   deleteModuleRow
@@ -165,6 +175,7 @@ router.delete(
 router.get(
   "/modules",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_view"),
   listModules
@@ -172,6 +183,7 @@ router.get(
 router.post(
   "/modules",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(createModuleSchema),
   checkPermission("module", "can_add"),
@@ -181,6 +193,7 @@ router.post(
 router.get(
   "/roles/table",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_view"),
   listRolesTable
@@ -188,6 +201,7 @@ router.get(
 router.patch(
   "/roles/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateRoleRowSchema),
   checkPermission("module", "can_edit"),
@@ -196,6 +210,7 @@ router.patch(
 router.delete(
   "/roles/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_delete"),
   deleteRoleRow
@@ -203,6 +218,7 @@ router.delete(
 router.get(
   "/roles",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_view"),
   listRoles
@@ -210,6 +226,7 @@ router.get(
 router.post(
   "/roles",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(createRoleSchema),
   checkPermission("module", "can_add"),
@@ -218,6 +235,7 @@ router.post(
 router.get(
   "/roles/:roleId/permissions",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_view"),
   getPermissionsByRole
@@ -225,22 +243,26 @@ router.get(
 router.put(
   "/roles/:roleId/permissions",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(updateRolePermissionsSchema),
   checkPermission("module", "can_edit"),
   savePermissionsByRole
 );
+
 router.get(
   "/users",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("user", "can_view"),
 
   getUsers,
 );
 router.patch(
-  "/users/:id",
+  "/user/status/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(adminUpdateUserStatusSchema),
   checkPermission("user", "can_edit"),
@@ -248,21 +270,24 @@ router.patch(
   updateUserStatus
 );
 router.put(
-  "/users/:id",
+  "/user/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   validateSchema(adminUpdateUserProfileSchema),
   updateUserProfileByAdminController,
 );
 router.post(
-  "/users/:id/logout",
+  "/user/:id/logout",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   logoutUserByAdmin,
 );
 router.delete(
-  "/users/:id",
+  "/user/:id",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("user", "can_delete"),
 
@@ -271,6 +296,7 @@ router.delete(
 router.get(
   "/me/permissions",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   getMyPermissions,
 );

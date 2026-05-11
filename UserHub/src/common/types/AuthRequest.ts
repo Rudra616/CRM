@@ -2,7 +2,7 @@ import type { Request } from "express";
 import type { StaffKind } from "./role";
 
 export interface AuthRequest extends Request {
-  user?: {
+  user: {
     id: number;
 
     /** `true` when session is an `admin` table row; `false` when `user` table. */

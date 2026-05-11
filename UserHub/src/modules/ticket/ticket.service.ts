@@ -10,7 +10,7 @@ import {
   TicketMessageView,
   TicketRow,
   TicketStatus,
-} from "./tickit.types";
+} from "./ticket.types";
 
 export const insertTicket = async (ticketData: CreateTicketInput): Promise<number> => {
   try {
@@ -26,7 +26,7 @@ export const insertTicket = async (ticketData: CreateTicketInput): Promise<numbe
     );
     return result.insertId;
   } catch (error: unknown) {
-    logServiceError("tickit.service", "insertTicket", error);
+    logServiceError("ticket.service", "insertTicket", error);
     throw error;
   }
 };
@@ -42,7 +42,7 @@ export const getTicketsByUserId = async (userId: number): Promise<TicketRow[]> =
     );
     return rows;
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getTicketsByUserId", error);
+    logServiceError("ticket.service", "getTicketsByUserId", error);
     throw error;
   }
 };
@@ -100,7 +100,7 @@ export const getTicketsByUserIdPaged = async (
 
     return { items, total };
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getTicketsByUserIdPaged", error);
+    logServiceError("ticket.service", "getTicketsByUserIdPaged", error);
     throw error;
   }
 };
@@ -114,7 +114,7 @@ export const getAllTickets = async (): Promise<TicketRow[]> => {
     );
     return rows;
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getAllTickets", error);
+    logServiceError("ticket.service", "getAllTickets", error);
     throw error;
   }
 };
@@ -179,7 +179,7 @@ export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketList
 
     return { items, total };
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getAllTicketsPaged", error);
+    logServiceError("ticket.service", "getAllTicketsPaged", error);
     throw error;
   }
 };
@@ -208,7 +208,7 @@ export const updateTicketByOwner = async (
     );
     return result.affectedRows > 0;
   } catch (error: unknown) {
-    logServiceError("tickit.service", "updateTicketByOwner", error);
+    logServiceError("ticket.service", "updateTicketByOwner", error);
     throw error;
   }
 };
@@ -234,7 +234,7 @@ export const insertTicketMessage = async (
     );
     return result.insertId;
   } catch (error: unknown) {
-    logServiceError("tickit.service", "insertTicketMessage", error);
+    logServiceError("ticket.service", "insertTicketMessage", error);
     throw error;
   }
 };
@@ -249,7 +249,7 @@ export const getTicketById = async (ticketId: number): Promise<TicketRow | null>
     );
     return rows[0] ?? null;
   } catch (error) {
-    logServiceError("tickit.service", "getTicketById", error);
+    logServiceError("ticket.service", "getTicketById", error);
     throw error;
   }
 };
@@ -281,7 +281,7 @@ export const getTicketMessagesByTicketId = async (
     );
     return rows;
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getTicketMessagesByTicketId", error);
+    logServiceError("ticket.service", "getTicketMessagesByTicketId", error);
     throw error;
   }
 };
@@ -301,7 +301,7 @@ export const markAdminMessagesReadByOwner = async (
       [ownerUserId, ticketId]
     );
   } catch (error: unknown) {
-    logServiceError("tickit.service", "markAdminMessagesReadByOwner", error);
+    logServiceError("ticket.service", "markAdminMessagesReadByOwner", error);
     throw error;
   }
 };
@@ -317,7 +317,7 @@ export const markUserMessagesReadByStaff = async (ticketId: number): Promise<voi
       [ticketId]
     );
   } catch (error: unknown) {
-    logServiceError("tickit.service", "markUserMessagesReadByStaff", error);
+    logServiceError("ticket.service", "markUserMessagesReadByStaff", error);
     throw error;
   }
 };
@@ -342,7 +342,7 @@ export const getOwnerTicketUnreadSummary = async (
       tickets_with_unread: Number(row?.tickets_with_unread ?? 0),
     };
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getOwnerTicketUnreadSummary", error);
+    logServiceError("ticket.service", "getOwnerTicketUnreadSummary", error);
     throw error;
   }
 };
@@ -363,7 +363,7 @@ export const getStaffTicketUnreadSummary = async (): Promise<StaffTicketUnreadSu
       tickets_with_unread: Number(row?.tickets_with_unread ?? 0),
     };
   } catch (error: unknown) {
-    logServiceError("tickit.service", "getStaffTicketUnreadSummary", error);
+    logServiceError("ticket.service", "getStaffTicketUnreadSummary", error);
     throw error;
   }
 };

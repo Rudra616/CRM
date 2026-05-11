@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   useCallback,
   useContext,
@@ -14,6 +14,12 @@ import {
 } from '../modules/ticket/api/ticket.api';
 import { usePermissions } from './PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../shared/utils/permissionModules';
+import {
+  getTicketSocket,
+  type NewMessageSocketEvent,
+  type TicketUpdatedSocketEvent,
+} from '../shared/socket/ticketSocket';
+import { useAuth } from './AuthContext';
 
 export interface TicketUnreadSummary {
   ticketsWithUnread: number;
@@ -35,7 +41,8 @@ export const TicketUnreadProvider = ({
   children: ReactNode;
 }) => {
   const { getModulePerm, permLoading } = usePermissions();
-  /** Same rule as `GET /tickit/staff-unread-summary` — backend uses ticket → can_add; do not call without it. */
+  const { user } = useAuth();
+  /** Same rule as `GET /ticket/staff-unread-summary` — backend uses ticket → can_add; do not call without it. */
   const ticketCanAdd = getModulePerm(PERMISSION_MODULE_KEYS.TICKET).can_add;
 
   const [summary, setSummary] = useState<TicketUnreadSummary>({
@@ -110,6 +117,63 @@ export const TicketUnreadProvider = ({
     }
     void loadStaffSummary();
   }, [gate, permLoading, ticketCanAdd, loadStaffSummary]);
+
+  //  Members get notified of new admin messages; staff get notified of new user messages and ticket updates. Both must ignore their own messages.
+  useEffect(() => {
+    if (gate !== 'member') return;
+
+    const socket = getTicketSocket();
+    const myId = user?.id;
+    const handleRealtimeMessage = (payload: NewMessageSocketEvent) => {
+      if (!myId || payload.senderId === myId) return;
+      if (payload.senderType !== 'admin') return;
+      setSummary((prev) => ({
+        ticketsWithUnread: prev.ticketsWithUnread + 1,
+        unreadMessageCount: prev.unreadMessageCount + 1,
+      }));
+    };
+
+    socket.on('new_message', handleRealtimeMessage);
+
+    return () => {
+      socket.off('new_message', handleRealtimeMessage);
+    };
+  }, [gate, user?.id]);
+
+  useEffect(() => {
+    if (gate !== 'owner' && gate !== 'delegate') return;
+    if (gate === 'delegate') {
+      if (permLoading) return;
+      if (!ticketCanAdd) return;
+    }
+
+    const socket = getTicketSocket();
+    const myId = user?.id;
+    
+    // Staff get notified of new user messages and ticket updates. Both must ignore their own messages.
+    const handleRealtimeMessage = (payload: NewMessageSocketEvent) => {
+      if (payload.senderType !== 'user') return;
+      if (myId && payload.senderId === myId) return;
+      setSummary((prev) => ({
+        ticketsWithUnread: prev.ticketsWithUnread + 1,
+        unreadMessageCount: prev.unreadMessageCount + 1,
+      }));
+    };
+    
+    // Staff get notified of new user messages and ticket updates. Both must ignore their own messages.
+    const handleTicketUpdated = (payload: TicketUpdatedSocketEvent) => {
+      if (payload.updatedBy !== 'user') return;
+      void loadStaffSummary();
+    };
+
+    socket.on('new_message', handleRealtimeMessage);
+    socket.on('ticket_updated', handleTicketUpdated);
+
+    return () => {
+      socket.off('new_message', handleRealtimeMessage);
+      socket.off('ticket_updated', handleTicketUpdated);
+    };
+  }, [gate, permLoading, ticketCanAdd, user?.id, loadStaffSummary]);
 
   const value = useMemo(
     () => ({ summary, refreshTicketUnread }),

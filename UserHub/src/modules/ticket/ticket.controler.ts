@@ -14,14 +14,16 @@ import {
   getStaffTicketUnreadSummary,
   updateTicketStatusByOwner,
   updateTicketStatusByAdmin,
-} from "./tickit.service";
+} from "./ticket.service";
 import { AuthRequest } from "../../common/types/AuthRequest";
 import { buildImageUrl, deleteFileIfExists } from "../../common/helpers/common.helper";
 import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
-import { TicketStatus } from "./tickit.types";
+import { TicketStatus } from "./ticket.types";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../admin/service/user.service";
+import { emitNewMessage, emitStatusUpdate, emitTicketUpdated } from "../../realtime/socket";
 
+/** Parses and validates query parameters for ticket listing endpoints. */
 const parseTicketListQuery = (q: Record<string, unknown>) => {
   const pageRaw = Number(q.page ?? 1);
   const reqLimit = Number(q.limit ?? USERS_PAGE_SIZE_OPTIONS[0]);
@@ -31,17 +33,29 @@ const parseTicketListQuery = (q: Record<string, unknown>) => {
   return { page, limit, search };
 };
 
-export const createTicket: RequestHandler = async (req: AuthRequest, res: Response) => {
-  try {
-    const { subject, description } = req.body as { subject: string; description: string };
-    const userId = req.user?.id;
 
-    if (!userId || !req.user) {
-      return errorResponse(res, "Unauthorized", 401);
-    }
+
+
+/**
+ * crate ticket for logged in user with subject, description and optional image attachment.  
+ *      
+ * @param req subject, description in body and optional image file in multipart form data
+ * @param res success message with created ticket ID response
+ * @returns 
+ */
+export const createTicket: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
+
+  try {
+    const { id: userId } = authReq.user;
+
+    const { subject, description } = req.body as {
+      subject: string;
+      description: string;
+    };
 
     const imageUrl = req.file
-      ? buildStoredImagePath(req.user, userId, req.file.filename)
+      ? buildStoredImagePath(authReq.user, userId, req.file.filename)
       : null;
 
     const ticketId = await insertTicket({
@@ -52,19 +66,32 @@ export const createTicket: RequestHandler = async (req: AuthRequest, res: Respon
       image_url: imageUrl,
     });
 
+    emitTicketUpdated({
+      ticketId,
+      ownerUserId: userId,
+      status: "open",
+      updatedBy: "user",
+      updatedById: userId,
+    });
+
     return successResponse(res, "Ticket created successfully", { ticketId }, 201);
   } catch (err: any) {
     return errorResponse(res, err.message, 500);
   }
 };
 
-/** Plain user: totals for sidebar badge (unread admin messages across own tickets). */
-export const getMyTicketUnreadSummaryHandler: RequestHandler = async (
-  req: AuthRequest,
-  res: Response
-) => {
+/**
+ * Get unread summary for the logged-in user's tickets.
+ * 
+ * @param req user must be authenticated; summary includes counts of unread messages for user's tickets
+ * @param res counts of unread messages for user's tickets
+ * @returns 
+ */
+export const getMyTicketUnreadSummaryHandler: RequestHandler = async (req,res) => {
+    const authReq = req as AuthRequest;
+
   try {
-    const userId = req.user?.id;
+    const userId = authReq.user.id;
     if (!userId) return errorResponse(res, "Unauthorized", 401);
 
     const summary = await getOwnerTicketUnreadSummary(userId);
@@ -74,13 +101,17 @@ export const getMyTicketUnreadSummaryHandler: RequestHandler = async (
   }
 };
 
-/** Staff: totals for sidebar badge (unread user messages across all tickets). */
-export const getStaffTicketUnreadSummaryHandler: RequestHandler = async (
-  req: AuthRequest,
-  res: Response
-) => {
+/**
+ * get unread summary for all tickets for staff 
+ * 
+ * @param req authenticated staff user request; summary includes counts of unread messages for all tickets
+ * @param res counts of unread messages for all tickets
+ * @returns 
+ */
+export const getStaffTicketUnreadSummaryHandler: RequestHandler = async (req,res) => {
   try {
-    if (!req.user?.is_staff) return errorResponse(res, "Forbidden", 403);
+    const authReq = req as AuthRequest;
+    if (!authReq.user.is_staff) return errorResponse(res, "Forbidden", 403);
 
     const summary = await getStaffTicketUnreadSummary();
     return successResponse(res, "Unread summary retrieved successfully", summary);
@@ -89,9 +120,18 @@ export const getStaffTicketUnreadSummaryHandler: RequestHandler = async (
   }
 };
 
-export const getUserTickets: RequestHandler = async (req: AuthRequest, res: Response) => {
+
+/**
+ * get tickets for logged in user with pagination, search and filter support.
+ * 
+ * @param req user must be authenticated; includes pagination, search, and filter parameters
+ * @param res paginated list of user's tickets matching search and filter criteria
+ * @returns 
+ */
+export const getUserTickets: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
   try {
-    const userId = req.user?.id;
+    const userId = authReq.user.id;
     if (!userId) {
       return errorResponse(res, "Unauthorized", 401);
     }
@@ -120,7 +160,14 @@ export const getUserTickets: RequestHandler = async (req: AuthRequest, res: Resp
   }
 };
 
-export const getAllTicketsByAdmin: RequestHandler = async (req: AuthRequest, res: Response) => {
+/**
+ * get all tickets for admin with pagination, search and filter support.
+ * 
+ * @param req admin user request; includes pagination, search, and filter parameters
+ * @param res paginated list of all tickets matching search and filter criteria
+ * @returns 
+ */
+export const getAllTicketsByAdmin: RequestHandler = async (req, res) => {
   try {
     const { page, limit, search } = parseTicketListQuery(req.query as Record<string, unknown>);
     const result = await getAllTicketsPaged({ page, limit, search });
@@ -145,17 +192,26 @@ export const getAllTicketsByAdmin: RequestHandler = async (req: AuthRequest, res
   }
 };
 
-/** Plain user only: edit own ticket subject/description (and optional new image) while open. */
-export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: Response) => {
+/**
+ * Update an owned ticket by the logged-in user.
+ *
+ * Allows a ticket owner to update subject, description, and optionally replace the ticket image.
+ * Prevents updates on closed tickets and enforces ownership validation.
+ *
+ * @param req Authenticated request containing ticket ID in params and updated fields in body
+ * @param res Returns success response if ticket is updated, otherwise error response
+ */
+export const updateOwnedTicket: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
   try {
-    const userId = req.user?.id;
+    const userId = authReq.user.id;
     if (!userId) return errorResponse(res, "Unauthorized", 401);
 
-    if (req.user?.is_staff) {
-      return errorResponse(res, "Forbidden", 403);
-    }
+    // if (authReq.user?.is_staff) {
+    //   return errorResponse(res, "Forbidden", 403);
+    // }
 
-    const ticketId = Number(req.params.id);
+    const ticketId = Number(authReq.params.id);
     const { subject, description } = req.body as { subject: string; description: string };
 
     if (!ticketId || Number.isNaN(ticketId)) {
@@ -172,7 +228,7 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
     let imageUrl: string | null | undefined = undefined;
     if (req.file) {
       if (ticket.image_url) deleteFileIfExists(ticket.image_url);
-      imageUrl = buildStoredImagePath(req.user!, userId, req.file.filename);
+      imageUrl = buildStoredImagePath(authReq.user!, userId, req.file.filename);
     }
 
     const updated = await updateTicketByOwner(ticketId, userId, {
@@ -182,6 +238,13 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
     });
 
     if (!updated) return errorResponse(res, "Ticket not found", 404);
+    emitTicketUpdated({
+      ticketId,
+      ownerUserId: ticket.user_id,
+      status: ticket.status,
+      updatedBy: "user",
+      updatedById: userId,
+    });
 
     return successResponse(res, "Ticket updated successfully");
   } catch (err: any) {
@@ -189,15 +252,25 @@ export const updateOwnedTicket: RequestHandler = async (req: AuthRequest, res: R
   }
 };
 
-export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: Response) => {
+/**
+ * Update the status of a ticket.
+ *
+ * Allows ticket owner to update status with restrictions, while staff/admin can update any ticket.
+ * Prevents unauthorized access and disallows updates on closed tickets for normal users.
+ *
+ * @param req Authenticated request containing ticket ID in params and new status in body
+ * @param res Returns success response if status is updated, otherwise error response
+ */
+export const updateTicketStatus: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
   try {
-    const userId = req.user?.id;
-    const isStaff = Boolean(req.user?.is_staff);
+    const userId = authReq.user?.id;
+    const isStaff = Boolean(authReq.user?.is_staff);
 
     if (!userId) return errorResponse(res, "Unauthorized", 401);
 
-    const ticketId = Number(req.params.id);
-    const { status } = req.body as { status: TicketStatus };
+    const ticketId = Number(authReq.params.id);
+    const { status } = authReq.body as { status: TicketStatus };
 
     if (!ticketId || Number.isNaN(ticketId)) {
       return errorResponse(res, "Invalid ticket ID", 400);
@@ -228,6 +301,13 @@ export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: 
     if (!updated) {
       return errorResponse(res, "Ticket not found or not updated", 400);
     }
+    emitStatusUpdate({
+      type: "ticket_status",
+      ticketId,
+      ownerUserId: ticket.user_id,
+      status,
+      updatedById: authReq.user?.id || 0,
+    });
 
     return successResponse(res, "Ticket status updated successfully");
   } catch (err: any) {
@@ -235,11 +315,20 @@ export const updateTicketStatus: RequestHandler = async (req: AuthRequest, res: 
   }
 };
 
-
-export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Response) => {
+/**
+ * Add a message to a support ticket.
+ *
+ * Allows ticket owner or authorized staff to send messages with optional image attachments.
+ * Handles permissions, ticket status checks, and marks messages as read accordingly.
+ *
+ * @param req Authenticated request containing ticket ID, message text, and optional file
+ * @param res Returns success response if message is added, otherwise error response
+ */
+export const addTicketMessage: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
   try {
     const { ticket_id, message } = req.body as { ticket_id: number; message: string };
-    const senderId = req.user?.id;
+    const senderId = authReq.user?.id;
     if (!senderId) {
       return errorResponse(res, "Unauthorized", 401);
     }
@@ -259,10 +348,10 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
     }
 
     const isOwner = ticket.user_id === senderId;
-    const isStaff = Boolean(req.user?.is_staff);
+    const isStaff = Boolean(authReq.user?.is_staff);
 
-    if (isStaff && !req.user?.is_main_admin) {
-      const roleId = req.user?.role_id;
+    if (isStaff && !authReq.user?.is_main_admin) {
+      const roleId = authReq.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
       if (!permission || permission.can_add !== 1) {
@@ -274,9 +363,9 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
       return errorResponse(res, "Forbidden: You cannot access this ticket", 403);
     }
     const imagePath = file
-      ? buildStoredImagePath(req.user!, senderId, file.filename)
+      ? buildStoredImagePath(authReq.user!, senderId, file.filename)
       : null;
-    await insertTicketMessage({
+    const messageId = await insertTicketMessage({
       ticket_id,
       sender_id: senderId,
       sender_type: isStaff ? "admin" : "user",
@@ -289,6 +378,23 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
     if (isStaff) {
       await markUserMessagesReadByStaff(Number(ticket_id));
     }
+    emitNewMessage({
+      ticketId: Number(ticket_id),
+      ownerUserId: ticket.user_id,
+      senderId,
+      senderType: isStaff ? "admin" : "user",
+      message: {
+        id: messageId,
+        ticket_id: Number(ticket_id),
+        sender_id: senderId,
+        sender_type: isStaff ? "admin" : "user",
+        message: text,
+        image: imagePath ? buildImageUrl(authReq, imagePath) : null,
+        created_at: new Date().toISOString(),
+        is_read_by_user: isStaff ? 0 : 1,
+        is_read_by_admin: isStaff ? 1 : 0,
+      },
+    });
 
     return successResponse(res, "Message added to ticket successfully");
   } catch (err: any) {
@@ -296,10 +402,20 @@ export const addTicketMessage: RequestHandler = async (req: AuthRequest, res: Re
   }
 };
 
-export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: Response) => {
+/**
+ * Retrieve all messages for a specific ticket.
+ *
+ * Allows ticket owner and authorized staff to view full ticket conversation with messages and ticket details.
+ * Enforces role-based access control and permission checks for staff users.
+ *
+ * @param req Authenticated request containing ticket ID in params
+ * @param res Returns ticket details and message list, otherwise error response
+ */
+export const getTicketMessages: RequestHandler = async (req, res) => {
+  const authReq = req as AuthRequest;
   try {
-    const ticketId = Number(req.params.id);
-    const requesterId = req.user?.id;
+    const ticketId = Number(authReq.params.id);
+    const requesterId = authReq.user?.id;
 
     if (!requesterId) return errorResponse(res, "Unauthorized", 401);
     if (!ticketId || Number.isNaN(ticketId)) return errorResponse(res, "Invalid ticket ID", 400);
@@ -308,10 +424,10 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
     if (!ticket) return errorResponse(res, "Ticket not found", 404);
 
     const isOwner = ticket.user_id === requesterId;
-    const isStaff = Boolean(req.user?.is_staff);
+    const isStaff = Boolean(authReq.user?.is_staff);
 
-    if (isStaff && !req.user?.is_main_admin) {
-      const roleId = req.user?.role_id;
+    if (isStaff && !authReq.user?.is_main_admin) {
+      const roleId = authReq.user?.role_id;
       if (!roleId) return errorResponse(res, "No role assigned", 403);
       const permission = await getPermissionByRoleAndModule(roleId, "ticket");
       if (!permission || permission.can_view !== 1) {
@@ -325,11 +441,11 @@ export const getTicketMessages: RequestHandler = async (req: AuthRequest, res: R
 
     const messages = (await getTicketMessagesByTicketId(ticketId)).map((msg: any) => ({
       ...msg,
-      image: msg.image ? buildImageUrl(req, msg.image) : null,
+      image: msg.image ? buildImageUrl(authReq, msg.image) : null,
     }));
     const ticketView = {
       ...ticket,
-      image_url: ticket.image_url ? buildImageUrl(req, ticket.image_url) : null,
+      image_url: ticket.image_url ? buildImageUrl(authReq, ticket.image_url) : null,
     };
 
     return successResponse(res, "Ticket messages retrieved successfully", {

@@ -123,8 +123,8 @@ export const updateSubadminSchema = Joi.object({
 export const adminUpdateUserStatusSchema = Joi.object({
   status: Joi.string().valid("active", "pending", "inactive").required().messages({
     "any.only":    "Status must be one of: active, pending, inactive",
-    "string.empty":"Status is required",
-    "any.required":"Status is required",
+    "string.empty":"Status is a required",
+    // "any.required":"Status aa required",
   }),
 });
 
@@ -135,9 +135,5 @@ export const adminUpdateUserProfileSchema = Joi.object({
   phone:      phoneField,
   email:      emailField,
   gender:     genderRequired,
-  status: Joi.string().valid("active", "pending", "inactive").required().messages({
-    "any.only":    "Status must be one of: active, pending, inactive",
-    "string.empty":"Status is required",
-    "any.required":"Status is required",
-  }),
+
 });

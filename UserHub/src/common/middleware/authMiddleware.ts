@@ -26,8 +26,8 @@ export const authenticate: RequestHandler = async (req, res, next) => {
   try {
     const decoded = verifyToken(token) as {
       id: number;
-      exp?: number;
-      username?: string;
+      exp: number;
+      username: string;
     };
 
     const userTokenRow  = await findUserToken(token);
@@ -96,6 +96,30 @@ export const authenticate: RequestHandler = async (req, res, next) => {
     clearSessionCookies(res);
     return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }
+};
+
+/** User-only guard for routes under `/api/*` (non-staff). */
+export const requireUserSession: RequestHandler = (req, res, next) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+  if (authReq.user.is_staff) {
+    return res.status(403).json({ success: false, message: "Forbidden: user session required" });
+  }
+  return next();
+};
+
+/** Staff-only guard for routes under `/api/admin/*` and `/api/subadmin/*`. */
+export const requireStaffSession: RequestHandler = (req, res, next) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+  if (!authReq.user.is_staff) {
+    return res.status(403).json({ success: false, message: "Forbidden: staff session required" });
+  }
+  return next();
 };
 
 // export const allowRoles = (...roles: number[]): RequestHandler => {

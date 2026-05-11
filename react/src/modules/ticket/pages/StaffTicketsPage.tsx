@@ -13,14 +13,18 @@ import { formatTicketOwner, STATUS_OPTIONS, statusBadgeClass } from '../utils/ti
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
-import { useTicketUnread } from '../../../context/TicketUnreadContext';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import {
+  getTicketSocket,
+  type NewMessageSocketEvent,
+  type TicketUpdatedSocketEvent,
+  type StatusUpdatedSocketEvent,
+} from '../../../shared/socket/ticketSocket';
 
 const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
 const StaffTicketsPage = () => {
-  const { refreshTicketUnread } = useTicketUnread();
   const { user } = useAuth();
   const { getModulePerm } = usePermissions();
   const ticketPerm = getModulePerm(PERMISSION_MODULE_KEYS.TICKET);
@@ -84,6 +88,80 @@ const StaffTicketsPage = () => {
     void loadTickets();
   }, [canView, currentPage, rowsPerPage, appliedSearchTerm]);
 
+  useEffect(() => {
+    if (!canView) return;
+    const socket = getTicketSocket();
+    const myId = user?.id;
+    const onRealtimeMessage = (payload: NewMessageSocketEvent) => {
+      if (myId && payload.senderId === myId) return;
+      let existsInCurrentList = false;
+      setTickets((prev) =>
+        prev.map((row) => {
+          if (row.id !== payload.ticketId) return row;
+          existsInCurrentList = true;
+          return {
+            ...row,
+            unread_from_user_count:
+              payload.senderType === 'user'
+                ? Number(row.unread_from_user_count ?? 0) + 1
+                : Number(row.unread_from_user_count ?? 0),
+          };
+        })
+      );
+      if (!existsInCurrentList) {
+        void loadTickets({ silent: true });
+      }
+      if (activeTicket?.id === payload.ticketId) {
+        if (payload.message) {
+          setMessages((prev) => [...prev, payload.message!]);
+        }
+      }
+    };
+    const onStatusUpdated = (payload: StatusUpdatedSocketEvent) => {
+      if (payload.type !== 'ticket_status') return;
+      if (myId && payload.updatedById === myId) return;
+      const nextStatus = payload.status;
+      setTickets((prev) =>
+        prev.map((row) => (row.id === payload.ticketId ? { ...row, status: nextStatus } : row))
+      );
+      if (activeTicket?.id === payload.ticketId) {
+        setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      }
+    };
+    const onTicketUpdated = (payload: TicketUpdatedSocketEvent) => {
+      if (myId && payload.updatedById === myId) return;
+      const nextStatus = payload.status;
+      if (!nextStatus) {
+        void loadTickets({ silent: true });
+        return;
+      }
+      let existsInCurrentList = false;
+      setTickets((prev) =>
+        prev.map((row) => {
+          if (row.id !== payload.ticketId) return row;
+          existsInCurrentList = true;
+          return { ...row, status: nextStatus };
+        })
+      );
+      if (!existsInCurrentList) {
+        void loadTickets({ silent: true });
+      }
+      if (activeTicket?.id === payload.ticketId) {
+        setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      }
+    };
+
+    socket.on('new_message', onRealtimeMessage);
+    socket.on('status_updated', onStatusUpdated);
+    socket.on('ticket_updated', onTicketUpdated);
+
+    return () => {
+      socket.off('new_message', onRealtimeMessage);
+      socket.off('status_updated', onStatusUpdated);
+      socket.off('ticket_updated', onTicketUpdated);
+    };
+  }, [canView, activeTicket?.id, user?.id]);
+
   const start = total === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
   const end = Math.min(currentPage * rowsPerPage, total);
 
@@ -131,17 +209,26 @@ const StaffTicketsPage = () => {
     }
     try {
       await addTicketMessageApi(activeTicket.id, message, image);
-      const res = await getTicketMessagesApi(activeTicket.id);
-      setMessages(res.data?.messages ?? []);
-      if (res.data?.ticket) {
-        setActiveTicket((t) => (t ? { ...t, ...res.data!.ticket } : t));
-      }
+      const optimisticId = Date.now();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: optimisticId,
+          ticket_id: activeTicket.id,
+          sender_id: user?.id ?? 0,
+          sender_type: 'admin',
+          message,
+          image: image ? URL.createObjectURL(image) : null,
+          created_at: new Date().toISOString(),
+          is_read_by_user: 0,
+          is_read_by_admin: 1,
+        },
+      ]);
       setTickets((prev) =>
         prev.map((row) =>
           row.id === activeTicket.id ? { ...row, unread_from_user_count: 0 } : row
         )
       );
-      await refreshTicketUnread();
       showSuccess('Reply sent');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to send reply');

@@ -9,7 +9,7 @@ import {
   updateTicketStatus,
   addTicketMessage,
   getTicketMessages,
-} from "./tickit.controler";
+} from "./ticket.controler";
 import { authenticate } from "../../common/middleware/authMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
@@ -18,7 +18,7 @@ import {
   createTicketSchema,
   updateOwnedTicketSchema,
   updateTicketStatusSchema,
-} from "./tickit.validation";
+} from "./ticket.validation";
 import { checkPermission, skipUnlessStaff } from "../../common/middleware/permission.middleware";
 
 const router = Router();
@@ -71,9 +71,6 @@ router.put(
   validateSchema(updateOwnedTicketSchema),
   updateOwnedTicket
 );
-/** `skipUnlessStaff` must run before `uploadSingle`. Otherwise staff’s route consumes the multipart
- *  body with multer, then `next("route")` replays the request and the second multer sees an empty
- *  stream → "Unexpected end of form" for regular users. */
 router.post(
   "/message",
   authenticate,

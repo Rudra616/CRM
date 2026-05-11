@@ -27,11 +27,11 @@ export const createTicketApi = async (
   formData.append('subject', payload.subject);
   formData.append('description', payload.description);
   if (imageFile) formData.append('image', imageFile);
-  const res = await axiosClient.post<ApiResponse<{ ticketId: number }>>('/tickit/create', formData);
+  const res = await axiosClient.post<ApiResponse<{ ticketId: number }>>('/ticket/create', formData);
   return res.data;
 };
 
-/** Owner-only: PUT /tickit/:id — same validation as create; optional image replaces attachment */
+/** Owner-only: PUT /ticket/:id — same validation as create; optional image replaces attachment */
 export const updateMyTicketApi = async (
   ticketId: number,
   payload: { subject: string; description: string },
@@ -41,7 +41,7 @@ export const updateMyTicketApi = async (
   formData.append('subject', payload.subject);
   formData.append('description', payload.description);
   if (imageFile) formData.append('image', imageFile);
-  const res = await axiosClient.put<ApiResponse<null>>(`/tickit/${ticketId}`, formData);
+  const res = await axiosClient.put<ApiResponse<null>>(`/ticket/${ticketId}`, formData);
   return res.data;
 };
 
@@ -50,31 +50,31 @@ export const getMyTicketsApi = (params?: {
   limit?: number;
   search?: string;
 }): Promise<ApiResponse<TicketListResponse>> =>
-  apiRequest<TicketListResponse>('GET', `/tickit/my-tickets?${buildListQuery(params)}`);
+  apiRequest<TicketListResponse>('GET', `/ticket/my-tickets?${buildListQuery(params)}`);
 
 export const getMyTicketUnreadSummaryApi = (): Promise<ApiResponse<OwnerTicketUnreadSummary>> =>
-  apiRequest<OwnerTicketUnreadSummary>('GET', '/tickit/my-unread-summary');
+  apiRequest<OwnerTicketUnreadSummary>('GET', '/ticket/my-unread-summary');
 
 export const getStaffTicketUnreadSummaryApi = (): Promise<ApiResponse<StaffTicketUnreadSummary>> =>
-  apiRequest<StaffTicketUnreadSummary>('GET', '/tickit/staff-unread-summary');
+  apiRequest<StaffTicketUnreadSummary>('GET', '/ticket/staff-unread-summary');
 
 export const getAllTicketsApi = (params?: {
   page?: number;
   limit?: number;
   search?: string;
 }): Promise<ApiResponse<TicketListResponse>> =>
-  apiRequest<TicketListResponse>('GET', `/tickit?${buildListQuery(params)}`);
+  apiRequest<TicketListResponse>('GET', `/ticket?${buildListQuery(params)}`);
 
 export const updateTicketStatusApi = (
   ticketId: number,
   status: TicketStatus
 ): Promise<ApiResponse<null>> =>
-  apiRequest<null>('PUT', `/tickit/${ticketId}/status`, { status });
+  apiRequest<null>('PUT', `/ticket/${ticketId}/status`, { status });
 
 export const getTicketMessagesApi = (
   ticketId: number
 ): Promise<ApiResponse<TicketThreadResponse>> =>
-  apiRequest<TicketThreadResponse>('GET', `/tickit/${ticketId}/messages`);
+  apiRequest<TicketThreadResponse>('GET', `/ticket/${ticketId}/messages`);
 
 export const addTicketMessageApi = async (
   ticketId: number,
@@ -85,7 +85,7 @@ export const addTicketMessageApi = async (
   formData.append('ticket_id', String(ticketId));
   formData.append('message', message);
   if (imageFile) formData.append('image', imageFile);
-  const res = await axiosClient.post<ApiResponse<null>>('/tickit/message', formData);
+  const res = await axiosClient.post<ApiResponse<null>>('/ticket/message', formData);
   return res.data;
 };
 

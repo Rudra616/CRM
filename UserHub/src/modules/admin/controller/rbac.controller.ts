@@ -23,6 +23,13 @@ import {
 } from "../../token.service";
 import { hasPermissionForUser } from "../../../common/middleware/permission.middleware";
  
+/**
+ * List all modules
+ *  
+ * @param req Request object
+ * @param res Response object
+ * @returns List of all modules
+ */
 export const listModules = async (_req: Request, res: Response) => {
   try {
     const rows = await getModules();
@@ -32,6 +39,13 @@ export const listModules = async (_req: Request, res: Response) => {
   }
 };
 
+/**
+ * Fetches paginated modules list with search support.
+ *
+ * @param req Request object with pagination and search query
+ * @param res Response object
+ * @returns Paginated modules data
+ */
 export const listModulesTable = async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -62,6 +76,13 @@ export const listModulesTable = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Updates module details by ID.
+ *
+ * @param req Request containing module ID and update data
+ * @param res Response object
+ * @returns Update status response
+ */
 export const updateModuleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -76,6 +97,13 @@ export const updateModuleRow = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Soft deletes a module by ID.
+ *
+ * @param req Request containing module ID
+ * @param res Response object
+ * @returns Delete status response
+ */
 export const deleteModuleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -89,6 +117,13 @@ export const deleteModuleRow = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Creates a new module.
+ *
+ * @param req Request containing module name
+ * @param res Response object
+ * @returns Created module ID
+ */
 export const addModule = async (req: Request, res: Response) => {
   try {
     const name = String((req.body as { name?: string }).name ?? "");
@@ -99,6 +134,13 @@ export const addModule = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Fetches all roles.
+ *
+ * @param req Request object
+ * @param res Response object
+ * @returns List of roles
+ */
 export const listRoles = async (_req: Request, res: Response) => {
   try {
     const rows = await getRoles();
@@ -108,6 +150,13 @@ export const listRoles = async (_req: Request, res: Response) => {
   }
 };
 
+/**
+ * Fetches paginated roles list with search support.
+ *
+ * @param req Request object with pagination and search query
+ * @param res Response object
+ * @returns Paginated roles data
+ */
 export const listRolesTable = async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -138,6 +187,14 @@ export const listRolesTable = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Updates role details by ID.
+ *
+ * @param req Request containing role ID and update data
+ * @param res Response object
+ * @returns Update status response
+ */
+
 export const updateRoleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -145,7 +202,7 @@ export const updateRoleRow = async (req: Request, res: Response) => {
     const body = req.body as { name?: string; status?: "active" | "inactive" };
     const ok = await updateRoleById(id, body);
     if (!ok) return errorResponse(res, "Role not found", 404);
-    await invalidateSubadminSessionsForRoleId(id);
+    // await invalidateSubadminSessionsForRoleId(id);
     return successResponse(res, "Role updated successfully", null, 200);
   } catch (err: any) {
     return errorResponse(res, err.message, 400);

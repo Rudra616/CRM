@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
-import { authenticate } from "../../common/middleware/authMiddleware";
+import { authenticate, requireStaffSession } from "../../common/middleware/authMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
 import {
   loginSchema,
@@ -8,34 +8,37 @@ import {
 } from "../user/user.validation";
 import { updateAdminSchema } from "../admin/admin.validation";
 import {
-  subadminLogin,
-  subadminLogout,
-  getSubadminProfile,
-  updateSubadminProfile,
-  changeSubadminPassword,
-} from "../admin/controller/subadmin.self.controller";
+  adminLogin,
+  adminLogout,
+  getAdminProfile,
+  updateAdminProfile,
+  changeAdminPassword,
+} from "../admin/controller/admin.controller";
 const router = Router();
 
 // Subadmin self
-router.post("/login", validateSchema(loginSchema), subadminLogin);
-router.post("/logout", subadminLogout);
+router.post("/login", validateSchema(loginSchema), adminLogin);
+router.post("/logout", adminLogout);
 router.get("/profile", authenticate, 
+  requireStaffSession,
   // allowRoles(Role.SUBADMIN), 
-  getSubadminProfile);
+  getAdminProfile);
 router.put(
   "/profile",
   authenticate,
+  requireStaffSession,
   // allowRoles(Role.SUBADMIN),
   uploadSingle("image"),
   validateSchema(updateAdminSchema),
-  updateSubadminProfile,
+  updateAdminProfile,
 );
 router.post(
   "/change-password",
   authenticate,
+  requireStaffSession,
       // allowRoles(Role.SUBADMIN),
   validateSchema(changePasswordSchema),
-  changeSubadminPassword,
+  changeAdminPassword,
 );
 export default router;
 

@@ -15,6 +15,13 @@ import { TicketMessageModal } from '../components/TicketMessageModal';
 import { useTicketUnread } from '../../../context/TicketUnreadContext';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import {
+  getTicketSocket,
+  type NewMessageSocketEvent,
+  type TicketUpdatedSocketEvent,
+  type StatusUpdatedSocketEvent,
+} from '../../../shared/socket/ticketSocket';
+import { useAuth } from '../../../context/AuthContext';
 
 const editableStatus = (status: TicketItem['status']) =>
   status === 'open';
@@ -22,6 +29,7 @@ const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
 const UserMyTicketsPage = () => {
   const { refreshTicketUnread } = useTicketUnread();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,6 +83,64 @@ const UserMyTicketsPage = () => {
     void loadTickets();
   }, [currentPage, rowsPerPage, appliedSearchTerm]);
 
+  useEffect(() => {
+    const socket = getTicketSocket();
+    const myId = user?.id;
+    const onRealtimeMessage = (payload: NewMessageSocketEvent) => {
+      if (myId && payload.senderId === myId) return;
+      setTickets((prev) =>
+        prev.map((row) =>
+          row.id === payload.ticketId
+            ? {
+                ...row,
+                unread_from_admin_count:
+                  payload.senderType === 'admin'
+                    ? Number(row.unread_from_admin_count ?? 0) + 1
+                    : Number(row.unread_from_admin_count ?? 0),
+              }
+            : row
+        )
+      );
+      if (activeTicket?.id === payload.ticketId) {
+        if (payload.message) {
+          setMessages((prev) => [...prev, payload.message!]);
+        }
+      }
+    };
+    const onStatusUpdated = (payload: StatusUpdatedSocketEvent) => {
+      if (payload.type !== 'ticket_status') return;
+      if (myId && payload.updatedById === myId) return;
+      const nextStatus = payload.status;
+      setTickets((prev) =>
+        prev.map((row) => (row.id === payload.ticketId ? { ...row, status: nextStatus } : row))
+      );
+      if (activeTicket?.id === payload.ticketId) {
+        setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      }
+    };
+    const onTicketUpdated = (payload: TicketUpdatedSocketEvent) => {
+      if (myId && payload.updatedById === myId) return;
+      const nextStatus = payload.status;
+      if (!nextStatus) return;
+      setTickets((prev) =>
+        prev.map((row) => (row.id === payload.ticketId ? { ...row, status: nextStatus } : row))
+      );
+      if (activeTicket?.id === payload.ticketId) {
+        setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      }
+    };
+
+    socket.on('new_message', onRealtimeMessage);
+    socket.on('status_updated', onStatusUpdated);
+    socket.on('ticket_updated', onTicketUpdated);
+
+    return () => {
+      socket.off('new_message', onRealtimeMessage);
+      socket.off('status_updated', onStatusUpdated);
+      socket.off('ticket_updated', onTicketUpdated);
+    };
+  }, [activeTicket?.id, user?.id]);
+
   const start = total === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
   const end = Math.min(currentPage * rowsPerPage, total);
 
@@ -101,14 +167,29 @@ const UserMyTicketsPage = () => {
     }
     try {
       await addTicketMessageApi(activeTicket.id, message, image);
-      const res = await getTicketMessagesApi(activeTicket.id);
-      setMessages(res.data?.messages ?? []);
+      const optimisticId = Date.now();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: optimisticId,
+          ticket_id: activeTicket.id,
+          sender_id: user?.id ?? 0,
+          sender_type: 'user',
+          message,
+          image: image ? URL.createObjectURL(image) : null,
+          created_at: new Date().toISOString(),
+          is_read_by_user: 1,
+          is_read_by_admin: 0,
+        },
+      ]);
       setTickets((prev) =>
         prev.map((row) =>
           row.id === activeTicket.id ? { ...row, unread_from_admin_count: 0 } : row
         )
       );
-      await refreshTicketUnread();
+      if (refreshTicketUnread) {
+        void refreshTicketUnread();
+      }
       showSuccess('Message sent');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to send message');
