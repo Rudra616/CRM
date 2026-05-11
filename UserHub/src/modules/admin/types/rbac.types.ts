@@ -36,7 +36,7 @@ export type RolePermissionInput = {
   can_delete: boolean;
 };
 
-/** One row from getMyPermissionsByRoleId (API /me/permissions for subadmin). */
+/** One row from getMyPermissionsByRoleId (API /me/permissions for delegated staff). */
 export type MyPermissionRow = {
   module_name: string;
   can_view: boolean;

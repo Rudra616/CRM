@@ -1,31 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { loginApi, adminLoginApi, subadminLoginApi } from '../api/auth.api';
+import { loginApi, adminLoginApi } from '../api/auth.api';
 import { clearClientAuthStorage } from '../../../shared/utils/authSession';
 import { validateLoginFields } from '../../../shared/utils/validation';
 import { useFormValidation } from '../../../shared/hooks/useFormValidation';
 import { showError, showSuccess, showInfo } from '../../../shared/utils/toast';
 import { AuthPageLayout, authLinkStyle } from '../../../shared/components/AuthPageLayout';
 import type { Admin, User, UserInfo } from '../../../shared/types/common.types';
-import type { AdminLoginResponse, LoginResponse, SubadminLoginResponse } from '../types/auth.types';
+import type { AdminLoginResponse, LoginResponse } from '../types/auth.types';
 import { MAIN_ADMIN_USERNAME } from '../../../shared/constants/adminAuth';
 import { homePathForGate } from '../../../shared/utils/sessionGate';
 
 const STAFF_LOGIN_PATHS = new Set(['/admin', '/admin/login']);
 
 /** Backend login returns snake_case names; normalize for session storage. */
-const memberFromUserApi = (u: User & Record<string, unknown>): UserInfo => ({
+const memberFromUserApi = (u: User): UserInfo => ({
   id: Number(u.id),
   username: u.username,
   email: u.email,
   firstname:
     u.firstname ??
-    (u.first_name as string | undefined) ??
+    (u as unknown as { first_name?: string }).first_name ??
     '',
   lastname:
     u.lastname ??
-    (u.last_name as string | undefined) ??
+    (u as unknown as { last_name?: string }).last_name ??
     '',
   phone: u.phone ?? '',
   is_staff: false,
@@ -33,7 +33,7 @@ const memberFromUserApi = (u: User & Record<string, unknown>): UserInfo => ({
   role_id: u.role_id ?? undefined,
 });
 
-const ownerFromAdminLogin = (u: Admin): UserInfo => ({
+const staffFromAdminLogin = (u: Admin): UserInfo => ({
   id: Number(u.id),
   username: u.username,
   email: u.email,
@@ -41,22 +41,9 @@ const ownerFromAdminLogin = (u: Admin): UserInfo => ({
   lastname: (u as unknown as { last_name?: string }).last_name ?? '',
   phone: (u as unknown as { phone?: string }).phone ?? '',
   is_staff: true,
-  is_main_admin: true,
+  is_main_admin:
+    String(u.username ?? '').trim().toLowerCase() === MAIN_ADMIN_USERNAME.toLowerCase(),
   role_id: u.role_id ?? null,
-});
-
-const delegateFromSubadminLogin = (
-  u: SubadminLoginResponse['subadmin']
-): UserInfo => ({
-  id: Number(u.id),
-  username: u.username,
-  email: u.email,
-  firstname: u.first_name ?? '',
-  lastname: u.last_name ?? '',
-  phone: '',
-  is_staff: true,
-  is_main_admin: false,
-  role_id: Number(u.role_id) > 0 ? Number(u.role_id) : null,
 });
 
 const Login = () => {
@@ -99,25 +86,12 @@ const Login = () => {
       let session: UserInfo;
 
       if (isStaffLoginRoute) {
-        const isMainAdminLogin =
-          trimmedUser.toLowerCase() === MAIN_ADMIN_USERNAME.toLowerCase();
-        if (isMainAdminLogin) {
-          const response = await adminLoginApi(trimmedUser, password);
-          if (!response.data) {
-            showError(response.message || 'Login failed');
-            return;
-          }
-          session = ownerFromAdminLogin((response.data as AdminLoginResponse).admin);
-        } else {
-          const response = await subadminLoginApi(trimmedUser, password);
-          if (!response.data) {
-            showError(response.message || 'Login failed');
-            return;
-          }
-          session = delegateFromSubadminLogin(
-            (response.data as SubadminLoginResponse).subadmin
-          );
+        const response = await adminLoginApi(trimmedUser, password);
+        if (!response.data) {
+          showError(response.message || 'Login failed');
+          return;
         }
+        session = staffFromAdminLogin((response.data as AdminLoginResponse).admin);
       } else {
         const response = await loginApi(trimmedUser, password);
         if (!response.data) {
@@ -130,11 +104,7 @@ const Login = () => {
       login(session);
 
       showSuccess('Login successful');
-      const gate = session.is_main_admin
-        ? 'owner'
-        : session.is_staff
-          ? 'delegate'
-          : 'member';
+      const gate = session.is_staff ? 'staff' : 'member';
       navigate(homePathForGate(gate), { replace: true });
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || 'Login failed';
@@ -147,7 +117,7 @@ const Login = () => {
       title={isStaffLoginRoute ? 'Staff sign in' : 'Sign in'}
       subtitle={
         isStaffLoginRoute
-          ? 'Main administrator uses username “admin”; other staff sign in with their username.'
+          ? 'Main administrator uses username "admin"; other staff sign in with their username.'
           : ''
       }
     >

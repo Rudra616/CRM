@@ -44,7 +44,7 @@ export const changeUserPasswordApi = (body: {
 };
 
 export const getSubadminProfileApi = (): Promise<ApiResponse<Admin>> => {
-  return apiRequest<Admin>('GET', '/subadmin/profile');
+  return apiRequest<Admin>('GET', '/admin/profile');
 };
 
 export const updateSubadminProfileWithImageApi = async (
@@ -59,7 +59,7 @@ export const updateSubadminProfileWithImageApi = async (
   formData.append('phone', data.phone);
   if (data.gender) formData.append('gender', data.gender);
   if (imageFile) formData.append('image', imageFile);
-  const res = await axiosClient.put<ApiResponse<Admin>>('/subadmin/profile', formData);
+  const res = await axiosClient.put<ApiResponse<Admin>>('/admin/profile', formData);
   return res.data;
 };
 
@@ -67,7 +67,7 @@ export const changeSubadminPasswordApi = (body: {
   newPassword: string;
   confirmPassword: string;
 }): Promise<ApiResponse<null>> => {
-  return apiRequest<null>('POST', '/subadmin/change-password', body);
+  return apiRequest<null>('POST', '/admin/change-password', body);
 };
 
 export const getAdminProfileApi = (): Promise<ApiResponse<Admin>> => {

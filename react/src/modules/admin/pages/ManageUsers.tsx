@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   getAdminUsersApi,
-  getSubadminUsersApi,
   getUsersApi,
   updateUserStatusApi,
   adminLogoutUserApi,
@@ -38,14 +37,14 @@ const ManageUsers = () => {
   // ─── Role flags ───────────────────────────────────────────────────────────
   /** Main administrator row — full access. Delegated staff uses `role_id` RBAC. */
   const isOwner = user?.is_main_admin;
-  const isDelegate = user?.is_staff && !user?.is_main_admin;
 
   // ─── Permissions ──────────────────────────────────────────────────────────
-  // For ADMIN: getModulePerm always returns all true (handled inside PermissionContext)
-  // For SUBADMIN: reads from DB via /admin/me/permissions
+  // For main admin: getModulePerm always returns all true (handled inside PermissionContext)
+  // For non-main staff: reads from DB via /admin/me/permissions
   const perm = getModulePerm(PERMISSION_MODULE_KEYS.USER);
 
   // Derived convenience flags
+  const canView = perm.can_view;
   const canEdit = perm.can_edit;    // show Status column + Edit + Logout buttons
   const canDelete = perm.can_delete;  // show Delete button
   const hasActions = canEdit || canDelete; // show Actions column at all
@@ -85,10 +84,9 @@ const ManageUsers = () => {
 
     setLoading(true);
     try {
-      let res;
-      if (isOwner) res = await getAdminUsersApi(params);
-      else if (isDelegate) res = await getSubadminUsersApi(params);
-      else res = await getUsersApi(params);
+      const res = user?.is_staff
+        ? await getAdminUsersApi(params)
+        : await getUsersApi(params);
 
       const data = res.data as UsersPageData | undefined;
       const items = data?.items ?? [];
@@ -124,7 +122,7 @@ const ManageUsers = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, rowsPerPage, isOwner, isDelegate, statusFilter, appliedSearchTerm]);
+  }, [currentPage, rowsPerPage, user?.is_staff, statusFilter, appliedSearchTerm]);
 
   // ─── Sync statusFilter from navigation state ──────────────────────────────
   useEffect(() => {

@@ -59,7 +59,7 @@ const ManagePermissions = () => {
   const canViewMatrix = isOwner || permRp.can_view;
   const canEditMatrix = isOwner || permRp.can_edit;
 
-  const rbacBase = isOwner ? '/admin/rbac' : '/subadmin/rbac';
+  const rbacBase = '/admin/rbac';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

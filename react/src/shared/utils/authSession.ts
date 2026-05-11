@@ -26,15 +26,9 @@ export function clearClientAuthStorage(): void {
   }
 }
 
-/**
- * Admin-area routes (after /admin/) should return to admin sign-in; everyone else to /login.
- */
-/** Staff (main admin + subadmin) share one sign-in URL. */
+/** Admin-area routes should return to admin sign-in; everyone else to /login. */
 export function getLoginRedirectUrl(pathname: string): string {
-  if (
-    pathname.startsWith('/admin/') ||
-    pathname.startsWith('/subadmin/')
-  ) {
+  if (pathname.startsWith('/admin/')) {
     return '/admin/login';
   }
   return '/login';

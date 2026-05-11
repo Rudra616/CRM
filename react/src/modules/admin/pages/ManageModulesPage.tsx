@@ -35,7 +35,7 @@ const ManageModulesPage = () => {
   const canEdit = isOwner || perm.can_edit;
   const canDelete = isOwner || perm.can_delete;
 
-  const rbacBase = isOwner ? '/admin/rbac' : '/subadmin/rbac';
+  const rbacBase = '/admin/rbac';
 
   const [rows, setRows] = useState<ModuleTableItem[]>([]);
   const [loading, setLoading] = useState(true);

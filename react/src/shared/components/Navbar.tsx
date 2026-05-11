@@ -9,15 +9,12 @@ import styles from './Navbar.module.css';
 
 const DASHBOARD_PATHS = [
   '/admin',
-  '/subadmin',
   '/user',
   '/profile',
   '/users',
   '/tickets',
   '/admin/tickets',
-  '/subadmin/tickets',
   '/admin/rbac',
-  '/subadmin/rbac',
   '/change-password',
   '/admin/change-password',
 ];
@@ -66,8 +63,8 @@ const Navbar = () => {
 
   const showSidebarToggle = isAuthenticated && isDashboardRoute(location.pathname);
 
-  const profilePath = gate === 'owner' ? '/admin/profile' : '/profile';
-  const passwordPath = gate === 'owner' ? '/admin/change-password' : '/change-password';
+  const profilePath = gate === 'member' ? '/profile' : '/admin/profile';
+  const passwordPath = gate === 'member' ? '/change-password' : '/admin/change-password';
 
   return (
     <nav

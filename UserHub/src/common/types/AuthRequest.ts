@@ -1,5 +1,4 @@
 import type { Request } from "express";
-import type { StaffKind } from "./role";
 
 export interface AuthRequest extends Request {
   user: {
@@ -16,7 +15,5 @@ export interface AuthRequest extends Request {
 
     /** RBAC id from `admin.role_id` — permissions via `role_permission`. */
     role_id?: number;
-
-    staff_kind?: StaffKind;
   };
 }

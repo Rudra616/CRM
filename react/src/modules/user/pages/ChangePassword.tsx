@@ -59,7 +59,7 @@ const ChangePassword = () => {
     }
   };
 
-  const backHref = isOwner ? '/admin/profile' : '/profile';
+  const backHref = isStaff ? '/admin/profile' : '/profile';
 
   return (
     <PageShell

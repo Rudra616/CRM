@@ -48,12 +48,12 @@ const Sidebar = ({ gate }: Props) => {
   const canViewUsers = canView(PERMISSION_MODULE_KEYS.USER);
   const canViewTickets = canView(PERMISSION_MODULE_KEYS.TICKET);
   const canViewAccessControl = canView(PERMISSION_MODULE_KEYS.MODULE);
-  const showSubadminAccessMenu = canViewAccessControl;
+  const showAccessControlMenu = canViewAccessControl;
 
   const subadminPerm = getModulePerm(PERMISSION_MODULE_KEYS.SUBADMIN);
-  const showDelegateSubadminMenu = subadminPerm.can_view || subadminPerm.can_add;
+  const showStaffSubadminMenu = subadminPerm.can_view || subadminPerm.can_add;
 
-  const getProfilePath = () => (gate === 'owner' ? '/admin/profile' : '/profile');
+  const getProfilePath = () => (gate === 'member' ? '/profile' : '/admin/profile');
 
   const nav = (path: string) => () => {
     navigate(path);
@@ -124,89 +124,21 @@ const Sidebar = ({ gate }: Props) => {
 
         <Menu menuItemStyles={menuItemStyles} closeOnClick={false}>
 
-          {/* ── ADMIN menu ────────────────────────────────────────────────── */}
-          {/*    Admin sees everything — no permission checks needed here      */}
-          {gate === 'owner' && (
+          {/* ── STAFF menu ────────────────────────────────────────────────── */}
+          {gate === 'staff' && (
             <>
               <MenuItem icon={<FaTachometerAlt />} onClick={nav('/admin/dashboard')}>
                 Dashboard
               </MenuItem>
 
-              <SubMenu label="Subadmin" icon={<FaUserShield />}>
-                <MenuItem icon={<FaUserPlus />} onClick={nav('/admin/create-subadmin')}>
-                  Create Subadmin
-                </MenuItem>
-                <MenuItem icon={<FaUsers />} onClick={nav('/admin/subadmins')}>
-                  Manage Subadmins
-                </MenuItem>
-              </SubMenu>
-
-              <MenuItem icon={<FaUsers />} onClick={nav('/admin/users')}>
-                Manage Users
-              </MenuItem>
-
-              <SubMenu label="Access control" icon={<FaShieldAlt />}>
-                <MenuItem icon={<FaCube />} onClick={nav('/admin/rbac/modules')}>
-                  Modules
-                </MenuItem>
-                <MenuItem icon={<FaUserTag />} onClick={nav('/admin/rbac/roles')}>
-                  Roles
-                </MenuItem>
-                <MenuItem icon={<FaShieldAlt />} onClick={nav('/admin/rbac/permissions')}>
-                  Role permissions
-                </MenuItem>
-              </SubMenu>
-
-              <SubMenu label="Tickets" icon={<FaTicketAlt />}>
-                <MenuItem icon={<FaTicketAlt />} onClick={nav('/admin/tickets')}>
-                  <span className="d-inline-flex align-items-center gap-2">
-                    Manage Tickets
-                    {ticketsWithUnread > 0 ? (
-                      <span
-                        className="badge rounded-pill bg-danger"
-                        style={{ fontSize: '0.7rem' }}
-                      >
-                        {ticketsWithUnread > 99 ? '99+' : ticketsWithUnread}
-                      </span>
-                    ) : null}
-                  </span>
-                </MenuItem>
-              </SubMenu>
-
-              <MenuItem icon={<FaUser />} onClick={nav('/admin/profile')}>
-                Profile
-              </MenuItem>
-
-              <MenuItem icon={<FaKey />} onClick={nav('/admin/change-password')}>
-                Change Password
-              </MenuItem>
-            </>
-          )}
-
-          {/* ── SUBADMIN menu ─────────────────────────────────────────────── */}
-          {/*    Each menu item is gated by the matching module's can_view.    */}
-          {/*    Dashboard, Profile, Change Password are always visible —      */}
-          {/*    they are not module-gated (no DB permission row needed).      */}
-          {gate === 'delegate' && (
-            <>
-              {/* Always visible — not a DB-module-gated page */}
-              <MenuItem icon={<FaTachometerAlt />} onClick={nav('/subadmin/dashboard')}>
-                Dashboard
-              </MenuItem>
-
-              {/*
-                Manage Users:
-                  - shown  → subadmin has can_view = 1 for module "user" in DB
-                  - hidden → can_view = 0 or no permission row at all
-              */}
               {canViewUsers && (
-                <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/users')}>
+                <MenuItem icon={<FaUsers />} onClick={nav('/admin/users')}>
                   Manage Users
                 </MenuItem>
               )}
 
               {canViewTickets && (
-                <MenuItem icon={<FaTicketAlt />} onClick={nav('/subadmin/tickets')}>
+                <MenuItem icon={<FaTicketAlt />} onClick={nav('/admin/tickets')}>
                   <span className="d-inline-flex align-items-center gap-2">
                     Tickets
                     {ticketsWithUnread > 0 ? (
@@ -221,35 +153,35 @@ const Sidebar = ({ gate }: Props) => {
                 </MenuItem>
               )}
 
-              {showDelegateSubadminMenu && (
+              {showStaffSubadminMenu && (
                 <SubMenu label="Subadmin" icon={<FaUserShield />}>
                   {subadminPerm.can_add && (
-                    <MenuItem icon={<FaUserPlus />} onClick={nav('/subadmin/create-subadmin')}>
+                    <MenuItem icon={<FaUserPlus />} onClick={nav('/admin/create-subadmin')}>
                       Create Subadmin
                     </MenuItem>
                   )}
                   {subadminPerm.can_view && (
-                    <MenuItem icon={<FaUsers />} onClick={nav('/subadmin/subadmins')}>
+                    <MenuItem icon={<FaUsers />} onClick={nav('/admin/subadmins')}>
                       Manage Subadmins
                     </MenuItem>
                   )}
                 </SubMenu>
               )}
 
-              {showSubadminAccessMenu && (
+              {showAccessControlMenu && (
                 <SubMenu label="Access control" icon={<FaShieldAlt />}>
                   {canViewAccessControl && (
-                    <MenuItem icon={<FaCube />} onClick={nav('/subadmin/rbac/modules')}>
+                    <MenuItem icon={<FaCube />} onClick={nav('/admin/rbac/modules')}>
                       Modules
                     </MenuItem>
                   )}
                   {canViewAccessControl && (
-                    <MenuItem icon={<FaUserTag />} onClick={nav('/subadmin/rbac/roles')}>
+                    <MenuItem icon={<FaUserTag />} onClick={nav('/admin/rbac/roles')}>
                       Roles
                     </MenuItem>
                   )}
                   {canViewAccessControl && (
-                    <MenuItem icon={<FaShieldAlt />} onClick={nav('/subadmin/rbac/permissions')}>
+                    <MenuItem icon={<FaShieldAlt />} onClick={nav('/admin/rbac/permissions')}>
                       Role permissions
                     </MenuItem>
                   )}
@@ -257,11 +189,11 @@ const Sidebar = ({ gate }: Props) => {
               )}
 
               {/* Always visible — not module-gated */}
-              <MenuItem icon={<FaUser />} onClick={nav('/profile')}>
+              <MenuItem icon={<FaUser />} onClick={nav('/admin/profile')}>
                 Profile
               </MenuItem>
 
-              <MenuItem icon={<FaKey />} onClick={nav('/change-password')}>
+              <MenuItem icon={<FaKey />} onClick={nav('/admin/change-password')}>
                 Change Password
               </MenuItem>
             </>

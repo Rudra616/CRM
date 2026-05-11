@@ -79,29 +79,18 @@ export const TicketUnreadProvider = ({
   }, []);
 
   const refreshTicketUnread = useCallback(async () => {
-    if (gate !== 'member' && gate !== 'owner' && gate !== 'delegate') return;
-
     if (gate === 'member') {
       await loadMemberSummary();
       return;
     }
 
-    if (gate === 'delegate') {
-      if (permLoading) return;
-      if (!ticketCanAdd) {
-        setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
-        return;
-      }
+    if (permLoading) return;
+    if (!ticketCanAdd) {
+      setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
+      return;
     }
-
     await loadStaffSummary();
   }, [gate, permLoading, ticketCanAdd, loadMemberSummary, loadStaffSummary]);
-
-  /** Owner path must not key off PermissionContext (permLoading/ticketCanAdd) or staff-unread-summary fires twice on admin load. */
-  useEffect(() => {
-    if (gate !== 'owner') return;
-    void loadStaffSummary();
-  }, [gate, loadStaffSummary]);
 
   useEffect(() => {
     if (gate !== 'member') return;
@@ -109,7 +98,7 @@ export const TicketUnreadProvider = ({
   }, [gate, loadMemberSummary]);
 
   useEffect(() => {
-    if (gate !== 'delegate') return;
+    if (gate !== 'staff') return;
     if (permLoading) return;
     if (!ticketCanAdd) {
       setSummary({ ticketsWithUnread: 0, unreadMessageCount: 0 });
@@ -141,11 +130,9 @@ export const TicketUnreadProvider = ({
   }, [gate, user?.id]);
 
   useEffect(() => {
-    if (gate !== 'owner' && gate !== 'delegate') return;
-    if (gate === 'delegate') {
-      if (permLoading) return;
-      if (!ticketCanAdd) return;
-    }
+    if (gate !== 'staff') return;
+    if (permLoading) return;
+    if (!ticketCanAdd) return;
 
     const socket = getTicketSocket();
     const myId = user?.id;

@@ -1,5 +1,3 @@
-import type { StaffKind } from "../types/role";
-
 /** Single main admin row: match this username (case-insensitive). */
 export const MAIN_ADMIN_USERNAME = "admin";
 
@@ -17,8 +15,3 @@ export const isSubadminRow = (row: {
   !isMainAdminRow(row) &&
   row.role_id != null &&
   Number(row.role_id) > 0;
-
-export const staffKindFromRow = (row: {
-  username: string;
-  role_id?: number | null;
-}): StaffKind => (isMainAdminRow(row) ? "main_admin" : "delegated");

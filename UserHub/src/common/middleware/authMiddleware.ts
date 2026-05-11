@@ -11,7 +11,7 @@ import {
 } from "../../modules/token.service";
 import { findUserById } from "../../modules/user/user.service";
 import { findAdminById } from "../../modules/admin/service/admin.service";
-import { isMainAdminRow, staffKindFromRow } from "../utils/adminIdentity";
+import { isMainAdminRow } from "../utils/adminIdentity";
 
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authReq = req as AuthRequest;
@@ -51,7 +51,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
       authReq.user = { id: Number(decoded.id), is_staff: false };
     }
 
-    // ── Admin / Subadmin session ──────────────────────────────────────────────
+    // ── Staff session (admin table) ───────────────────────────────────────────
     if (adminTokenRow) {
       const adminRow = await findAdminById(Number(decoded.id));
       
@@ -66,7 +66,6 @@ export const authenticate: RequestHandler = async (req, res, next) => {
         is_staff: true,
         is_main_admin: main,
         role_id: adminRow.role_id ?? undefined,
-        staff_kind: staffKindFromRow(adminRow),
       };
     }
 
@@ -110,7 +109,7 @@ export const requireUserSession: RequestHandler = (req, res, next) => {
   return next();
 };
 
-/** Staff-only guard for routes under `/api/admin/*` and `/api/subadmin/*`. */
+/** Staff-only guard for routes under `/api/admin/*`. */
 export const requireStaffSession: RequestHandler = (req, res, next) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) {

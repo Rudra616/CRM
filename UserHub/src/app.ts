@@ -3,7 +3,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import userRoutes from "./modules/user/user.routes";
 import adminRoutes from "./modules/admin/admin.routes";
-import subadminRoutes from "./modules/subadmin/subadmin.routes";
 import cookieParser from "cookie-parser";
 import { UPLOADS_ROOT } from "./config/uploads";
 import tickitRoutes from "./modules/ticket/ticket.route";
@@ -21,7 +20,6 @@ app.use("/uploads", express.static(UPLOADS_ROOT));
 app.use(cookieParser());
 
 app.use("/api/admin", adminRoutes);
-app.use("/api/subadmin", subadminRoutes);
 app.use("/api", userRoutes);
 app.use("/api/ticket", tickitRoutes);
 export default app;

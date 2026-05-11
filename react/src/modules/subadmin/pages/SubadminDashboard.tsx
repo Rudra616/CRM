@@ -88,12 +88,12 @@ const SubadminDashboard: React.FC = () => {
             hint="Disabled or inactive users"
             colClass="col-sm-6 col-md-4"
           />
-          {/* <DashboardStatCard
+          <DashboardStatCard
             title="Deleted Users"
             value={deletedUsers}
             hint="Soft deleted users"
             colClass="col-sm-6 col-md-4"
-          /> */}
+          />
         </div>
       )}
 
@@ -105,22 +105,22 @@ const SubadminDashboard: React.FC = () => {
 
       <div className="d-flex flex-wrap gap-2">
         {canViewUsers && (
-          <Link className="btn btn-primary" to="/subadmin/users">
+          <Link className="btn btn-primary" to="/admin/users">
             Manage Users
           </Link>
         )}
         {canViewTickets && (
-          <Link className="btn btn-outline-primary" to="/subadmin/tickets">
+          <Link className="btn btn-outline-primary" to="/admin/tickets">
             Manage Tickets
           </Link>
         )}
         {canAddSubadmin && (
-          <Link className="btn btn-outline-primary" to="/subadmin/create-subadmin">
+          <Link className="btn btn-outline-primary" to="/admin/create-subadmin">
             Create Subadmin
           </Link>
         )}
         {canViewSubadmins && (
-          <Link className="btn btn-outline-primary" to="/subadmin/subadmins">
+          <Link className="btn btn-outline-primary" to="/admin/subadmins">
             Manage Subadmins
           </Link>
         )}
@@ -130,17 +130,17 @@ const SubadminDashboard: React.FC = () => {
         <div className="w-100 mt-3 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
           <span className="small text-muted me-1">Access control:</span>
           {canViewRbac && (
-            <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/modules">
+            <Link className="btn btn-outline-secondary btn-sm" to="/admin/rbac/modules">
               Modules
             </Link>
           )}
           {canViewRbac && (
-            <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/roles">
+            <Link className="btn btn-outline-secondary btn-sm" to="/admin/rbac/roles">
               Roles
             </Link>
           )}
           {canViewRbac && (
-            <Link className="btn btn-outline-secondary btn-sm" to="/subadmin/rbac/permissions">
+            <Link className="btn btn-outline-secondary btn-sm" to="/admin/rbac/permissions">
               Role permissions
             </Link>
           )}

@@ -35,7 +35,7 @@ export interface ApiResponse<T> {
 
 /**
  * Signed-in identity (browser session).
- * Use `role_id` for RBAC on delegated staff only (`admin.role_id`).
+ * Use `role_id` for RBAC staff only (`admin.role_id`).
  */
 export interface UserInfo {
   id: number;
@@ -44,7 +44,7 @@ export interface UserInfo {
   firstname?: string;
   lastname?: string;
   phone?: string;
-  /** Session is an `admin` table row (main or delegated staff). */
+  /** Session is an `admin` table row. */
   is_staff: boolean;
   /** Reserved main administrator row — full bypass; never rename username in UI/API. */
   is_main_admin: boolean;

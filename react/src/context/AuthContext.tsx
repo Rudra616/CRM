@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { UserInfo } from '../shared/types/common.types';
 import { MAIN_ADMIN_USERNAME } from '../shared/constants/adminAuth';
-import { logoutAdminApi, logoutApi, logoutSubadminApi } from '../modules/auth/api/auth.api';
+import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
 import { getAdminProfileApi } from '../modules/admin/api/admin.api';
-import { getProfileApi, getSubadminProfileApi } from '../modules/user/api/user.api';
+import { getProfileApi } from '../modules/user/api/user.api';
 import {
   buildSessionEndedLoginUrl,
   clearClientAuthStorage,
@@ -72,8 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     const current = userRef.current;
     try {
-      if (current?.is_main_admin) await logoutAdminApi();
-      else if (current?.is_staff) await logoutSubadminApi();
+      if (current?.is_staff) await logoutAdminApi();
       else await logoutApi();
     } catch {}
     finally {
@@ -124,26 +123,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const isSubadminArea = path.startsWith('/subadmin/');
-
-    if (isSubadminArea) {
-      setIsLoading(true);
-      void (async () => {
-        try {
-          const res = await getSubadminProfileApi();
-          if (res.data) {
-            const row = res.data as AdminProfileRow;
-            login(authFromAdminRow(row, false, {}));
-          }
-        } catch {
-          clearClientAuthStorage();
-        } finally {
-          setIsLoading(false);
-        }
-      })();
-      return;
-    }
-
     const needsMemberOrSharedBootstrap =
       path.startsWith('/user/') ||
       path.startsWith('/tickets/') ||
@@ -157,10 +136,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           if (path === '/profile' || path === '/change-password') {
             try {
-              const s = await getSubadminProfileApi();
+              const s = await getAdminProfileApi();
               if (s.data) {
                 const row = s.data as AdminProfileRow;
-                login(authFromAdminRow(row, false, {}));
+                const uname = String(row.username ?? '').trim().toLowerCase();
+                login(
+                  authFromAdminRow(row, uname === MAIN_ADMIN_USERNAME.toLowerCase(), {})
+                );
                 return;
               }
             } catch {

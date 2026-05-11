@@ -24,9 +24,7 @@ import {
   deleteRoleRow,
   getPermissionsByRole,
   getMyPermissions,
-  listModules,
   listModulesTable,
-  listRoles,
   listRolesTable,
   savePermissionsByRole,
   updateModuleRow,
@@ -172,14 +170,6 @@ router.delete(
   checkPermission("module", "can_delete"),
   deleteModuleRow
 );
-router.get(
-  "/modules",
-  authenticate,
-  requireStaffSession,
-  // allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermission("module", "can_view"),
-  listModules
-);
 router.post(
   "/modules",
   authenticate,
@@ -214,14 +204,6 @@ router.delete(
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   checkPermission("module", "can_delete"),
   deleteRoleRow
-);
-router.get(
-  "/roles",
-  authenticate,
-  requireStaffSession,
-  // allowRoles(Role.ADMIN, Role.SUBADMIN),
-  checkPermission("module", "can_view"),
-  listRoles
 );
 router.post(
   "/roles",

@@ -102,9 +102,6 @@ export type RolePermissionSaveRow = {
 export const getUsersApi = (p: UsersListParams): Promise<ApiResponse<UsersPageData>> =>
   apiRequest<UsersPageData>('GET', `/users?${usersListSearchParams(p).toString()}`);
 
-export const getSubadminUsersApi = (p: UsersListParams): Promise<ApiResponse<UsersPageData>> =>
-  apiRequest<UsersPageData>('GET', `/admin/users?${usersListSearchParams(p).toString()}`);
-
 export const getAdminUsersApi = (p: UsersListParams): Promise<ApiResponse<UsersPageData>> =>
   apiRequest<UsersPageData>('GET', `/admin/users?${usersListSearchParams(p).toString()}`);
 
@@ -115,8 +112,21 @@ export const getAdminDashboardSummaryApi = (): Promise<ApiResponse<AdminDashboar
   );
 };
 
-export const getModulesApi = (): Promise<ApiResponse<ModuleItem[]>> =>
-  apiRequest<ModuleItem[]>('GET', '/admin/modules');
+export const getModulesApi = async (): Promise<ApiResponse<ModuleItem[]>> => {
+  const first = await getModulesTableApi({ page: 1, limit: 100 });
+  const items: ModuleItem[] = [...(first.data?.items ?? [])];
+  const totalPages = first.data?.pagination?.totalPages ?? 1;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const res = await getModulesTableApi({ page, limit: 100 });
+    items.push(...(res.data?.items ?? []));
+  }
+
+  return {
+    ...first,
+    data: items,
+  };
+};
 
 export const createModuleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
   apiRequest<{ id: number }>('POST', '/admin/modules', body);
@@ -137,8 +147,21 @@ export const patchModuleApi = (
 export const deleteModuleApi = (id: number): Promise<ApiResponse<null>> =>
   apiRequest<null>('DELETE', `/admin/modules/${id}`);
 
-export const getRolesApi = (): Promise<ApiResponse<RoleItem[]>> =>
-  apiRequest<RoleItem[]>('GET', '/admin/roles');
+export const getRolesApi = async (): Promise<ApiResponse<RoleItem[]>> => {
+  const first = await getRolesTableApi({ page: 1, limit: 100 });
+  const items: RoleItem[] = [...(first.data?.items ?? [])];
+  const totalPages = first.data?.pagination?.totalPages ?? 1;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const res = await getRolesTableApi({ page, limit: 100 });
+    items.push(...(res.data?.items ?? []));
+  }
+
+  return {
+    ...first,
+    data: items,
+  };
+};
 
 export const createRoleApi = (body: { name: string }): Promise<ApiResponse<{ id: number }>> =>
   apiRequest<{ id: number }>('POST', '/admin/roles', body);
@@ -172,26 +195,6 @@ export const saveRolePermissionsApi = (
   permissions: RolePermissionSaveRow[]
 ): Promise<ApiResponse<{ roleId: number }>> =>
   apiRequest<{ roleId: number }>('PUT', `/admin/roles/${roleId}/permissions`, { permissions });
-
-export const getAdminMyModulesApi = (): Promise<ApiResponse<{ moduleKeys: string[] }>> =>
-  apiRequest<{ moduleKeys: string[] }>('GET', '/admin/me/modules');
-
-export const getSubadminMyModulesApi = (): Promise<ApiResponse<{ moduleKeys: string[] }>> =>
-  apiRequest<{ moduleKeys: string[] }>('GET', '/subadmin/me/modules');
-
-export const getMyModulesApi = async (
-  isMainAdmin: boolean
-): Promise<ApiResponse<{ moduleKeys: string[] }>> => {
-  if (isMainAdmin) {
-    return getAdminMyModulesApi();
-  }
-  try {
-    return await getSubadminMyModulesApi();
-  } catch {
-    // Backward compatibility if an older backend only exposes /admin/me/modules.
-    return getAdminMyModulesApi();
-  }
-};
 
 export const getSubadminsApi = (
   page: number,

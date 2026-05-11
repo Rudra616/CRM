@@ -35,14 +35,10 @@ const Register: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { getModulePerm, permLoading } = usePermissions();
-  const isCreateSubadmin =
-    location.pathname === '/admin/create-subadmin' ||
-    location.pathname === '/subadmin/create-subadmin';
+  const isCreateSubadmin = location.pathname === '/admin/create-subadmin';
   const isDelegateStaff = Boolean(user?.is_staff && !user?.is_main_admin);
   const canCreateSubadminByRbac = getModulePerm(PERMISSION_MODULE_KEYS.SUBADMIN).can_add;
-  const backToSubadminsPath = location.pathname.startsWith('/subadmin')
-    ? '/subadmin/subadmins'
-    : '/admin/subadmins';
+  const backToSubadminsPath = '/admin/subadmins';
 
   const { errors, setErrorsFromValidation, clearFieldError, resetErrors } = useFormValidation<RegisterForm>();
 

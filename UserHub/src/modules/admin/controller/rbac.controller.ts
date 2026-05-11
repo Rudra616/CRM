@@ -3,10 +3,9 @@ import { errorResponse, successResponse } from "../../../common/utils/apiRespons
 import {
   createModule,
   createRole,
-  getModules,
   getModulesPaginated,
+  getMyPermissionsByRoleId,
   getRolePermissions,
-  getRoles,
   getRolesPaginated,
   replaceRolePermissions,
   softDeleteModuleById,
@@ -21,24 +20,7 @@ import {
   invalidateSubadminSessionsForModuleId,
   invalidateSubadminSessionsForRoleId,
 } from "../../token.service";
-import { hasPermissionForUser } from "../../../common/middleware/permission.middleware";
  
-/**
- * List all modules
- *  
- * @param req Request object
- * @param res Response object
- * @returns List of all modules
- */
-export const listModules = async (_req: Request, res: Response) => {
-  try {
-    const rows = await getModules();
-    return successResponse(res, "Modules fetched successfully", rows, 200);
-  } catch (err: any) {
-    return errorResponse(res, err.message, 500);
-  }
-};
-
 /**
  * Fetches paginated modules list with search support.
  *
@@ -131,22 +113,6 @@ export const addModule = async (req: Request, res: Response) => {
     return successResponse(res, "Module created successfully", { id }, 201);
   } catch (err: any) {
     return errorResponse(res, err.message, 400);
-  }
-};
-
-/**
- * Fetches all roles.
- *
- * @param req Request object
- * @param res Response object
- * @returns List of roles
- */
-export const listRoles = async (_req: Request, res: Response) => {
-  try {
-    const rows = await getRoles();
-    return successResponse(res, "Roles fetched successfully", rows, 200);
-  } catch (err: any) {
-    return errorResponse(res, err.message, 500);
   }
 };
 
@@ -299,16 +265,15 @@ export const getMyPermissions = async (req: Request, res: Response) => {
       );
     }
 
-    const modules = await getModules();
     const permissions: Record<string, { can_view: boolean; can_add: boolean; can_edit: boolean; can_delete: boolean }> = {};
 
-    for (const mod of modules) {
-      const moduleName = mod.name;
-      permissions[moduleName] = {
-        can_view: await hasPermissionForUser(user, moduleName, "can_view"),
-        can_add: await hasPermissionForUser(user, moduleName, "can_add"),
-        can_edit: await hasPermissionForUser(user, moduleName, "can_edit"),
-        can_delete: await hasPermissionForUser(user, moduleName, "can_delete"),
+    const rows = await getMyPermissionsByRoleId(user.role_id);
+    for (const row of rows) {
+      permissions[row.module_name] = {
+        can_view: row.can_view,
+        can_add: row.can_add,
+        can_edit: row.can_edit,
+        can_delete: row.can_delete,
       };
     }
 

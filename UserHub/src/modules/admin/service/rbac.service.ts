@@ -2,7 +2,6 @@ import db from "../../../config/db";
 import { logServiceError } from "../../../common/helpers/serviceError";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "./user.service";
 import type {
-  ModuleRow,
   ModuleTableRow,
   MyPermissionRow,
   RolePermissionInput,
@@ -20,18 +19,6 @@ const ROLE_PERMISSION_TABLE = (() => {
 
 
 const rp = () => `\`${ROLE_PERMISSION_TABLE}\``;
-
-export const getModules = async (): Promise<ModuleRow[]> => {
-  try {
-    const [rows]: any = await db.query(
-      "SELECT id, name, status FROM module WHERE COALESCE(is_delete, 0) = 0 ORDER BY id DESC"
-    );
-    return rows;
-  } catch (error: unknown) {
-    logServiceError("rbac.service", "getModules", error);
-    throw error;
-  }
-};
 
 const activeModuleNameExists = async (
   name: string,
@@ -152,18 +139,6 @@ export const createModule = async (name: string): Promise<number> => {
     return Number(result.insertId);
   } catch (error: unknown) {
     logServiceError("rbac.service", "createModule", error);
-    throw error;
-  }
-};
-
-export const getRoles = async (): Promise<RoleRow[]> => {
-  try {
-    const [rows]: any = await db.query(
-      "SELECT id, name, status FROM role WHERE COALESCE(is_delete, 0) = 0 ORDER BY id ASC"
-    );
-    return rows;
-  } catch (error: unknown) {
-    logServiceError("rbac.service", "getRoles", error);
     throw error;
   }
 };
