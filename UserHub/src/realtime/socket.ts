@@ -2,16 +2,34 @@ import { createServer } from "http";
 import { Socket, Server } from "socket.io";
 import { verifyToken } from "../common/helpers/common.helper";
 import { findAdminToken, findUserToken } from "../modules/token.service";
-import { StatusEvent, SocketUser, NewMessageEvent, TicketUpdatedEvent } from "./type";
-
+import { findAdminById, getActiveAdminIds } from "../modules/admin/service/admin.service";
+import { getPermissionByRoleAndModule } from "../common/permission.service";
+import { isMainAdminRow } from "../common/utils/adminIdentity";
+import { SocketEmit, SocketUser } from "./type";
 
 let io: Server | null = null;
 
-/**
- * 
- * @param cookieHeader 
- * @returns 
- */
+const userRoom = (id: number): string => `user:${id}`;
+
+const emitOne = (userId: number, channel: string, payload: unknown): void => {
+  if (!io) return;
+  io.to(userRoom(userId)).emit(channel, payload);
+};
+
+const emitToEachAdmin = async (channel: string, payload: unknown): Promise<void> => {
+  const ids = await getActiveAdminIds();
+  for (const id of ids) emitOne(id, channel, payload);
+};
+
+const hasModuleSocketAccess = (row: {
+  can_view?: number;
+  can_add?: number;
+  can_edit?: number;
+} | null): boolean => {
+  if (!row) return false;
+  return row.can_view === 1 || row.can_add === 1 || row.can_edit === 1;
+};
+
 const parseCookieToken = (cookieHeader?: string): string | null => {
   if (!cookieHeader) return null;
   const parts = cookieHeader.split(";").map((part) => part.trim());
@@ -35,16 +53,30 @@ const resolveSocketUser = async (token: string): Promise<SocketUser | null> => {
   };
 };
 
-const emitToTicketAudience = (ownerUserId: number, event: string, payload: unknown): void => {
-  if (!io) return;
-  io.to(`user:${ownerUserId}`).emit(event, payload);
-  io.to("staff").emit(event, payload);
+/** Staff socket access: main admin, or ticket module any of view/add/edit, or user module same (aligned with previous connection check). */
+const assertStaffSocketAllowed = async (userId: number): Promise<void> => {
+  const adminRow = await findAdminById(userId);
+  if (!adminRow || adminRow.status !== "active") {
+    throw new Error("Unauthorized");
+  }
+  if (isMainAdminRow(adminRow)) return;
+
+  const roleId = adminRow.role_id != null ? Number(adminRow.role_id) : null;
+  if (!roleId || roleId <= 0) {
+    throw new Error("Forbidden");
+  }
+
+  const ticketPerm = await getPermissionByRoleAndModule(roleId, "ticket");
+  const userModPerm = await getPermissionByRoleAndModule(roleId, "user");
+  if (!hasModuleSocketAccess(ticketPerm) && !hasModuleSocketAccess(userModPerm)) {
+    throw new Error("Forbidden");
+  }
 };
 
 export const initSocketServer = (server: ReturnType<typeof createServer>): Server => {
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: process.env.FRONTEND_URL,
       credentials: true,
     },
   });
@@ -55,6 +87,16 @@ export const initSocketServer = (server: ReturnType<typeof createServer>): Serve
       if (!token) return next(new Error("Unauthorized"));
       const user = await resolveSocketUser(token);
       if (!user) return next(new Error("Unauthorized"));
+
+      if (user.is_staff) {
+        try {
+          await assertStaffSocketAllowed(user.id);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Unauthorized";
+          return next(new Error(msg));
+        }
+      }
+
       socket.data.user = user;
       next();
     } catch {
@@ -68,49 +110,57 @@ export const initSocketServer = (server: ReturnType<typeof createServer>): Serve
       socket.disconnect();
       return;
     }
-
-    socket.join(`user:${user.id}`);
-    if (user.is_staff) {
-      socket.join("staff");
-    }
+    socket.join(userRoom(user.id));
   });
 
   return io;
 };
 
-export const emitNewMessage = (event: NewMessageEvent): void => {
-  emitToTicketAudience(event.ownerUserId, "new_message", event);
+/** Drops every socket in `user:${userId}` (e.g. after `force_logout`). */
+export const disconnectSocketsInUserRoom = (userId: number): void => {
+  if (!io) return;
+  io.in(userRoom(userId)).disconnectSockets(true);
 };
 
-export const emitTicketUpdated = (event: TicketUpdatedEvent): void => {
-  emitToTicketAudience(event.ownerUserId, "ticket_updated", event);
-};
-
-
-export const emitStatusUpdate = (event: StatusEvent): void => {
+export const emitSocket = async (dispatch: SocketEmit): Promise<void> => {
   if (!io) return;
 
-  switch (event.type) {
-    case "user_status":
-      // 👤 affected user + staff should know user status changes
-      io.to(`user:${event.userId}`).emit("status_updated", event);
-      io.to("staff").emit("status_updated", event);
+  switch (dispatch.name) {
+    case "new_message": {
+      const p = dispatch.payload;
+      emitOne(p.ownerUserId, "new_message", p);
+      if (p.senderType === "user") await emitToEachAdmin("new_message", p);
       break;
+    }
 
-    case "ticket_status":
-      // 🎫 user + staff both should know ticket updates
-      io.to(`user:${event.ownerUserId}`).emit("status_updated", event);
-      io.to("staff").emit("status_updated", event);
+    case "ticket_updated": {
+      const p = dispatch.payload;
+      emitOne(p.ownerUserId, "ticket_updated", p);
+      await emitToEachAdmin("ticket_updated", p);
       break;
+    }
+
+    case "status": {
+      const ev = dispatch.event;
+      switch (ev.type) {
+        case "user_status":
+          emitOne(ev.userId, "status_updated", ev);
+          await emitToEachAdmin("status_updated", ev);
+          break;
+        case "ticket_status":
+          emitOne(ev.ownerUserId, "status_updated", ev);
+          await emitToEachAdmin("status_updated", ev);
+          break;
+      }
+      break;
+    }
+
+    case "user_logout": {
+      const uid = dispatch.userId;
+      const payload = { userId: uid };
+      emitOne(uid, "force_logout", payload);
+      setImmediate(() => disconnectSocketsInUserRoom(uid));
+      break;
+    }
   }
-};
-
-export const emitUserLogout = (event: { userId: number }): void => {
-  if (!io) return;
-
-  // logout all user devices/tabs
-  io.to(`user:${event.userId}`).emit("force_logout", event);
-
-  // notify staff dashboard
-  io.to("staff").emit("user_logged_out", event);
 };

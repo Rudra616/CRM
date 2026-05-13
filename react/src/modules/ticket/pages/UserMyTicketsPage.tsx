@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../../../shared/components/PageShell';
 import { showError, showSuccess } from '../../../shared/utils/toast';
 import {
@@ -30,6 +30,7 @@ const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 const UserMyTicketsPage = () => {
   const { refreshTicketUnread } = useTicketUnread();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,6 +83,56 @@ const UserMyTicketsPage = () => {
   useEffect(() => {
     void loadTickets();
   }, [currentPage, rowsPerPage, appliedSearchTerm]);
+
+  useEffect(() => {
+    const raw = searchParams.get('openTicket');
+    if (!raw) return;
+    const tid = Number(raw);
+    if (!Number.isFinite(tid) || tid <= 0) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('openTicket');
+          return next;
+        },
+        { replace: true }
+      );
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        setMessageLoading(true);
+        const res = await getTicketMessagesApi(tid);
+        if (cancelled) return;
+        const ticket = res.data?.ticket;
+        if (ticket) {
+          setModalOpen(true);
+          setActiveTicket(ticket);
+          setMessages(res.data?.messages ?? []);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          showError((err as { message?: string })?.message || 'Failed to load ticket messages');
+        }
+      } finally {
+        if (!cancelled) {
+          setMessageLoading(false);
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete('openTicket');
+              return next;
+            },
+            { replace: true }
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const socket = getTicketSocket();

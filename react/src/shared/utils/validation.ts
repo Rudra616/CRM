@@ -265,3 +265,10 @@ export const validateEditUserFields = (data: {
     gender: data.gender ?? "",
   });
 };
+
+export const validateModuleName = (name: string): ValidationResult => {
+  if (!name?.trim()) {
+    return { valid: false, message: "Module name is required" };
+  }
+  return { valid: true };
+};

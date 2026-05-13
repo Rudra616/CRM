@@ -32,6 +32,19 @@ export const findAdminById = async (id: number): Promise<Admin | null> => {
   }
 };
 
+/** Active admin ids for socket fan-out (each admin only in `user:${id}`, no shared `staff` room). */
+export const getActiveAdminIds = async (): Promise<number[]> => {
+  try {
+    const [rows]: any = await db.query(
+      `SELECT id FROM \`admin\` WHERE status = 'active' AND COALESCE(is_delete, 0) = 0`
+    );
+    return Array.isArray(rows) ? rows.map((r: { id: number }) => Number(r.id)) : [];
+  } catch (error: unknown) {
+    logServiceError("admin.service", "getActiveAdminIds", error);
+    throw error;
+  }
+};
+
 export const checkDuplicateAdminUsernameOrEmail = async (
   username: string,
   email: string,

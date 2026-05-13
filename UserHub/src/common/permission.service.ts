@@ -1,9 +1,12 @@
 import db from "../config/db";
 
 /**
- * Enforce `module` and `role` both **active** (and not soft-deleted) so an inactive
- * module/role does not grant API or menu access. `NULL` status is treated as active
- * for older rows: `COALESCE(status, 'active') = 'active'`.
+ * Fetch permisson record for a specific role and module
+ * Ensure then role and module are active and not soft delete
+ * 
+ * @param roleId ID of the role
+ * @param moduleName - Name of the module
+ * @returns Role permission record if found
  */
 export const getPermissionByRoleAndModule = async (
   roleId: number,

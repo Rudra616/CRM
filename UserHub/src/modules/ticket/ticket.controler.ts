@@ -15,13 +15,15 @@ import {
   updateTicketStatusByOwner,
   updateTicketStatusByAdmin,
 } from "./ticket.service";
+import { findUserById } from "../user/user.service";
+import { findAdminById } from "../admin/service/admin.service";
 import { AuthRequest } from "../../common/types/AuthRequest";
 import { buildImageUrl, deleteFileIfExists } from "../../common/helpers/common.helper";
 import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
 import { TicketStatus } from "./ticket.types";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../admin/service/user.service";
-import { emitNewMessage, emitStatusUpdate, emitTicketUpdated } from "../../realtime/socket";
+import { emitSocket } from "../../realtime/socket";
 
 /** Parses and validates query parameters for ticket listing endpoints. */
 const parseTicketListQuery = (q: Record<string, unknown>) => {
@@ -54,6 +56,11 @@ export const createTicket: RequestHandler = async (req, res) => {
       description: string;
     };
 
+    const ownerRow = await findUserById(userId);
+    if (!ownerRow) {
+      return errorResponse(res, "User not found", 404);
+    }
+
     const imageUrl = req.file
       ? buildStoredImagePath(authReq.user, userId, req.file.filename)
       : null;
@@ -66,12 +73,18 @@ export const createTicket: RequestHandler = async (req, res) => {
       image_url: imageUrl,
     });
 
-    emitTicketUpdated({
-      ticketId,
-      ownerUserId: userId,
-      status: "open",
-      updatedBy: "user",
-      updatedById: userId,
+    await emitSocket({
+      name: "ticket_updated",
+      payload: {
+        ticketId,
+        ownerUserId: userId,
+        status: "open",
+        updatedBy: "user",
+        updatedById: userId,
+        kind: "created",
+        ownerUsername: ownerRow.username,
+        subject,
+      },
     });
 
     return successResponse(res, "Ticket created successfully", { ticketId }, 201);
@@ -238,12 +251,15 @@ export const updateOwnedTicket: RequestHandler = async (req, res) => {
     });
 
     if (!updated) return errorResponse(res, "Ticket not found", 404);
-    emitTicketUpdated({
-      ticketId,
-      ownerUserId: ticket.user_id,
-      status: ticket.status,
-      updatedBy: "user",
-      updatedById: userId,
+    await emitSocket({
+      name: "ticket_updated",
+      payload: {
+        ticketId,
+        ownerUserId: ticket.user_id,
+        status: ticket.status,
+        updatedBy: "user",
+        updatedById: userId,
+      },
     });
 
     return successResponse(res, "Ticket updated successfully");
@@ -301,12 +317,15 @@ export const updateTicketStatus: RequestHandler = async (req, res) => {
     if (!updated) {
       return errorResponse(res, "Ticket not found or not updated", 400);
     }
-    emitStatusUpdate({
-      type: "ticket_status",
-      ticketId,
-      ownerUserId: ticket.user_id,
-      status,
-      updatedById: authReq.user?.id || 0,
+    await emitSocket({
+      name: "status",
+      event: {
+        type: "ticket_status",
+        ticketId,
+        ownerUserId: ticket.user_id,
+        status,
+        updatedById: authReq.user?.id || 0,
+      },
     });
 
     return successResponse(res, "Ticket status updated successfully");
@@ -378,21 +397,40 @@ export const addTicketMessage: RequestHandler = async (req, res) => {
     if (isStaff) {
       await markUserMessagesReadByStaff(Number(ticket_id));
     }
-    emitNewMessage({
-      ticketId: Number(ticket_id),
-      ownerUserId: ticket.user_id,
-      senderId,
-      senderType: isStaff ? "admin" : "user",
-      message: {
-        id: messageId,
-        ticket_id: Number(ticket_id),
-        sender_id: senderId,
-        sender_type: isStaff ? "admin" : "user",
-        message: text,
-        image: imagePath ? buildImageUrl(authReq, imagePath) : null,
-        created_at: new Date().toISOString(),
-        is_read_by_user: isStaff ? 0 : 1,
-        is_read_by_admin: isStaff ? 1 : 0,
+
+    let senderDisplayName: string | undefined;
+    if (isStaff) {
+      const adm = await findAdminById(senderId);
+      const u = adm?.username?.trim();
+      senderDisplayName = u || undefined;
+    } else {
+      const mem = await findUserById(senderId);
+      const u = mem?.username?.trim();
+      senderDisplayName = u || undefined;
+    }
+    const ticketSubjectRaw = String(ticket.subject ?? "").trim();
+    const ticketSubject = ticketSubjectRaw || undefined;
+
+    await emitSocket({
+      name: "new_message",
+      payload: {
+        ticketId: Number(ticket_id),
+        ownerUserId: ticket.user_id,
+        senderId,
+        senderType: isStaff ? "admin" : "user",
+        ticketSubject,
+        senderDisplayName,
+        message: {
+          id: messageId,
+          ticket_id: Number(ticket_id),
+          sender_id: senderId,
+          sender_type: isStaff ? "admin" : "user",
+          message: text,
+          image: imagePath ? buildImageUrl(authReq, imagePath) : null,
+          created_at: new Date().toISOString(),
+          is_read_by_user: isStaff ? 0 : 1,
+          is_read_by_admin: isStaff ? 1 : 0,
+        },
       },
     });
 

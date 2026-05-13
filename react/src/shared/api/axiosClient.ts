@@ -5,8 +5,18 @@ import {
   isPublicAuthPath,
 } from '../utils/authSession';
 
+/** Prefer `VITE_API_URL`; in dev default `/api` so Vite proxies to `VITE_BACKEND_URL`. */
+const resolveApiBaseURL = (): string => {
+  const explicit = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (explicit) return explicit;
+  if (import.meta.env.DEV) return '/api';
+  const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim();
+  if (backend) return `${backend.replace(/\/$/, '')}/api`;
+  return 'http://localhost:3000/api';
+};
+
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3000/api'),
+  baseURL: resolveApiBaseURL(),
   timeout: 10000,
   withCredentials: true, 
   headers: {

@@ -80,6 +80,7 @@ router.post(
   checkPermission("ticket", "can_add"),
   addTicketMessage
 );
+/** Same path as above: `skipUnlessStaff` uses `next('route')` for members so they must hit this chain (no ticket `can_add` RBAC). */
 router.post(
   "/message",
   authenticate,

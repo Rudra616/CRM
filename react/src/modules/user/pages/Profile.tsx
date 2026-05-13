@@ -22,9 +22,27 @@ import { authLinkStyle } from '../../../shared/components/AuthPageLayout';
 import { colors } from '../../../theme/colors';
 import { MAIN_ADMIN_USERNAME } from '../../../shared/constants/adminAuth';
 
-const API_BASE = import.meta.env.DEV
-  ? ''
-  : import.meta.env.VITE_API_ORIGIN || 'http://localhost:3000';
+/** Prefix for relative `image_url` (e.g. `/uploads/...`). Uses env when set; otherwise same-origin (Vite proxy). */
+const profileAssetBase = (): string => {
+  const asset = (import.meta.env.VITE_ASSET_URL as string | undefined)?.trim();
+  if (asset) return asset.replace(/\/$/, '');
+  const backend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim();
+  if (backend) return backend.replace(/\/$/, '');
+  const api = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (api) {
+    try {
+      if (api.startsWith('http://') || api.startsWith('https://')) {
+        return new URL(api).origin;
+      }
+      if (typeof window !== 'undefined') {
+        return new URL(api, window.location.origin).origin;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+};
 
 const profileAvatarRing = `0 0 0 3px #fff, 0 0 0 5px ${colors.primary}` as const;
 
@@ -205,7 +223,7 @@ const Profile = () => {
   const imageUrl = profile?.image_url
     ? profile.image_url.startsWith('http')
       ? profile.image_url
-      : `${API_BASE}${profile.image_url}`
+      : `${profileAssetBase()}${profile.image_url}`
     : null;
 
   // If image URL changes after an update, allow re-loading.

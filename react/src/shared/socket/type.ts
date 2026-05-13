@@ -1,9 +1,3 @@
-
-  export type SocketUser = {
-    id: number;
-    is_staff: boolean;
-  };
-
   export type NewMessageEvent = {
     ticketId: number;
     ownerUserId: number;
@@ -50,17 +44,3 @@
         status: "open" | "closed";
         updatedById: number;
       };
-
-  /**
-   * All server→client socket dispatches. `name` is the dispatch kind;
-   * ticket rows use the same strings as the Socket.IO event on the wire.
-   */
-  export type SocketEmit =
-    | { name: "new_message"; payload: NewMessageEvent }
-    | { name: "ticket_updated"; payload: TicketUpdatedEvent }
-    | { name: "status"; event: StatusEvent }
-    | { name: "user_logout"; userId: number };
-
-
-      
-  

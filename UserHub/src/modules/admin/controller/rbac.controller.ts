@@ -68,8 +68,8 @@ export const listModulesTable = async (req: Request, res: Response) => {
 export const updateModuleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid module ID", 400);
-    const body = req.body as { name?: string; status?: "active" | "inactive" };
+    if (!Number.isInteger(id)) return errorResponse(res, "Invalid module ID", 400);
+    const body = req.body as { name: string; status: "active" | "inactive" };
     const ok = await updateModuleById(id, body);
     if (!ok) return errorResponse(res, "Module not found", 404);
     await invalidateSubadminSessionsForModuleId(id);
@@ -89,7 +89,7 @@ export const updateModuleRow = async (req: Request, res: Response) => {
 export const deleteModuleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid module ID", 400);
+    if (!Number.isInteger(id)) return errorResponse(res, "Invalid module ID", 400);
     const ok = await softDeleteModuleById(id);
     if (!ok) return errorResponse(res, "Module not found", 404);
     await invalidateSubadminSessionsForModuleId(id);
@@ -108,7 +108,7 @@ export const deleteModuleRow = async (req: Request, res: Response) => {
  */
 export const addModule = async (req: Request, res: Response) => {
   try {
-    const name = String((req.body as { name?: string }).name ?? "");
+    const name = String((req.body as { name: string }).name ?? "");
     const id = await createModule(name);
     return successResponse(res, "Module created successfully", { id }, 201);
   } catch (err: any) {
@@ -164,8 +164,8 @@ export const listRolesTable = async (req: Request, res: Response) => {
 export const updateRoleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid role ID", 400);
-    const body = req.body as { name?: string; status?: "active" | "inactive" };
+    if (!Number.isInteger(id)) return errorResponse(res, "Invalid role ID", 400);
+    const body = req.body as { name: string; status: "active" | "inactive" };
     const ok = await updateRoleById(id, body);
     if (!ok) return errorResponse(res, "Role not found", 404);
     // await invalidateSubadminSessionsForRoleId(id);
@@ -178,7 +178,7 @@ export const updateRoleRow = async (req: Request, res: Response) => {
 export const deleteRoleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) return errorResponse(res, "Invalid role ID", 400);
+    if (!Number.isInteger(id)) return errorResponse(res, "Invalid role ID", 400);
     const ok = await softDeleteRoleById(id);
     if (!ok) return errorResponse(res, "Role not found", 404);
     await invalidateSubadminSessionsForRoleId(id);
@@ -190,7 +190,7 @@ export const deleteRoleRow = async (req: Request, res: Response) => {
 
 export const addRole = async (req: Request, res: Response) => {
   try {
-    const name = String((req.body as { name?: string }).name ?? "");
+    const name = String((req.body as { name: string }).name ?? "");
     const id = await createRole(name);
     return successResponse(res, "Role created successfully", { id }, 201);
   } catch (err: any) {
@@ -201,7 +201,7 @@ export const addRole = async (req: Request, res: Response) => {
 export const getPermissionsByRole = async (req: Request, res: Response) => {
   try {
     const roleId = Number(req.params.roleId);
-    if (!Number.isInteger(roleId) || roleId <= 0) return errorResponse(res, "Invalid role ID", 400);
+    if (!Number.isInteger(roleId)) return errorResponse(res, "Invalid role ID", 400);
 
     const permissions = await getRolePermissions(roleId);
     return successResponse(res, "Role permissions fetched successfully", { roleId, permissions }, 200);
@@ -213,7 +213,7 @@ export const getPermissionsByRole = async (req: Request, res: Response) => {
 export const savePermissionsByRole = async (req: Request, res: Response) => {
   try {
     const roleId = Number(req.params.roleId);
-    if (!Number.isInteger(roleId) || roleId <= 0) return errorResponse(res, "Invalid role ID", 400);
+    if (!Number.isInteger(roleId)) return errorResponse(res, "Invalid role ID", 400);
 
     const raw = Array.isArray(req.body.permissions) ? req.body.permissions : [];
     const permissions: RolePermissionInput[] = raw.map((row: unknown) => {

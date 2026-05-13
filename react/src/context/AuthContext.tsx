@@ -5,7 +5,6 @@ import { logoutAdminApi, logoutApi } from '../modules/auth/api/auth.api';
 import { getAdminProfileApi } from '../modules/admin/api/admin.api';
 import { getProfileApi } from '../modules/user/api/user.api';
 import {
-  buildSessionEndedLoginUrl,
   clearClientAuthStorage,
   isPublicAuthPath,
 } from '../shared/utils/authSession';
@@ -14,11 +13,7 @@ import {
   clearUserStorage,
   loadUserFromStorage,
 } from '../shared/authSession';
-import {
-  disconnectTicketSocket,
-  getTicketSocket,
-  type StatusUpdatedSocketEvent,
-} from '../shared/socket/ticketSocket';
+import { disconnectTicketSocket } from '../shared/socket/ticketSocket';
 
 interface AuthContextType {
   user: UserInfo | null;
@@ -187,39 +182,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setIsLoading(false);
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const socket = getTicketSocket();
-    const endSession = () => {
-      disconnectTicketSocket();
-      clearClientAuthStorage();
-      clearUserStorage();
-      userRef.current = null;
-      setUser(null);
-      window.location.replace(buildSessionEndedLoginUrl(window.location.pathname));
-    };
-
-    const onStatusUpdated = (payload: StatusUpdatedSocketEvent) => {
-      if (payload.type !== 'user_status') return;
-      if (payload.userId !== user.id) return;
-      if (payload.status === 'active') return;
-      endSession();
-    };
-
-    const onForceLogout = (payload?: { userId?: number }) => {
-      if (payload?.userId && payload.userId !== user.id) return;
-      endSession();
-    };
-
-    socket.on('status_updated', onStatusUpdated);
-    socket.on('force_logout', onForceLogout);
-    return () => {
-      socket.off('status_updated', onStatusUpdated);
-      socket.off('force_logout', onForceLogout);
-    };
-  }, [user]);
 
   return (
     <AuthContext.Provider

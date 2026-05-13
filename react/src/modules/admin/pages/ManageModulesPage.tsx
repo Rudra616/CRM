@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
-
+import { validateModuleName } from '../../../shared/utils/validation';
 const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
 
 const fmtWhen = (v?: string) => {
@@ -51,6 +51,7 @@ const ManageModulesPage = () => {
   const [editRow, setEditRow] = useState<ModuleTableItem | null>(null);
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState<'active' | 'inactive'>('active');
+    const [error, setError] = useState<string>("");
 
   const fetchRows = useCallback(async () => {
     if (!canView) return;
@@ -141,18 +142,29 @@ const ManageModulesPage = () => {
     }
   };
 
-  const onCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      await createModuleApi({ name: newName });
-      setNewName('');
-      showSuccess('Module created');
-      setCurrentPage(1);
-      void fetchRows();
-    } catch (err: unknown) {
-      showError((err as { message?: string })?.message || 'Create failed');
-    }
-  };
+
+const onCreate = async (e: FormEvent) => {
+  e.preventDefault();
+
+  const validation = validateModuleName(newName);
+
+  if (!validation.valid) {
+    setError(validation.message || "Invalid module name"); // <-- use setter
+    return;
+  }
+
+  setError(""); // clear error if valid
+
+  try {
+    await createModuleApi({ name: newName.trim() });
+    setNewName("");
+    showSuccess("Module created");
+    setCurrentPage(1);
+    void fetchRows();
+  } catch (err: unknown) {
+    showError((err as { message?: string })?.message || "Create failed");
+  }
+};
 
   if (!canView) {
     return (
@@ -190,6 +202,7 @@ const ManageModulesPage = () => {
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. product"
                 />
+                {error && <small className="text-danger">{error}</small>}
               </div>
               <div className="col-auto">
                 <button type="submit" className="btn btn-primary btn-sm">

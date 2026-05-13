@@ -2,9 +2,11 @@ import app from "./app";
 import testDB from "./config/testDb";
 import { createServer } from "http";
 import { initSocketServer } from "./realtime/socket";
-const PORT = process.env.PORT || 3000;
+import { validateEnvVariables } from "./common/helpers/validateEnv";
+const PORT = process.env.PORT;
 
 testDB()
+validateEnvVariables()
 const server = createServer(app);
 initSocketServer(server);
 

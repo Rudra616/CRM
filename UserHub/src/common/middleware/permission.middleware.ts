@@ -60,7 +60,7 @@ export const checkPermission = (
 
 
 
-/** Skip staff-only handlers so the next `POST /message` route runs (regular ticket owners). */
+/** Staff on this route continue; members call `next('route')` so Express runs the next registered handler for the same path (e.g. a member-only `POST /message` chain). */
 export const skipUnlessStaff: RequestHandler = (req, res, next) => {
   if ((req as AuthRequest).user?.is_staff) return next();
   next("route");
