@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 import { TicketUnreadProvider } from '../../context/TicketUnreadContext';
+import MemberBroadcastDock from '../../modules/broadcast/components/MemberBroadcastDock';
 import { sessionGate } from '../utils/sessionGate';
 
 const SIDEBAR_WIDTH = 280;
@@ -34,6 +35,7 @@ const DashboardLayout = ({ children }: Props) => {
           {content}
         </div>
       </div>
+      {gate === 'member' ? <MemberBroadcastDock /> : null}
     </TicketUnreadProvider>
   );
 };

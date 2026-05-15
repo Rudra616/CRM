@@ -51,6 +51,16 @@
         updatedById: number;
       };
 
+  export type BroadcastMessageEvent = {
+    id: number;
+    message: string;
+    created_at: string;
+  };
+
+  export type BroadcastRemovedEvent = {
+    id: number;
+  };
+
   /**
    * All server→client socket dispatches. `name` is the dispatch kind;
    * ticket rows use the same strings as the Socket.IO event on the wire.
@@ -59,7 +69,9 @@
     | { name: "new_message"; payload: NewMessageEvent }
     | { name: "ticket_updated"; payload: TicketUpdatedEvent }
     | { name: "status"; event: StatusEvent }
-    | { name: "user_logout"; userId: number };
+    | { name: "user_logout"; userId: number }
+    | { name: "broadcast_message"; payload: BroadcastMessageEvent }
+    | { name: "broadcast_removed"; payload: BroadcastRemovedEvent };
 
 
       

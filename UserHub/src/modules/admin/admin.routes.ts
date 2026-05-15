@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
-import { authenticate, requireStaffSession } from "../../common/middleware/authMiddleware";
+import { authenticate, requireStaffSession, requireMainAdmin } from "../../common/middleware/authMiddleware";
 import { loginSchema, changePasswordSchema } from "../user/user.validation";
 import {
   createSubadminSchema,
@@ -51,6 +51,12 @@ import {
 } from "../../common/middleware/permission.middleware";
 // Subadmin CRUD (managed by admin)
 // User management
+import {
+  createBroadcast,
+  getMemberBroadcastList,
+  deleteBroadcast,
+} from "../broadcast/broadcast.controller";
+import { createBroadcastSchema } from "../broadcast/broadcast.validation";
 import {
   getUsers,
   updateUserStatus,
@@ -281,6 +287,30 @@ router.get(
   requireStaffSession,
   // allowRoles(Role.ADMIN, Role.SUBADMIN),
   getMyPermissions,
+);
+
+/** Main admin only: site-wide broadcast messages (also pushed on Socket.IO `admin_broadcast`). */
+router.post(
+  "/broadcast",
+  authenticate,
+  requireStaffSession,
+  requireMainAdmin,
+  validateSchema(createBroadcastSchema),
+  createBroadcast
+);
+router.get(
+  "/broadcast",
+  authenticate,
+  requireStaffSession,
+  requireMainAdmin,
+  getMemberBroadcastList
+);
+router.delete(
+  "/broadcast/:id",
+  authenticate,
+  requireStaffSession,
+  requireMainAdmin,
+  deleteBroadcast
 );
  
 export default router;

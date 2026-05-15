@@ -3,9 +3,17 @@ import type {
   NewMessageEvent as NewMessageSocketEvent,
   TicketUpdatedEvent as TicketUpdatedSocketEvent,
   StatusEvent as StatusUpdatedSocketEvent,
+  AdminBroadcastEvent as AdminBroadcastSocketEvent,
+  BroadcastRemovedEvent as BroadcastRemovedSocketEvent,
 } from './type';
 
-export type { NewMessageSocketEvent, TicketUpdatedSocketEvent, StatusUpdatedSocketEvent };
+export type {
+  NewMessageSocketEvent,
+  TicketUpdatedSocketEvent,
+  StatusUpdatedSocketEvent,
+  AdminBroadcastSocketEvent,
+  BroadcastRemovedSocketEvent,
+};
 
 let ticketSocket: Socket | null = null;
 
@@ -22,7 +30,7 @@ export const getTicketSocket = (): Socket => {
   ticketSocket = io(resolveSocketUrl(), {
     withCredentials: true,
     autoConnect: true,
-    transports: ['websocket'],
+    // transports: ['websocket'],
   });
 
   return ticketSocket;

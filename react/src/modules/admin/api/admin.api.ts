@@ -314,3 +314,23 @@ export type MyPermissionsResponse = {
 
 export const getMyPermissionsApi = (): Promise<ApiResponse<MyPermissionsResponse>> =>
   apiRequest<MyPermissionsResponse>('GET', '/admin/me/permissions');
+
+export type BroadcastItem = {
+  id: number;
+  message: string;
+  is_delete: number;
+  created_at: string;
+};
+
+export const createBroadcastApi = (body: {
+  message: string;
+}): Promise<ApiResponse<{ id: number; message: string; created_at: string }>> =>
+  apiRequest<{ id: number; message: string; created_at: string }>('POST', '/admin/broadcast', body);
+
+export const listBroadcastsApi = (
+  limit = 50
+): Promise<ApiResponse<{ items: BroadcastItem[] }>> =>
+  apiRequest<{ items: BroadcastItem[] }>('GET', `/admin/broadcast?limit=${limit}`);
+
+export const deleteBroadcastApi = (id: number): Promise<ApiResponse<null>> =>
+  apiRequest<null>('DELETE', `/admin/broadcast/${id}`);

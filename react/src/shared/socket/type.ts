@@ -44,3 +44,13 @@
         status: "open" | "closed";
         updatedById: number;
       };
+
+  export type AdminBroadcastEvent = {
+    id: number;
+    message: string;
+    created_at: string;
+  };
+
+  export type BroadcastRemovedEvent = {
+    id: number;
+  };

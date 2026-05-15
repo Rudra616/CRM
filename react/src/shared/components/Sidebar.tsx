@@ -12,6 +12,7 @@ import {
   FaShieldAlt,
   FaCube,
   FaUserTag,
+  FaBullhorn,
 } from 'react-icons/fa';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
@@ -130,6 +131,12 @@ const Sidebar = ({ gate }: Props) => {
               <MenuItem icon={<FaTachometerAlt />} onClick={nav('/admin/dashboard')}>
                 Dashboard
               </MenuItem>
+
+              {user?.is_main_admin && (
+                <MenuItem icon={<FaBullhorn />} onClick={nav('/admin/broadcast')}>
+                  Broadcast
+                </MenuItem>
+              )}
 
               {canViewUsers && (
                 <MenuItem icon={<FaUsers />} onClick={nav('/admin/users')}>

@@ -6,6 +6,7 @@ import adminRoutes from "./modules/admin/admin.routes";
 import cookieParser from "cookie-parser";
 import { UPLOADS_ROOT } from "./config/uploads";
 import tickitRoutes from "./modules/ticket/ticket.route";
+import broadcastPublicRoutes from "./modules/broadcast/broadcast.public.routes";
 dotenv.config();
 
 const app = express();
@@ -20,6 +21,7 @@ app.use("/uploads", express.static(UPLOADS_ROOT));
 app.use(cookieParser());
 
 app.use("/api/admin", adminRoutes);
+app.use("/api/broadcast", broadcastPublicRoutes);
 app.use("/api", userRoutes);
 app.use("/api/ticket", tickitRoutes);
 export default app;

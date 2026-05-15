@@ -157,59 +157,49 @@ const StaffTicketsPage = () => {
     const myId = user?.id;
     const onRealtimeMessage = (payload: NewMessageSocketEvent) => {
       if (myId && payload.senderId === myId) return;
-      let existsInCurrentList = false;
+      const tid = Number(payload.ticketId);
       setTickets((prev) =>
-        prev.map((row) => {
-          if (row.id !== payload.ticketId) return row;
-          existsInCurrentList = true;
-          return {
-            ...row,
-            unread_from_user_count:
-              payload.senderType === 'user'
-                ? Number(row.unread_from_user_count ?? 0) + 1
-                : Number(row.unread_from_user_count ?? 0),
-          };
-        })
+        prev.map((row) =>
+          Number(row.id) === tid
+            ? {
+                ...row,
+                unread_from_user_count:
+                  payload.senderType === 'user'
+                    ? Number(row.unread_from_user_count ?? 0) + 1
+                    : Number(row.unread_from_user_count ?? 0),
+              }
+            : row
+        )
       );
-      if (!existsInCurrentList) {
-        void loadTickets({ silent: true });
-      }
-      if (activeTicket?.id === payload.ticketId) {
-        if (payload.message) {
-          setMessages((prev) => [...prev, payload.message!]);
-        }
+      if (activeTicket && Number(activeTicket.id) === tid && payload.message) {
+        setMessages((prev) => [...prev, payload.message]);
       }
     };
     const onStatusUpdated = (payload: StatusUpdatedSocketEvent) => {
       if (payload.type !== 'ticket_status') return;
       if (myId && payload.updatedById === myId) return;
       const nextStatus = payload.status;
+      const tid = Number(payload.ticketId);
       setTickets((prev) =>
-        prev.map((row) => (row.id === payload.ticketId ? { ...row, status: nextStatus } : row))
+        prev.map((row) => (Number(row.id) === tid ? { ...row, status: nextStatus } : row))
       );
-      if (activeTicket?.id === payload.ticketId) {
+      if (activeTicket && Number(activeTicket.id) === tid) {
         setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
       }
     };
     const onTicketUpdated = (payload: TicketUpdatedSocketEvent) => {
       if (myId && payload.updatedById === myId) return;
-      const nextStatus = payload.status;
-      if (!nextStatus) {
+      if (payload.kind === 'created') {
         void loadTickets({ silent: true });
         return;
       }
-      let existsInCurrentList = false;
+      const nextStatus = payload.status;
+      if (!nextStatus) return;
+      const tid = Number(payload.ticketId);
       setTickets((prev) =>
-        prev.map((row) => {
-          if (row.id !== payload.ticketId) return row;
-          existsInCurrentList = true;
-          return { ...row, status: nextStatus };
-        })
+        prev.map((row) => (Number(row.id) === tid ? { ...row, status: nextStatus } : row))
       );
-      if (!existsInCurrentList) {
-        void loadTickets({ silent: true });
-      }
-      if (activeTicket?.id === payload.ticketId) {
+      if (activeTicket && Number(activeTicket.id) === tid) {
         setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
       }
     };

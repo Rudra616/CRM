@@ -27,6 +27,7 @@ import ChangePassword from '../modules/user/pages/ChangePassword';
 import UserCreateTicketPage from '../modules/ticket/pages/UserCreateTicketPage';
 import UserMyTicketsPage from '../modules/ticket/pages/UserMyTicketsPage';
 import StaffTicketsPage from '../modules/ticket/pages/StaffTicketsPage';
+import AdminBroadcastPage from '../modules/admin/pages/AdminBroadcastPage';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
@@ -47,6 +48,7 @@ export const AppRoutes = () => (
     <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
       {/* Admin routes */}
       <Route path="/admin/dashboard" element={<ProtectedRoute gates={['staff']}><StaffDashboard /></ProtectedRoute>} />
+      <Route path="/admin/broadcast" element={<ProtectedRoute gates={['staff']}><AdminBroadcastPage /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute gates={['staff']}><ManageUsers /></ProtectedRoute>} />
       <Route path="/admin/subadmins" element={<ProtectedRoute gates={['staff']}><ManageSubadmins /></ProtectedRoute>} />
       <Route path="/admin/rbac/modules" element={<ProtectedRoute gates={['staff']}><ManageModulesPage /></ProtectedRoute>} />

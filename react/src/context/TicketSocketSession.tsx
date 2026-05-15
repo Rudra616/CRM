@@ -12,17 +12,30 @@ import {
   isPublicAuthPath,
 } from '../shared/utils/authSession';
 import { showSuccess, showSuccessClickable } from '../shared/utils/toast';
+import { PERMISSION_MODULE_KEYS } from '../shared/utils/permissionModules';
 import { useAuth } from './AuthContext';
+import { usePermissions } from './PermissionContext';
 
 /**
- * Subscribes to the shared socket only when logged-in and not on login/register pages.
- * Staff RBAC is enforced on the server (`io.use` in UserHub).
- * Socket.IO uses `VITE_BACKEND_URL` / `VITE_SOCKET_URL`, not the Vite dev port.
+ * Listens for `force_logout` / inactive `user_status`, and ticket events. Member broadcast UI uses `MemberBroadcastDock` + Socket.IO `admin_broadcast`.
+ * Staff: open Socket.IO after permissions load when the user has ticket `can_add` **or** any User module permission (user management / status / logout signals).
+ * Ticket toasts (`ticket_updated`, staff `new_message`) stay limited to ticket `can_add`.
  */
 export const TicketSocketSession = () => {
   const { user, logout, isLoading } = useAuth();
+  const { getModulePerm, permLoading } = usePermissions();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  const ticketPerm = getModulePerm(PERMISSION_MODULE_KEYS.TICKET);
+  const userPerm = getModulePerm(PERMISSION_MODULE_KEYS.USER);
+  const ticketCanAdd = ticketPerm.can_add;
+  const staffSocketAllowed =
+    ticketCanAdd ||
+    userPerm.can_view ||
+    userPerm.can_add ||
+    userPerm.can_edit ||
+    userPerm.can_delete;
 
   useEffect(() => {
     if (isLoading || !user || isPublicAuthPath(pathname)) {
@@ -30,11 +43,20 @@ export const TicketSocketSession = () => {
       return;
     }
 
+    if (user.is_staff) {
+      if (permLoading) return;
+      if (!staffSocketAllowed) {
+        disconnectTicketSocket();
+        return;
+      }
+    }
+
     const socket = getTicketSocket();
 
     const endSession = () => {
+      const pathWhenEnding = window.location.pathname;
       void logout().finally(() => {
-        window.location.replace(buildSessionEndedLoginUrl(window.location.pathname));
+        navigate(buildSessionEndedLoginUrl(pathWhenEnding), { replace: true });
       });
     };
 
@@ -46,12 +68,13 @@ export const TicketSocketSession = () => {
     };
 
     const onForceLogout = (payload?: { userId?: number }) => {
-      if (payload?.userId && payload.userId !== user.id) return;
+      const uid = payload?.userId;
+      if (uid != null && Number(uid) !== Number(user.id)) return;
       endSession();
     };
 
     let onNewTicketToast: ((p: TicketUpdatedSocketEvent) => void) | undefined;
-    if (user.is_staff) {
+    if (user.is_staff && ticketCanAdd) {
       onNewTicketToast = (payload: TicketUpdatedSocketEvent) => {
         if (payload.kind !== 'created') return;
         if (!payload.ownerUsername) return;
@@ -87,6 +110,7 @@ export const TicketSocketSession = () => {
         return;
       }
 
+      if (!ticketCanAdd) return;
       if (p.senderType !== 'user') return;
       const whoPart = who ? ` from @${who}` : '';
       const subPart = subPreview ? ` — "${subPreview}"` : '';
@@ -108,7 +132,8 @@ export const TicketSocketSession = () => {
       socket.off('status_updated', onStatusUpdated);
       socket.off('force_logout', onForceLogout);
     };
-  }, [user, logout, navigate, isLoading, pathname]);
+  }, [user, logout, navigate, isLoading, pathname, permLoading, staffSocketAllowed, ticketCanAdd]);
 
   return null;
 };
+
