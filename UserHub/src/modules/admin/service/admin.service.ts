@@ -3,9 +3,20 @@ import { Admin } from "../../../common/types/user";
 import { logServiceError } from "../../../common/helpers/serviceError";
 import { RowDataPacket } from "mysql2";
 import { normalizeListPageLimit } from "./user.service";
+import { softDelete } from "../../../common/helpers/service.helper";
 
-// ─── Lookup ───────────────────────────────────────────────────────────────────
+
+
+
 let Quary = `SELECT id, username, first_name, last_name, phone, email, gender, image_url,role_id, status`
+const subadminListFrom = `FROM \`admin\` a LEFT JOIN \`role\` r ON r.id = a.role_id`;
+
+/**
+ * Find admin active and not softdelete
+ * 
+ * @param username 
+ * @returns object if founf otherwise null
+ */
 export const findAdminByUsername = async (username: string): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
@@ -19,6 +30,12 @@ export const findAdminByUsername = async (username: string): Promise<Admin | nul
   }
 };
 
+/**
+ * find admin using id also if not deleted
+ * 
+ * @param id 
+ * @returns object if found other wise null
+ */
 export const findAdminById = async (id: number): Promise<Admin | null> => {
   try {
     const [rows]: any = await db.query(
@@ -32,7 +49,7 @@ export const findAdminById = async (id: number): Promise<Admin | null> => {
   }
 };
 
-/** Active admin ids for socket fan-out (each admin only in `user:${id}`, no shared `staff` room). */
+
 export const getActiveAdminIds = async (): Promise<number[]> => {
   try {
     const [rows]: any = await db.query(
@@ -43,8 +60,16 @@ export const getActiveAdminIds = async (): Promise<number[]> => {
     logServiceError("admin.service", "getActiveAdminIds", error);
     throw error;
   }
-};
+}; 
 
+/**
+ * Checks whether an admin username or email already exists in the system 
+ * 
+ * @param username Username to check for duplication
+ * @param email Email addres check for duplication
+ * @param excludeId check id exist or not
+ * @returns Returns true if a duplicate exists, otherwise false
+ */
 export const checkDuplicateAdminUsernameOrEmail = async (
   username: string,
   email: string,
@@ -53,6 +78,7 @@ export const checkDuplicateAdminUsernameOrEmail = async (
   try {
     const [rows]: any = await db.query(
       `SELECT id FROM \`admin\` WHERE (username = ? OR email = ?) AND id != ? AND COALESCE(is_delete, 0) = 0`,
+       
       [username, email, excludeId]
     );
     return rows.length > 0;
@@ -62,8 +88,15 @@ export const checkDuplicateAdminUsernameOrEmail = async (
   }
 };
 
-const subadminListFrom = `FROM \`admin\` a
-LEFT JOIN \`role\` r ON r.id = a.role_id`;
+/**
+ * Retrieves a paginated list of subadmin user with serch filter
+ * 
+ * @param page Page number for pagination
+ * @param limit Number of records per page
+ * @param search 
+ * @returns object (items,total,limit)
+ * 
+ */
 export const getSubadminsPaginated = async (
   page: number,
   limit: number,
@@ -111,6 +144,12 @@ export const getSubadminsPaginated = async (
   }
 };
 
+/**
+ * Insert new subadmin as per his role 
+ * 
+ * @param data 
+ * @returns subadmin id
+ */
 export const insertSubadmin = async (data: {
   username: string;
   password: string;
@@ -122,14 +161,6 @@ export const insertSubadmin = async (data: {
   role_id: number;
 }): Promise<number> => {
   try {
-    await db.query(
-      `UPDATE \`admin\`
-       SET username = CONCAT(username, '_deleted_', id),
-           email = CONCAT(id, '_deleted_', email)
-       WHERE (username = ? OR email = ?)
-         AND COALESCE(is_delete, 0) = 1`,
-      [data.username, data.email]
-    );
 
     const [result]: any = await db.query(
       `INSERT INTO \`admin\`
@@ -153,6 +184,13 @@ export const insertSubadmin = async (data: {
   }
 };
 
+/**
+ * Update subadmin as per reqruement
+ * 
+ * @param id Id of subadmin
+ * @param data update data 
+ * @returns Resolves when the update operation is completed
+ */
 export const updateSubadminById = async (
   id: number,
   data: {
@@ -199,6 +237,13 @@ export const updateSubadminById = async (
   }
 };
 
+/**
+ * Update subadmin password
+ * 
+ * @param id subadmin id
+ * @param hashedPassword New hashed password to store in the database
+ * @returns 
+ */
 export const updateSubadminPassword = async (
   id: number,
   hashedPassword: string
@@ -215,21 +260,39 @@ export const updateSubadminPassword = async (
   }
 };
 
+/**
+ * Soft delete subadmin based his id
+ * 
+ * @param id Subadmin id 
+ * @returns Returns true if the record was successfully marked as deleted, otherwise false
+ */
+// export const deleteSubadminById = async (id: number): Promise<boolean> => {
+//   try {
+//     const [result]: any = await db.query(
+//       "UPDATE `admin` SET is_delete = 1 WHERE id = ? AND COALESCE(is_delete, 0) = 0",
+//       [id]
+//     );
+//     return result.affectedRows > 0;
+//   } catch (error: unknown) {
+//     logServiceError("admin.service", "deleteSubadminById", error);
+//     throw error;
+//   }
+// };
 export const deleteSubadminById = async (id: number): Promise<boolean> => {
   try {
-    const [result]: any = await db.query(
-      "UPDATE `admin` SET is_delete = 1 WHERE id = ? AND COALESCE(is_delete, 0) = 0",
-      [id]
-    );
-    return result.affectedRows > 0;
-  } catch (error: unknown) {
+    return await softDelete("admin", id);
+  }catch (error: unknown) {
     logServiceError("admin.service", "deleteSubadminById", error);
     throw error;
   }
 };
 
 // ─── Dashboard summary ────────────────────────────────────────────────────────
-
+/**
+ * Get dashboard summary
+ * This function calculates and Total number of users,subadmin,(pending,inaction,active)users 
+ * @returns userCount,subadminCount,activeUsers,pendingUsers,inactiveUsers,deleteUsers
+ */
 export const getAdminDashboardSummary = async (): Promise<{
   userCount: number;
   subadminCount: number;
@@ -273,8 +336,13 @@ export const getAdminDashboardSummary = async (): Promise<{
   }
 };
 
-// ─── Update ───────────────────────────────────────────────────────────────────
-
+/**
+ * Update amdin profile
+ * 
+ * @param adminId Id  
+ * @param data Partial admin profile data (only provided fields will be updated)
+ * @returns Resolves when the update operation completes successfully
+ */
 export const updateAdminProfileService = async (
   adminId: number,
   data: {
@@ -308,6 +376,13 @@ export const updateAdminProfileService = async (
   }
 };
 
+/**
+ * Update password
+ * 
+ * @param adminId Id
+ * @param hashedPassword New hashed password to store in the database
+ * @returns 
+ */
 export const updateAdminPassword = async (
   adminId: number,
   hashedPassword: string

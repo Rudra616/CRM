@@ -5,9 +5,17 @@ import { getPermissionByRoleAndModule } from "../permission.service";
 export type PermissionAction = "can_view" | "can_add" | "can_edit" | "can_delete";
 
 /**
- * Shared RBAC permission check used by middleware and controllers.
- * Keeps frontend-oriented permission APIs aligned with middleware behavior.
+ * Checks whether the authenticated staff user has permission
+ * to perform a specific action on a module.
+ *
+ * Main admins automatically receive full access.
+ *
+ * @param user Authenticated user object
+ * @param moduleName Permission module name
+ * @param action Permission action key to validate
+ * @returns True if user has permission, otherwise false
  */
+
 export const hasPermissionForUser = async (
   user: AuthRequest["user"] | undefined,
   moduleName: string,

@@ -1,8 +1,14 @@
 import db from "../config/db";
 import { logServiceError } from "../common/helpers/serviceError";
 
-// ─── User Tokens ──────────────────────────────────────────────────────────────
-
+/**
+ * Creates or updates a user authentication token with 1-day expiry.
+ *
+ * @param userId User ID
+ * @param username Username
+ * @param token JWT token
+ * @returns void
+ */
 export const upsertUserToken = async (
   userId: number,
   username: string,
@@ -31,6 +37,12 @@ export const upsertUserToken = async (
   }
 };
 
+/**
+ * Retrieves a valid (non-expired) user token.
+ *
+ * @param token JWT token
+ * @returns Token record or null if not found
+ */
 export const findUserToken = async (token: string): Promise<any | null> => {
   try {
     const [rows]: any = await db.query(
@@ -44,6 +56,12 @@ export const findUserToken = async (token: string): Promise<any | null> => {
   }
 };
 
+/**
+ * Deletes a user authentication token.
+ *
+ * @param token JWT token
+ * @returns void
+ */
 export const removeUserToken = async (token: string): Promise<void> => {
   try {
     await db.query("DELETE FROM user_token WHERE token = ?", [token]);
@@ -53,6 +71,12 @@ export const removeUserToken = async (token: string): Promise<void> => {
   }
 };
 
+/**
+ * Deletes all authentication tokens for a specific user.
+ *
+ * @param userId User ID
+ * @returns void
+ */
 export const removeAllUserTokensForUserId = async (userId: number): Promise<void> => {
   try {
     await db.query("DELETE FROM user_token WHERE user_id = ?", [userId]);
@@ -62,6 +86,12 @@ export const removeAllUserTokensForUserId = async (userId: number): Promise<void
   }
 };
 
+/**
+ * Checks if a user has any active (non-expired) authentication token.
+ *
+ * @param userId User ID
+ * @returns True if active token exists, otherwise false
+ */
 export const hasActiveUserTokenForUserId = async (userId: number): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
@@ -75,8 +105,14 @@ export const hasActiveUserTokenForUserId = async (userId: number): Promise<boole
   }
 };
 
-// ─── Admin Tokens (admin + subadmin) ─────────────────────────────────────────
-
+/**
+ * Creates or updates an admin authentication token with 1-day expiry.
+ *
+ * @param adminId Admin ID
+ * @param username Username
+ * @param token JWT token
+ * @returns void
+ */
 export const upsertAdminToken = async (
   adminId: number,
   username: string,
@@ -105,6 +141,12 @@ export const upsertAdminToken = async (
   }
 };
 
+/**
+ * Retrieves a valid (non-expired) admin token.
+ *
+ * @param token JWT token
+ * @returns Token record or null if not found
+ */
 export const findAdminToken = async (token: string): Promise<any | null> => {
   try {
     const [rows]: any = await db.query(
@@ -118,6 +160,12 @@ export const findAdminToken = async (token: string): Promise<any | null> => {
   }
 };
 
+/**
+ * Deletes an admin authentication token.
+ *
+ * @param token JWT token
+ * @returns void
+ */
 export const removeAdminToken = async (token: string): Promise<void> => {
   try {
     await db.query("DELETE FROM admin_token WHERE token = ?", [token]);
@@ -127,6 +175,12 @@ export const removeAdminToken = async (token: string): Promise<void> => {
   }
 };
 
+/**
+ * Deletes all authentication tokens for a specific admin.
+ *
+ * @param adminId Admin ID
+ * @returns void
+ */
 export const removeAllAdminTokensForAdminId = async (adminId: number): Promise<void> => {
   try {
     await db.query("DELETE FROM admin_token WHERE admin_id = ?", [adminId]);
@@ -136,6 +190,12 @@ export const removeAllAdminTokensForAdminId = async (adminId: number): Promise<v
   }
 };
 
+/**
+ * Checks if an admin has any active (non-expired) authentication token.
+ *
+ * @param adminId Admin ID
+ * @returns True if active token exists, otherwise false
+ */
 export const hasActiveAdminTokenForAdminId = async (adminId: number): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(
@@ -149,7 +209,12 @@ export const hasActiveAdminTokenForAdminId = async (adminId: number): Promise<bo
   }
 };
 
-/** After role / permission matrix edits: force subadmins on this role to sign in again. */
+/**
+ * Invalidates all subadmin sessions belonging to a role (forces re-login after role/permission changes).
+ *
+ * @param roleId Role ID
+ * @returns void
+ */
 export const invalidateSubadminSessionsForRoleId = async (roleId: number): Promise<void> => {
   try {
     await db.query(
@@ -163,7 +228,12 @@ export const invalidateSubadminSessionsForRoleId = async (roleId: number): Promi
   }
 };
 
-/** After module edits: force subadmins whose role_permission row references this module to sign in again. */
+/**
+ * Invalidates all subadmin sessions for roles that have access to a specific module.
+ *
+ * @param moduleId Module ID
+ * @returns void
+ */
 export const invalidateSubadminSessionsForModuleId = async (moduleId: number): Promise<void> => {
   try {
     await db.query(

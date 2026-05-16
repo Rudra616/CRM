@@ -1,12 +1,19 @@
 import db from "../../../config/db";
 import { User } from "../../../common/types/user";
 import { logServiceError } from "../../../common/helpers/serviceError";
+import { softDelete } from "../../../common/helpers/service.helper";
 
 // ─── Paginated list ───────────────────────────────────────────────────────────
 
 /** Allowed `limit` query values for GET users list (shared with API response). */
 export const USERS_PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100] as const;
 
+/**
+ * Normalizes and validates pagination limit, ensuring it matches allowed page size options or falls back to default.
+ *
+ * @param limit Requested page limit
+ * @returns Validated page limit from allowed options
+ */
 export const normalizeListPageLimit = (limit?: number) => {
   const n = Number(limit);
   if (!Number.isFinite(n) || n <= 0) return USERS_PAGE_SIZE_OPTIONS[0];
@@ -15,6 +22,16 @@ export const normalizeListPageLimit = (limit?: number) => {
     : USERS_PAGE_SIZE_OPTIONS[0];
 };
 
+/**
+ * Fetches paginated users list with optional status, search, and deleted user filtering.
+ *
+ * @param page Current page number
+ * @param limit Number of records per page
+ * @param statusFilter Optional user status filter
+ * @param search Optional search keyword
+ * @param opts Optional deleted user filter options
+ * @returns Paginated users data
+ */
 export const getUsersPaginated = async (
   page: number,
   limit: number,
@@ -72,8 +89,13 @@ export const getUsersPaginated = async (
   }
 };
 
-// ─── Status update ────────────────────────────────────────────────────────────
-
+/**
+ * Updates the status of a user by ID.
+ *
+ * @param userId User ID
+ * @param status User status value
+ * @returns Updated user details or null if user not found
+ */
 export const updateUserStatusService = async (
   userId: number,
   status: string
@@ -101,8 +123,13 @@ export const updateUserStatusService = async (
   }
 };
 
-// ─── Full profile update by admin ─────────────────────────────────────────────
-
+/**
+ * Updates a user's profile details by admin and returns the updated user data.
+ *
+ * @param userId User ID
+ * @param data User profile fields to update
+ * @returns Updated user details or null if user not found
+ */
 export const updateUserProfileByAdmin = async (
   userId: number,
   data: {
@@ -143,26 +170,28 @@ export const updateUserProfileByAdmin = async (
   }
 };
 
-// ─── Soft delete ──────────────────────────────────────────────────────────────
-
-export const softDeleteUserByAdmin = async (userId: number): Promise<boolean> => {
+/**
+ * Soft deletes a user by marking the user as deleted.
+ *
+ * @param userId User ID
+ * @returns True if the user was deleted successfully, otherwise false
+ */
+export const softDeleteUserByAdmin = async  (userId: number): Promise<boolean> => {
   try {
-    const [rows]: any = await db.query(
-      "SELECT id FROM `user` WHERE id = ? AND COALESCE(is_delete, 0) = 0 LIMIT 1",
-      [userId]
-    );
-    if (!rows.length) return false;
-
-    await db.query("UPDATE `user` SET is_delete = 1 WHERE id = ?", [userId]);
-    return true;
-  } catch (error: unknown) {
+    return await softDelete("user", userId);
+  }catch (error: unknown) {
     logServiceError("admin/user.service", "softDeleteUserByAdmin", error);
     throw error;
   }
-};
-
-// ─── Duplicate check (for admin edits) ───────────────────────────────────────
-
+}; 
+/**
+ * Checks whether an active user with the same username or email already exists, excluding a specific user ID.
+ *
+ * @param username Username to check
+ * @param email Email to check
+ * @param excludeId User ID to exclude from duplicate check
+ * @returns True if duplicate user exists, otherwise false
+ */
 export const checkDuplicateUserUsernameOrEmail = async (
   username: string,
   email: string,

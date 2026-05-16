@@ -1,24 +1,40 @@
 import db from "../../config/db";
 import { User } from "../../common/types/user";
 import { logServiceError } from "../../common/helpers/serviceError";
+import { checkDuplicate } from "../../common/helpers/service.helper";
 // ─── Lookup ───────────────────────────────────────────────────────────────────
 let Quary = "SELECT id, username, password, first_name, last_name, phone, email, gender, image_url, status, is_delete";
+/**
+ * Fetches a user by username or email to check duplicates during registration.
+ *
+ * @param username Username to check
+ * @param email Email to check
+ * @returns List of matching users (id, username, email)
+ */
 export const findUserByUsernameOrEmail = async (
   username: string,
   email: string
-): Promise<Array<{ id: number; username: string; email: string }>> => {
+): Promise<boolean> => {
   try {
-    const [rows]: any = await db.query(
-      "SELECT id, username, email FROM `user` WHERE (username = ? OR email = ?) AND COALESCE(is_delete, 0) != 1",
-      [username, email]
-    );
-    return rows ?? [];
+    return await checkDuplicate("user", { username, email });
   } catch (error: unknown) {
     logServiceError("user.service", "findUserByUsernameOrEmail", error);
     throw error;
   }
 };
 
+export const existsByFields = async (
+  table: "user" | "admin",
+  fields: Record<string, any>
+): Promise<boolean> => {
+  return await checkDuplicate(table, fields);
+};
+/**
+ * Fetches a user by username (active only).
+ *
+ * @param username Username
+ * @returns User data or null if not found
+ */
 export const findUserByUsername = async (username: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
@@ -35,6 +51,12 @@ export const findUserByUsername = async (username: string): Promise<User | null>
   }
 };
 
+/**
+ * Fetches a user by ID (active only).
+ *
+ * @param id User ID
+ * @returns User data or null if not found
+ */
 export const findUserById = async (id: number): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
@@ -49,6 +71,12 @@ export const findUserById = async (id: number): Promise<User | null> => {
   }
 };
 
+/**
+ * Fetches a user by email (active only).
+ *
+ * @param email User email
+ * @returns User data or null if not found
+ */
 export const findUserByEmail = async (email: string): Promise<User | null> => {
   try {
     const [rows]: any = await db.query(
@@ -62,6 +90,14 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
   }
 };
 
+/**
+ * Checks if a username or email already exists for another user.
+ *
+ * @param username Username to check
+ * @param email Email to check
+ * @param excludeId User ID to exclude from check
+ * @returns True if duplicate exists, otherwise false
+ */
 export const checkDuplicateUsernameOrEmail = async (
   username: string,
   email: string,
@@ -79,8 +115,19 @@ export const checkDuplicateUsernameOrEmail = async (
   }
 };
 
-// ─── Insert ───────────────────────────────────────────────────────────────────
-
+/**
+ * Creates a new user with hashed password and optional gender/status.
+ *
+ * @param username Username
+ * @param hashedPassword Encrypted password
+ * @param first_name First name
+ * @param last_name Last name
+ * @param phone Phone number
+ * @param email Email address
+ * @param gender Optional gender
+ * @param status Account status (default: pending)
+ * @returns Newly created user ID
+ */
 export const insertUser = async (
   username: string,
   hashedPassword: string,
@@ -106,8 +153,13 @@ export const insertUser = async (
   }
 };
 
-// ─── Update ───────────────────────────────────────────────────────────────────
-
+/**
+ * Updates user profile information including optional image.
+ *
+ * @param userId User ID
+ * @param data User profile fields to update
+ * @returns void
+ */
 export const updateUserById = async (
   userId: number,
   data: {
@@ -142,6 +194,13 @@ export const updateUserById = async (
   }
 };
 
+/**
+ * Updates a user's password.
+ *
+ * @param userId User ID
+ * @param hashedPassword New hashed password
+ * @returns True if update was successful, otherwise false
+ */
 export const updateUserPassword = async (
   userId: number,
   hashedPassword: string
@@ -158,8 +217,12 @@ export const updateUserPassword = async (
   }
 };
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
-
+/**
+ * Soft deletes a user by marking the account as deleted.
+ *
+ * @param userId User ID
+ * @returns True if user was deleted successfully, otherwise false
+ */
 export const softDeleteUser = async (userId: number): Promise<boolean> => {
   try {
     const [rows]: any = await db.query(

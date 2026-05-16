@@ -175,6 +175,13 @@ export const updateRoleRow = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Soft deletes a role and invalidates all related subadmin sessions.
+ *
+ * @param req Request object containing role ID in params
+ * @param res Response object
+ * @returns Success response if role is deleted
+ */
 export const deleteRoleRow = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -188,6 +195,13 @@ export const deleteRoleRow = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Creates a new role in the system.
+ *
+ * @param req Request object containing role name in body
+ * @param res Response object
+ * @returns Newly created role ID
+ */
 export const addRole = async (req: Request, res: Response) => {
   try {
     const name = String((req.body as { name: string }).name ?? "");
@@ -198,6 +212,13 @@ export const addRole = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Fetches all permissions assigned to a specific role.
+ *
+ * @param req Request object containing roleId in params
+ * @param res Response object
+ * @returns Role permissions list
+ */
 export const getPermissionsByRole = async (req: Request, res: Response) => {
   try {
     const roleId = Number(req.params.roleId);
@@ -210,6 +231,13 @@ export const getPermissionsByRole = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Saves and replaces all permissions for a role and invalidates related sessions.
+ *
+ * @param req Request object containing roleId and permissions array
+ * @param res Response object
+ * @returns Success response after saving permissions
+ */
 export const savePermissionsByRole = async (req: Request, res: Response) => {
   try {
     const roleId = Number(req.params.roleId);
@@ -238,6 +266,13 @@ export const savePermissionsByRole = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Fetches permissions for the currently logged-in user based on role or admin status.
+ *
+ * @param req Authenticated request object containing user data
+ * @param res Response object
+ * @returns User permissions grouped by module
+ */
 export const getMyPermissions = async (req: Request, res: Response) => {
   try {
     const user = (req as AuthRequest).user;

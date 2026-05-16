@@ -19,6 +19,7 @@ import {
   insertUser,
   updateUserById,
   updateUserPassword,
+  existsByFields,
 } from "./user.service";
 import {
   upsertUserToken,
@@ -27,17 +28,20 @@ import {
 } from "../token.service";
 import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../common/helpers/cookie.helper";
 
-// ─── Register ─────────────────────────────────────────────────────────────────
+/**
+ * Registers a new user after validating duplicate username/email and hashing password.
+ *
+ * @param req Request object containing user registration data
+ * @param res Response object
+ * @returns Success response after user registration
+ */
 export const registerUser = async (req: Request, res: Response) => {
   try {
     const { username, password, first_name, last_name, phone, email, gender } = req.body;
 
-    const existing = await findUserByUsernameOrEmail(username, email);
-    if (existing.length > 0) {
-      if (existing.some((u) => u.email === email))
-        return errorResponse(res, "Email already registered", 409);
-      if (existing.some((u) => u.username === username))
-        return errorResponse(res, "Username already taken", 409);
+    const exists = await existsByFields("user", { username, email });
+
+    if (exists) {
       return errorResponse(res, "Username or email already exists", 409);
     }
 
@@ -50,7 +54,13 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Login ────────────────────────────────────────────────────────────────────
+/**
+ * Authenticates a user by verifying credentials and issuing an access token.
+ *
+ * @param req Request object containing username and password
+ * @param res Response object
+ * @returns Logged-in user details with authentication token
+ */
 export const loginUser = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
@@ -91,7 +101,13 @@ export const loginUser = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Logout ───────────────────────────────────────────────────────────────────
+/**
+ * Logs out the current user by clearing authentication cookies and removing session token.
+ *
+ * @param req Request object containing user session
+ * @param res Response object
+ * @returns Success logout response
+ */
 export const logoutUser = async (req: Request, res: Response) => {
   const token = req.cookies.token;
   if (token) {
@@ -102,7 +118,13 @@ export const logoutUser = async (req: Request, res: Response) => {
   return successResponse(res, "Logged out", null, 200);
 };
 
-// ─── Profile ──────────────────────────────────────────────────────────────────
+/**
+ * Fetches the currently authenticated user's profile details.
+ *
+ * @param req Authenticated request object
+ * @param res Response object
+ * @returns User profile data
+ */
 export const getProfile: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -119,7 +141,13 @@ export const getProfile: RequestHandler = async (req, res) => {
   }
 };
 
-// ─── Update Profile ───────────────────────────────────────────────────────────
+/**
+ * Updates the authenticated user's profile including optional profile image.
+ *
+ * @param req Authenticated request object containing updated profile data
+ * @param res Response object
+ * @returns Updated user profile data
+ */
 export const updateProfile: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);
@@ -151,7 +179,13 @@ export const updateProfile: RequestHandler = async (req, res) => {
   }
 };
 
-// ─── Forgot Password ──────────────────────────────────────────────────────────
+/**
+ * Initiates password reset process by sending reset email to registered user.
+ *
+ * @param req Request object containing email
+ * @param res Response object
+ * @returns Success response if email is sent
+ */
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -168,7 +202,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Reset Password ───────────────────────────────────────────────────────────
+/**
+ * Resets user password after validating reset token.
+ *
+ * @param req Request object containing reset token and new password
+ * @param res Response object
+ * @returns Success response after password reset
+ */
 export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
@@ -196,7 +236,13 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Verify Reset Token ───────────────────────────────────────────────────────
+/**
+ * Verifies whether a password reset token is valid and not expired.
+ *
+ * @param req Request object containing reset token
+ * @param res Response object
+ * @returns Token validation status
+ */
 export const verifyResetToken = async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
@@ -217,7 +263,13 @@ export const verifyResetToken = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Change Password ──────────────────────────────────────────────────────────
+/**
+ * Changes the authenticated user's password and invalidates all active sessions.
+ *
+ * @param req Authenticated request object containing new password
+ * @param res Response object
+ * @returns Success response after password change
+ */
 export const changePassword: RequestHandler = async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return errorResponse(res, "Unauthorized", 401);

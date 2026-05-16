@@ -27,8 +27,7 @@ const userRoom = (id: number): string => `user:${id}`;
  * Room name used for global admin/user broadcasts.
  * All connected sockets join this room to receive system-wide events.
  */
-const BROADCAST_ROOM = "broadcast:all";
-
+const USER_BROADCAST_ROOM = "broadcast:users";
 /**
  * Emits an event to a specific user's socket room.
  * Used for private events like messages, ticket updates, and logout.
@@ -63,7 +62,8 @@ const emitToEachAdmin = async (channel: string, payload: unknown): Promise<void>
  */
 const emitToBroadcastRoom = (channel: string, payload: unknown): void => {
   if (!io) return;
-  io.to(BROADCAST_ROOM).emit(channel, payload);
+
+  io.to(USER_BROADCAST_ROOM).emit(channel, payload);
 };
 
 /**
@@ -92,7 +92,7 @@ const hasModuleSocketAccess = (row: {
 const parseCookieToken = (cookieHeader?: string): string | null => {
   if (!cookieHeader) return null;
   const parts = cookieHeader.split(";").map((part) => part.trim());
-  console.log("kahbsihb")
+  // console.log("kahbsihb")
   for (const part of parts) {
     if (part.startsWith("token=")) {
       return decodeURIComponent(part.slice("token=".length));
@@ -210,8 +210,11 @@ export const initSocketServer = (server: ReturnType<typeof createServer>): Serve
       socket.disconnect();
       return;
     }
-    socket.join(userRoom(user.id));
-    socket.join(BROADCAST_ROOM);
+  socket.join(userRoom(user.id));
+
+  if (!user.is_staff) {
+    socket.join(USER_BROADCAST_ROOM);
+  }
   });
 
   return io;

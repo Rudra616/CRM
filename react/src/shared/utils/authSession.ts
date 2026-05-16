@@ -34,7 +34,7 @@ export function getLoginRedirectUrl(pathname: string): string {
   return '/login';
 }
 
-/** Full URL for hard navigation after unauthorized access (shows a neutral message on login). */
+/** Login path + `reason=session` for SPA navigation after socket-driven logout. */
 export function buildSessionEndedLoginUrl(pathname: string): string {
   const target = getLoginRedirectUrl(pathname);
   const sep = target.includes('?') ? '&' : '?';

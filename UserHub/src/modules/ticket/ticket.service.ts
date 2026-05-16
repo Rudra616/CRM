@@ -12,6 +12,12 @@ import {
   TicketStatus,
 } from "./ticket.types";
 
+/**
+ * Creates a new support ticket for a user.
+ *
+ * @param ticketData Ticket details including user_id, subject, description, status, and optional image
+ * @returns Newly created ticket ID
+ */
 export const insertTicket = async (ticketData: CreateTicketInput): Promise<number> => {
   try {
     const [result]: any = await db.query(
@@ -31,6 +37,12 @@ export const insertTicket = async (ticketData: CreateTicketInput): Promise<numbe
   }
 };
 
+/**
+ * Fetches all tickets for a specific user, ordered by newest first.
+ *
+ * @param userId User ID
+ * @returns List of tickets belonging to the user
+ */
 export const getTicketsByUserId = async (userId: number): Promise<TicketRow[]> => {
   try {
     const [rows]: any = await db.query(
@@ -47,6 +59,13 @@ export const getTicketsByUserId = async (userId: number): Promise<TicketRow[]> =
   }
 };
 
+/**
+ * Fetches paginated tickets for a specific user with optional search on subject, description, and status, including unread admin message count.
+ *
+ * @param userId User ID
+ * @param q Query parameters for pagination and search
+ * @returns Paginated ticket list with total count
+ */
 export const getTicketsByUserIdPaged = async (
   userId: number,
   q: TicketListQuery
@@ -105,6 +124,11 @@ export const getTicketsByUserIdPaged = async (
   }
 };
 
+/**
+ * Fetches all tickets in the system ordered by newest first.
+ *
+ * @returns List of all tickets
+ */
 export const getAllTickets = async (): Promise<TicketRow[]> => {
   try {
     const [rows]: any = await db.query(
@@ -119,6 +143,12 @@ export const getAllTickets = async (): Promise<TicketRow[]> => {
   }
 };
 
+/**
+ * Fetches paginated tickets with optional search across ticket fields and user details, including unread user message count.
+ *
+ * @param q Query parameters for pagination and search
+ * @returns Paginated ticket list with total count
+ */
 export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketListResult> => {
   try {
     const page = Math.max(1, q.page);
@@ -184,7 +214,14 @@ export const getAllTicketsPaged = async (q: TicketListQuery): Promise<TicketList
   }
 };
 
-
+/**
+ * Updates a ticket by its owner (user), allowing modification of subject, description, and optional image.
+ *
+ * @param ticketId Ticket ID
+ * @param ownerUserId Owner user ID
+ * @param data Updated ticket data
+ * @returns True if ticket was updated successfully, otherwise false
+ */
 export const updateTicketByOwner = async (
   ticketId: number,
   ownerUserId: number,
@@ -213,6 +250,12 @@ export const updateTicketByOwner = async (
   }
 };
 
+/**
+ * Inserts a new message into a ticket conversation with read-status handling for user and admin.
+ *
+ * @param messageData Ticket message payload including sender info and content
+ * @returns Newly created ticket message ID
+ */
 export const insertTicketMessage = async (
   messageData: CreateTicketMessageInput
 ): Promise<number> => {
@@ -239,6 +282,12 @@ export const insertTicketMessage = async (
   }
 };
 
+/**
+ * Fetches a single ticket by its ID.
+ *
+ * @param ticketId Ticket ID
+ * @returns Ticket details or null if not found
+ */
 export const getTicketById = async (ticketId: number): Promise<TicketRow | null> => {
   try {
     const [rows]: any = await db.query(
@@ -254,6 +303,12 @@ export const getTicketById = async (ticketId: number): Promise<TicketRow | null>
   }
 };
 
+/**
+ * Fetches all messages of a ticket including sender details (admin/user) in chronological order.
+ *
+ * @param ticketId Ticket ID
+ * @returns List of ticket messages with sender information
+ */
 export const getTicketMessagesByTicketId = async (
   ticketId: number
 ): Promise<TicketMessageView[]> => {
@@ -286,7 +341,13 @@ export const getTicketMessagesByTicketId = async (
   }
 };
 
-/** Mark all admin messages on this ticket as read by the ticket owner (opens chat). */
+/**
+ * Marks all admin messages in a ticket as read by the ticket owner.
+ *
+ * @param ticketId Ticket ID
+ * @param ownerUserId Ticket owner (user) ID
+ * @returns void
+ */
 export const markAdminMessagesReadByOwner = async (
   ticketId: number,
   ownerUserId: number
@@ -306,7 +367,12 @@ export const markAdminMessagesReadByOwner = async (
   }
 };
 
-/** Mark all user messages on this ticket as read by staff (opens chat). */
+/**
+ * Marks all user messages in a ticket as read by admin/staff.
+ *
+ * @param ticketId Ticket ID
+ * @returns void
+ */
 export const markUserMessagesReadByStaff = async (ticketId: number): Promise<void> => {
   try {
     await db.query(
@@ -322,6 +388,12 @@ export const markUserMessagesReadByStaff = async (ticketId: number): Promise<voi
   }
 };
 
+/**
+ * Fetches unread ticket message summary for a ticket owner (user).
+ *
+ * @param userId User ID
+ * @returns Total unread messages and number of tickets with unread messages
+ */
 export const getOwnerTicketUnreadSummary = async (
   userId: number
 ): Promise<OwnerTicketUnreadSummary> => {
@@ -347,6 +419,11 @@ export const getOwnerTicketUnreadSummary = async (
   }
 };
 
+/**
+ * Fetches unread ticket message summary for admin/staff.
+ *
+ * @returns Total unread messages and number of tickets with unread tickets
+ */
 export const getStaffTicketUnreadSummary = async (): Promise<StaffTicketUnreadSummary> => {
   try {
     const [rows]: any = await db.query(
@@ -368,6 +445,14 @@ export const getStaffTicketUnreadSummary = async (): Promise<StaffTicketUnreadSu
   }
 };
 
+/**
+ * Updates ticket status by owner (user), preventing updates if ticket is already closed.
+ *
+ * @param ticketId Ticket ID
+ * @param userId User ID of ticket owner
+ * @param status New ticket status
+ * @returns True if status was updated successfully, otherwise false
+ */
 export const updateTicketStatusByOwner = async (
   ticketId: number,
   userId: number,
@@ -386,6 +471,14 @@ export const updateTicketStatusByOwner = async (
 
   return result.affectedRows > 0;
 };
+
+/**
+ * Updates ticket status by admin.
+ *
+ * @param ticketId Ticket ID
+ * @param status New ticket status
+ * @returns True if status was updated successfully, otherwise false
+ */
 export const updateTicketStatusByAdmin = async (
   ticketId: number,
   status: TicketStatus

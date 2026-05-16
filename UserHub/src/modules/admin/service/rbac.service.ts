@@ -9,6 +9,7 @@ import type {
   RoleRow,
   RoleTableRow,
 } from "../types/rbac.types";
+import { softDelete } from "../../../common/helpers/service.helper";
 
 /** Pivot table for RBAC. Set DB_ROLE_PERMISSION_TABLE if your MySQL name differs (e.g. role_permissions). */
 const ROLE_PERMISSION_TABLE = (() => {
@@ -19,38 +20,50 @@ const ROLE_PERMISSION_TABLE = (() => {
 
 
 const rp = () => `\`${ROLE_PERMISSION_TABLE}\``;
+const toFlag = (v: boolean): 0 | 1 => (v ? 1 : 0);
 
-const activeModuleNameExists = async (
+/**
+ * Check if exist table name was exist and its not delete also with case-insensitive
+ * 
+ * @param table Table name (moduel and role)
+ * @param name Name to check exist or not
+ * @param excludeId - Optional ID to exclude from check (used during update operations)
+ * @param caseInsensitive If true performs case insensitive name compare
+ * @returns true if matching record exists ,otherwise false
+ */
+const activeNameExists = async (
+  table: "module" | "role",
   name: string,
-  excludeModuleId?: number
+  excludeId?: number,
+  caseInsensitive = false
 ): Promise<boolean> => {
   const params: unknown[] = [name];
-  let sql =
-    "SELECT id FROM module WHERE COALESCE(is_delete, 0) = 0 AND LOWER(name) = LOWER(?)";
-  if (excludeModuleId !== undefined) {
+
+  let sql = `SELECT id FROM ${table} WHERE COALESCE(is_delete, 0) = 0`;
+
+  sql += caseInsensitive
+    ? " AND LOWER(name) = LOWER(?)"
+    : " AND name = ?";
+
+  if (excludeId !== undefined) {
     sql += " AND id <> ?";
-    params.push(excludeModuleId);
+    params.push(excludeId);
   }
+
   sql += " LIMIT 1";
+
   const [rows]: any = await db.query(sql, params);
   return Array.isArray(rows) && rows.length > 0;
 };
 
-const activeRoleNameExists = async (
-  name: string,
-  excludeRoleId?: number
-): Promise<boolean> => {
-  const params: unknown[] = [name];
-  let sql = "SELECT id FROM role WHERE COALESCE(is_delete, 0) = 0 AND name = ?";
-  if (excludeRoleId !== undefined) {
-    sql += " AND id <> ?";
-    params.push(excludeRoleId);
-  }
-  sql += " LIMIT 1";
-  const [rows]: any = await db.query(sql, params);
-  return Array.isArray(rows) && rows.length > 0;
-};
-
+/**
+ * Fetches paginated modules list with optional search filtering.
+ *
+ * @param page Current page number
+ * @param limit Number of records per page
+ * @param search Optional search keyword for module name
+ * @returns Paginated modules data
+ */
 export const getModulesPaginated = async (
   page: number,
   limit: number,
@@ -72,7 +85,7 @@ export const getModulesPaginated = async (
     const total = Number(countRow?.total ?? 0);
     const [rows]: any = await db.query(
       `SELECT id, name, status, created_at, updated_at FROM module ${where}
-       ORDER BY id DESC LIMIT ? OFFSET ?`,
+       ORDER BY COALESCE(updated_at, created_at) DESC, id DESC LIMIT ? OFFSET ?`,
       [...params, safeLimit, offset]
     );
     return { items: rows, total, limit: safeLimit };
@@ -82,12 +95,19 @@ export const getModulesPaginated = async (
   }
 };
 
+/**
+ * Updates module details by ID.
+ *
+ * @param id Module ID
+ * @param data Module data to update
+ * @returns True if the module was updated successfully, otherwise false
+ */
 export const updateModuleById = async (
   id: number,
   data: { name?: string; status?: "active" | "inactive" }
 ): Promise<boolean> => {
   try {
-    if (data.name !== undefined && (await activeModuleNameExists(data.name, id))) {
+    if (data.name !== undefined && (await activeNameExists("module",data.name, id))) {
       throw new Error("A module with this name already exists");
     }
     const parts: string[] = [];
@@ -114,22 +134,30 @@ export const updateModuleById = async (
   }
 };
 
+/**
+ * Soft deletes a module by marking it as deleted.
+ *
+ * @param id Module ID
+ * @returns True if the module was deleted successfully, otherwise false
+ */
 export const softDeleteModuleById = async (id: number): Promise<boolean> => {
   try {
-    const [result]: any = await db.query(
-      "UPDATE module SET is_delete = 1, updated_at = NOW() WHERE id = ? AND COALESCE(is_delete, 0) = 0",
-      [id]
-    );
-    return result.affectedRows > 0;
+    return await softDelete("module", id);
   } catch (error: unknown) {
     logServiceError("rbac.service", "softDeleteModuleById", error);
     throw error;
   }
-};
+}
 
+/**
+ * Creates a new module after validating duplicate name existence.
+ *
+ * @param name Module name
+ * @returns Newly created module ID
+ */
 export const createModule = async (name: string): Promise<number> => {
   try {
-    if (await activeModuleNameExists(name)) {
+    if (await activeNameExists("module",name)) {
       throw new Error("A module with this name already exists");
     }
     const [result]: any = await db.query(
@@ -143,6 +171,14 @@ export const createModule = async (name: string): Promise<number> => {
   }
 };
 
+/**
+ * Fetches paginated roles list with optional search filtering.
+ *
+ * @param page Current page number
+ * @param limit Number of records per page
+ * @param search Optional search keyword for role name
+ * @returns Paginated roles data
+ */
 export const getRolesPaginated = async (
   page: number,
   limit: number,
@@ -164,7 +200,7 @@ export const getRolesPaginated = async (
     const total = Number(countRow?.total ?? 0);
     const [rows]: any = await db.query(
       `SELECT id, name, status, created_at, updated_at FROM role ${where}
-       ORDER BY id DESC LIMIT ? OFFSET ?`,
+       ORDER BY COALESCE(updated_at, created_at) DESC, id DESC LIMIT ? OFFSET ?`,
       [...params, safeLimit, offset]
     );
     return { items: rows, total, limit: safeLimit };
@@ -174,12 +210,19 @@ export const getRolesPaginated = async (
   }
 };
 
+/**
+ * Updates role details by ID.
+ *
+ * @param id Role ID
+ * @param data Role data to update
+ * @returns True if the role was updated successfully, otherwise false
+ */
 export const updateRoleById = async (
   id: number,
   data: { name?: string; status?: "active" | "inactive" }
 ): Promise<boolean> => {
   try {
-    if (data.name !== undefined && (await activeRoleNameExists(data.name, id))) {
+    if (data.name !== undefined && (await activeNameExists("role",data.name, id))) {
       throw new Error("A role with this name already exists");
     }
     const parts: string[] = [];
@@ -206,19 +249,27 @@ export const updateRoleById = async (
   }
 };
 
+/**
+ * Soft deletes a role by marking it as deleted.
+ *
+ * @param id Role ID
+ * @returns True if the role was deleted successfully, otherwise false
+ */
 export const softDeleteRoleById = async (id: number): Promise<boolean> => {
   try {
-    const [result]: any = await db.query(
-      "UPDATE role SET is_delete = 1, updated_at = NOW() WHERE id = ? AND COALESCE(is_delete, 0) = 0",
-      [id]
-    );
-    return result.affectedRows > 0;
+    return await softDelete("role", id);
   } catch (error: unknown) {
     logServiceError("rbac.service", "softDeleteRoleById", error);
     throw error;
   }
 };
 
+/**
+ * Fetches role details by ID if the role is active and not deleted.
+ *
+ * @param id Role ID
+ * @returns Role details or null if not found
+ */
 export const findRoleById = async (id: number): Promise<RoleRow | null> => {
   try {
     const [rows]: any = await db.query(
@@ -232,9 +283,15 @@ export const findRoleById = async (id: number): Promise<RoleRow | null> => {
   }
 };
 
+/**
+ * Creates a new role after validating duplicate name existence.
+ *
+ * @param name Role name
+ * @returns Newly created role ID
+ */
 export const createRole = async (name: string): Promise<number> => {
   try {
-    if (await activeRoleNameExists(name)) {
+    if (await activeNameExists("role",name)) {
       throw new Error("A role with this name already exists");
     }
     const [result]: any = await db.query(
@@ -248,6 +305,12 @@ export const createRole = async (name: string): Promise<number> => {
   }
 };
 
+/**
+ * Fetches permissions assigned to a specific role.
+ *
+ * @param roleId Role ID
+ * @returns List of role permissions
+ */
 export const getRolePermissions = async (roleId: number): Promise<RolePermissionRow[]> => {
   try {
     const [rows]: any = await db.query(
@@ -268,8 +331,13 @@ export const getRolePermissions = async (roleId: number): Promise<RolePermission
   }
 };
 
-const toFlag = (v: boolean): 0 | 1 => (v ? 1 : 0);
-
+/**
+ * Replaces existing permissions of a role with the provided permission set.
+ *
+ * @param roleId Role ID
+ * @param permissions List of role permissions to assign
+ * @returns Promise resolved when permissions are updated successfully
+ */
 export const replaceRolePermissions = async (
   roleId: number,
   permissions: RolePermissionInput[]
@@ -313,7 +381,10 @@ export const replaceRolePermissions = async (
 };
 
 /**
- * @returns Permissions for the given role ID (module names + flags).
+ * Fetches active module permissions assigned to a specific role.
+ *
+ * @param roleId Role ID
+ * @returns List of module permissions for the role
  */
 export const getMyPermissionsByRoleId = async (roleId: number): Promise<MyPermissionRow[]> => {
   try {

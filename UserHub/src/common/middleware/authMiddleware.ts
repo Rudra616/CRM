@@ -13,6 +13,13 @@ import { findUserById } from "../../modules/user/user.service";
 import { findAdminById } from "../../modules/admin/service/admin.service";
 import { isMainAdminRow } from "../utils/adminIdentity";
 
+/**
+ * Authenticates user/admin using JWT token from cookies.
+ *
+ * @param req Incoming request object containing authentication cookie
+ * @param res Response object used for sending auth responses
+ * @returns Resolves with next() or sends 401/403 response on failure
+ */
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authReq = req as AuthRequest;
   const token = authReq.cookies.token;
@@ -97,7 +104,13 @@ export const authenticate: RequestHandler = async (req, res, next) => {
   }
 };
 
-/** User-only guard for routes under `/api/*` (non-staff). */
+/**
+ * Validates that the request belongs to an authenticated non-staff user.
+ *
+ * @param req Incoming request object containing authenticated user data
+ * @param res Response object used for sending error responses
+ * @returns Calls next() if valid user, otherwise returns 401/403 response
+ */
 export const requireUserSession: RequestHandler = (req, res, next) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) {
@@ -109,7 +122,13 @@ export const requireUserSession: RequestHandler = (req, res, next) => {
   return next();
 };
 
-/** Staff-only guard for routes under `/api/admin/*`. */
+/**
+ * Validates that the request belongs to an authenticated staff user.
+ *
+ * @param req Incoming request object containing authenticated user data
+ * @param res Response object used for sending error responses
+ * @returns Calls next() if valid staff user, otherwise returns 401/403 response
+ */
 export const requireStaffSession: RequestHandler = (req, res, next) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) {
@@ -121,12 +140,21 @@ export const requireStaffSession: RequestHandler = (req, res, next) => {
   return next();
 };
 
-// export const allowRoles = (...roles: number[]): RequestHandler => {
-//   return (req, res, next) => {
-//     const authReq = req as AuthRequest;
-//     if (!authReq.user || !roles.includes(authReq.user.role)) {
-//       return res.status(403).json({ success: false, message: "Forbidden" });
-//     }
-//     next();
-//   };
-// };
+/**
+ * Ensures only main admin users can access the route.
+ *
+ * @param req Incoming request object containing authenticated user data
+ * @param res Response object used for sending error responses
+ * @returns Calls next() if main admin, otherwise returns 403 response
+ */
+export const requireMainAdmin: RequestHandler = (req, res, next) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user?.is_staff) {
+    return res.status(403).json({ success: false, message: "Forbidden: staff session required" });
+  }
+  if (!authReq.user.is_main_admin) {
+    return res.status(403).json({ success: false, message: "Forbidden: main admin only" });
+  }
+  next();
+};
+

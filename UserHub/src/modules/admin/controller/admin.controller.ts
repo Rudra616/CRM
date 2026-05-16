@@ -27,6 +27,7 @@ import { setAuthCookie, clearAuthCookie, clearSessionCookies } from "../../../co
 import { isMainAdminRow, isSubadminRow, MAIN_ADMIN_USERNAME } from "../../../common/utils/adminIdentity";
 import { USERS_PAGE_SIZE_OPTIONS } from "../service/user.service";
 import { findRoleById } from "../service/rbac.service";
+import { existsByFields } from "../../user/user.service";
 
 /**
  * Handles admin login authentication.
@@ -216,21 +217,32 @@ export const getDashboardSummary: RequestHandler = async (_req, res) => {
   }
 };
 
+/**
+ * Creates a new subadmin after validating role, uniqueness, and reserved username.
+ *
+ * @param req Request object containing subadmin details
+ * @param res Response object
+ * @returns Created subadmin response
+ */
 export const createSubadmin = async (req: Request, res: Response) => {
   try {
     const { username, password, first_name, last_name, phone, email, gender, role_id } = req.body;
+      const exists = await existsByFields("admin", { username, email });
+
+    if (exists) {
+      return errorResponse(res, "Username or asdasd already exists", 409);
+    }
 
     if (String(username).trim().toLowerCase() === MAIN_ADMIN_USERNAME) {
       return errorResponse(res, "Reserved username", 400);
     }
 
+
+
     const roleId = Number(role_id);
     if (!Number.isInteger(roleId) || roleId <= 0) return errorResponse(res, "Invalid role", 400);
-    const roleRow = await findRoleById(roleId);
-    if (!roleRow) return errorResponse(res, "Invalid role", 400);
-
-    const isDup = await checkDuplicateAdminUsernameOrEmail(username, email, 0);
-    if (isDup) return errorResponse(res, "Username or email already exists", 409);
+    // const roleRow = await findRoleById(roleId);
+    // if (!roleRow) return errorResponse(res, "Invalid role", 400);
 
     const hashedPassword = await hashPassword(password);
     await insertSubadmin({
@@ -246,10 +258,18 @@ export const createSubadmin = async (req: Request, res: Response) => {
 
     return successResponse(res, "Subadmin created successfully", null, 201);
   } catch (err: any) {
+
     return errorResponse(res, err.message, 500);
   }
 };
 
+/**
+ * Fetches paginated list of subadmins with optional search.
+ *
+ * @param req Request object with query params (page, limit, search)
+ * @param res Response object
+ * @returns Paginated subadmin list with metadata
+ */
 export const getSubadmins = async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -273,6 +293,13 @@ export const getSubadmins = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Fetches a subadmin by ID after validating existence and permissions.
+ *
+ * @param req Request object containing subadmin ID in params
+ * @param res Response object
+ * @returns Subadmin details
+ */
 export const getSubadminById: RequestHandler<{ id: string }> = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
@@ -287,6 +314,13 @@ export const getSubadminById: RequestHandler<{ id: string }> = async (req, res) 
   }
 };
 
+/**
+ * Updates subadmin details including optional role change and invalidates sessions.
+ *
+ * @param req Request object containing subadmin ID and update data
+ * @param res Response object
+ * @returns Updated subadmin data
+ */
 export const updateSubadmin: RequestHandler<{ id: string }> = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
@@ -328,6 +362,13 @@ export const updateSubadmin: RequestHandler<{ id: string }> = async (req, res) =
   }
 };
 
+/**
+ * Changes a subadmin's password and invalidates all active sessions.
+ *
+ * @param req Request object containing subadmin ID and new password
+ * @param res Response object
+ * @returns Success response after password update
+ */
 export const changeSubadminPasswordByAdmin: RequestHandler<{ id: string }> = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
@@ -350,6 +391,13 @@ export const changeSubadminPasswordByAdmin: RequestHandler<{ id: string }> = asy
   }
 };
 
+/**
+ * Deletes a subadmin after validation and revokes all active sessions.
+ *
+ * @param req Request object containing subadmin ID
+ * @param res Response object
+ * @returns Success response after deletion
+ */
 export const deleteSubadmin: RequestHandler<{ id: string }> = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return errorResponse(res, "Invalid ID", 400);
