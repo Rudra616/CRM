@@ -7,7 +7,6 @@ import {
   listBroadcasts,
   softDeleteBroadcast,
 } from "./broadcast.service";
-import { emitSocket } from "../../realtime/socket";
 
 /**
  * Creates a new broadcast message and emits it via socket to all connected clients.
@@ -22,10 +21,6 @@ export const createBroadcast: RequestHandler = async (req, res) => {
 
     const broadcast = await insertBroadcast({ message });
 
-    await emitSocket({
-      name: "broadcast_message",
-      payload: broadcast,
-    });
 
     return successResponse(
       res,
@@ -60,10 +55,7 @@ export const deleteBroadcast: RequestHandler = async (req, res) => {
     if (!ok) {
       return errorResponse(res, "Broadcast not found or already deleted", 404);
     }
-    await emitSocket({
-      name: "broadcast_removed",
-      payload: { id },
-    });
+
     return successResponse(res, "Broadcast deleted", null, 200);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to delete broadcast";

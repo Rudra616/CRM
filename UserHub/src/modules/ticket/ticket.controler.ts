@@ -23,7 +23,6 @@ import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
 import { TicketStatus } from "./ticket.types";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../admin/service/user.service";
-import { emitSocket } from "../../realtime/socket";
 
 /** Parses and validates query parameters for ticket listing endpoints. */
 const parseTicketListQuery = (q: Record<string, unknown>) => {
@@ -73,19 +72,7 @@ export const createTicket: RequestHandler = async (req, res) => {
       image_url: imageUrl,
     });
 
-    await emitSocket({
-      name: "ticket_updated",
-      payload: {
-        ticketId,
-        ownerUserId: userId,
-        status: "open",
-        updatedBy: "user",
-        updatedById: userId,
-        kind: "created",
-        ownerUsername: ownerRow.username,
-        subject,
-      },
-    });
+
 
     return successResponse(res, "Ticket created successfully", { ticketId }, 201);
   } catch (err: any) {
@@ -251,16 +238,7 @@ export const updateOwnedTicket: RequestHandler = async (req, res) => {
     });
 
     if (!updated) return errorResponse(res, "Ticket not found", 404);
-    await emitSocket({
-      name: "ticket_updated",
-      payload: {
-        ticketId,
-        ownerUserId: ticket.user_id,
-        status: ticket.status,
-        updatedBy: "user",
-        updatedById: userId,
-      },
-    });
+
 
     return successResponse(res, "Ticket updated successfully");
   } catch (err: any) {
@@ -317,16 +295,7 @@ export const updateTicketStatus: RequestHandler = async (req, res) => {
     if (!updated) {
       return errorResponse(res, "Ticket not found or not updated", 400);
     }
-    await emitSocket({
-      name: "status",
-      event: {
-        type: "ticket_status",
-        ticketId,
-        ownerUserId: ticket.user_id,
-        status,
-        updatedById: authReq.user?.id || 0,
-      },
-    });
+
 
     return successResponse(res, "Ticket status updated successfully");
   } catch (err: any) {
@@ -410,29 +379,6 @@ export const addTicketMessage: RequestHandler = async (req, res) => {
     }
     const ticketSubjectRaw = String(ticket.subject ?? "").trim();
     const ticketSubject = ticketSubjectRaw || undefined;
-
-    await emitSocket({
-      name: "new_message",
-      payload: {
-        ticketId: Number(ticket_id),
-        ownerUserId: ticket.user_id,
-        senderId,
-        senderType: isStaff ? "admin" : "user",
-        ticketSubject,
-        senderDisplayName,
-        message: {
-          id: messageId,
-          ticket_id: Number(ticket_id),
-          sender_id: senderId,
-          sender_type: isStaff ? "admin" : "user",
-          message: text,
-          image: imagePath ? buildImageUrl(authReq, imagePath) : null,
-          created_at: new Date().toISOString(),
-          is_read_by_user: isStaff ? 0 : 1,
-          is_read_by_admin: isStaff ? 1 : 0,
-        },
-      },
-    });
 
     return successResponse(res, "Message added to ticket successfully");
   } catch (err: any) {

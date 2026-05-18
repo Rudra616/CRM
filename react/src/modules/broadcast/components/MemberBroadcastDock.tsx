@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FaBullhorn, FaComments, FaTimes, FaCommentDots } from 'react-icons/fa';
 import { useAuth } from '../../../context/AuthContext';
-import {
-  getTicketSocket,
-  type AdminBroadcastSocketEvent,
-  type BroadcastRemovedSocketEvent,
-} from '../../../shared/socket/ticketSocket';
+
 import { listMemberBroadcastsApi, type MemberBroadcastRow } from '../api/broadcast.api';
 import { colors } from '../../../theme/colors';
 
@@ -86,40 +82,6 @@ const MemberBroadcastDock = () => {
   }, [user, isLoading]);
 
   /* SOCKET */
-  useEffect(() => {
-    if (isLoading || !user?.id || user.is_staff) return;
-
-    const socket = getTicketSocket();
-
-    const onBroadcast = (p: AdminBroadcastSocketEvent) => {
-      const id = Number(p.id);
-      const message = String(p.message ?? '').trim();
-      if (!Number.isFinite(id) || id <= 0 || !message) return;
-      setItems((prev) =>
-        sortBroadcastsChrono([
-          ...prev.filter((x) => x.id !== id),
-          {
-            id,
-            message,
-            created_at: p.created_at || new Date().toISOString(),
-            is_delete: 0,
-          },
-        ])
-      );
-    };
-
-    const onRemoved = (p: BroadcastRemovedSocketEvent) => {
-      setItems((prev) => prev.filter((x) => x.id !== Number(p.id)));
-    };
-
-    socket.on('admin_broadcast', onBroadcast);
-    socket.on('broadcast_removed', onRemoved);
-
-    return () => {
-      socket.off('admin_broadcast', onBroadcast);
-      socket.off('broadcast_removed', onRemoved);
-    };
-  }, [user, isLoading]);
 
   const formatDate = (d: string) => {
     const date = new Date(d);

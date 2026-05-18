@@ -13,7 +13,6 @@ import {
   clearUserStorage,
   loadUserFromStorage,
 } from '../shared/authSession';
-import { disconnectTicketSocket } from '../shared/socket/ticketSocket';
 
 interface AuthContextType {
   user: UserInfo | null;
@@ -71,7 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else await logoutApi();
     } catch {}
     finally {
-      disconnectTicketSocket();
       clearClientAuthStorage();
       clearUserStorage();
       userRef.current = null;

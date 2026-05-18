@@ -12,7 +12,6 @@ import {
   removeAllUserTokensForUserId,
   hasActiveUserTokenForUserId,
 } from "../../token.service";
-import { emitSocket } from "../../../realtime/socket";
 import { AuthRequest } from "../../../common/types/AuthRequest";
 
 /**
@@ -69,16 +68,7 @@ export const updateUserStatus: RequestHandler = async (req, res) => {
       await removeAllUserTokensForUserId(userId);
     }
 
-    // 🔥 SOCKET EMIT
-    await emitSocket({
-      name: "status",
-      event: {
-        type: "user_status",
-        userId,
-        status,
-        updatedById: authReq.user.id || 0,
-      },
-    });
+
 
     return successResponse(res, "User status updated successfully", updatedUser, 200);
   } catch (err: any) {
@@ -134,10 +124,6 @@ export const logoutUserByAdmin = async (req: Request, res: Response) => {
 
     const wasLoggedIn = await hasActiveUserTokenForUserId(userId);
     await removeAllUserTokensForUserId(userId);
-    if (wasLoggedIn) {
-      await emitSocket({ name: "user_logout", userId });
-    }
-
     return successResponse(res,
       wasLoggedIn ? "User logged out successfully" : "User was already logged out",
       { wasLoggedIn }, 200

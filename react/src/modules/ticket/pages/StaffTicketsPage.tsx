@@ -16,12 +16,7 @@ import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
-import {
-  getTicketSocket,
-  type NewMessageSocketEvent,
-  type TicketUpdatedSocketEvent,
-  type StatusUpdatedSocketEvent,
-} from '../../../shared/socket/ticketSocket';
+
 
 const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
@@ -151,69 +146,6 @@ const StaffTicketsPage = () => {
     };
   }, [searchParams, setSearchParams, canMessageView]);
 
-  useEffect(() => {
-    if (!canView) return;
-    const socket = getTicketSocket();
-    const myId = user?.id;
-    const onRealtimeMessage = (payload: NewMessageSocketEvent) => {
-      if (myId && payload.senderId === myId) return;
-      const tid = Number(payload.ticketId);
-      setTickets((prev) =>
-        prev.map((row) =>
-          Number(row.id) === tid
-            ? {
-                ...row,
-                unread_from_user_count:
-                  payload.senderType === 'user'
-                    ? Number(row.unread_from_user_count ?? 0) + 1
-                    : Number(row.unread_from_user_count ?? 0),
-              }
-            : row
-        )
-      );
-      if (activeTicket && Number(activeTicket.id) === tid && payload.message) {
-        setMessages((prev) => [...prev, payload.message]);
-      }
-    };
-    const onStatusUpdated = (payload: StatusUpdatedSocketEvent) => {
-      if (payload.type !== 'ticket_status') return;
-      if (myId && payload.updatedById === myId) return;
-      const nextStatus = payload.status;
-      const tid = Number(payload.ticketId);
-      setTickets((prev) =>
-        prev.map((row) => (Number(row.id) === tid ? { ...row, status: nextStatus } : row))
-      );
-      if (activeTicket && Number(activeTicket.id) === tid) {
-        setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-      }
-    };
-    const onTicketUpdated = (payload: TicketUpdatedSocketEvent) => {
-      if (myId && payload.updatedById === myId) return;
-      if (payload.kind === 'created') {
-        void loadTickets({ silent: true });
-        return;
-      }
-      const nextStatus = payload.status;
-      if (!nextStatus) return;
-      const tid = Number(payload.ticketId);
-      setTickets((prev) =>
-        prev.map((row) => (Number(row.id) === tid ? { ...row, status: nextStatus } : row))
-      );
-      if (activeTicket && Number(activeTicket.id) === tid) {
-        setActiveTicket((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-      }
-    };
-
-    socket.on('new_message', onRealtimeMessage);
-    socket.on('status_updated', onStatusUpdated);
-    socket.on('ticket_updated', onTicketUpdated);
-
-    return () => {
-      socket.off('new_message', onRealtimeMessage);
-      socket.off('status_updated', onStatusUpdated);
-      socket.off('ticket_updated', onTicketUpdated);
-    };
-  }, [canView, activeTicket?.id, user?.id]);
 
   const start = total === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
   const end = Math.min(currentPage * rowsPerPage, total);
