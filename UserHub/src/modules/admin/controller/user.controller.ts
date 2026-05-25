@@ -13,6 +13,7 @@ import {
   hasActiveUserTokenForUserId,
 } from "../../token.service";
 import { AuthRequest } from "../../../common/types/AuthRequest";
+import { emitSocket, SOCKET_EVENTS } from "../../../socket";
 
 /**
  * get users with pagination, search and filter support.
@@ -66,9 +67,9 @@ export const updateUserStatus: RequestHandler = async (req, res) => {
 
     if (status !== "active") {
       await removeAllUserTokensForUserId(userId);
+      emitSocket(SOCKET_EVENTS.SESSION_ENDED, { userId });
     }
-
-
+    emitSocket(SOCKET_EVENTS.USER_STATUS, { userId, status });
 
     return successResponse(res, "User status updated successfully", updatedUser, 200);
   } catch (err: any) {
@@ -124,6 +125,7 @@ export const logoutUserByAdmin = async (req: Request, res: Response) => {
 
     const wasLoggedIn = await hasActiveUserTokenForUserId(userId);
     await removeAllUserTokensForUserId(userId);
+    if (wasLoggedIn) emitSocket(SOCKET_EVENTS.SESSION_ENDED, { userId });
     return successResponse(res,
       wasLoggedIn ? "User logged out successfully" : "User was already logged out",
       { wasLoggedIn }, 200
@@ -146,6 +148,7 @@ export const deleteUserByAdmin = async (req: Request, res: Response) => {
     if (isNaN(userId)) return errorResponse(res, "Invalid user ID", 400);
 
     await removeAllUserTokensForUserId(userId);
+    emitSocket(SOCKET_EVENTS.SESSION_ENDED, { userId });
 
     const deleted = await softDeleteUserByAdmin(userId);
     if (!deleted) return errorResponse(res, "User not found", 404);

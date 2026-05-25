@@ -8,8 +8,6 @@ export type LatestBroadcast = {
   created_at: string;
 } | null;
 
-export const getLatestBroadcastApi = (): Promise<ApiResponse<LatestBroadcast>> =>
-  apiRequest<LatestBroadcast>('GET', '/broadcast/latest');
 
 export type MemberBroadcastRow = {
   id: number;

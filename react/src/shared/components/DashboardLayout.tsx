@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 import { TicketUnreadProvider } from '../../context/TicketUnreadContext';
+import { useSocketSession } from '../useSocketSession';
 import MemberBroadcastDock from '../../modules/broadcast/components/MemberBroadcastDock';
 import { sessionGate } from '../utils/sessionGate';
 
@@ -15,7 +16,8 @@ interface Props {
 
 const DashboardLayout = ({ children }: Props) => {
   const { collapsed, isMobile } = useSidebar();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  useSocketSession(user, logout);
   const gate = sessionGate(user);
   const content = children ?? <Outlet />;
 

@@ -3,7 +3,6 @@ import { successResponse, errorResponse } from "../../common/utils/apiResponse";
 import {
   insertBroadcast,
   getBroadcastById,
-  getLatestBroadcast,
   listBroadcasts,
   softDeleteBroadcast,
 } from "./broadcast.service";
@@ -63,23 +62,7 @@ export const deleteBroadcast: RequestHandler = async (req, res) => {
   }
 };
 
-/**
- * Fetches the latest broadcast message for public access.
- *
- * @param req Request object
- * @param res Response object
- * @returns Latest broadcast message
- */
-/** Latest active broadcast for a logged-in member (`requireUserSession`). */
-export const getLatestBroadcastPublic: RequestHandler = async (_req, res) => {
-  try {
-    const row = await getLatestBroadcast();
-    return successResponse(res, "Latest broadcast", row, 200);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch broadcast";
-    return errorResponse(res, msg, 500);
-  }
-};
+
 
 /** Active broadcasts for members (`requireUserSession`). */
 export const getMemberBroadcastList: RequestHandler = async (req, res) => {

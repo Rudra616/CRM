@@ -59,26 +59,6 @@ export const getBroadcastById = async (id: number): Promise<BroadcastRow | null>
   }
 };
 
-/**
- * Fetches the latest active broadcast message.
- *
- * @returns Latest broadcast record or null if none exists
- */
-export const getLatestBroadcast = async (): Promise<BroadcastRow | null> => {
-  try {
-    const [rows]: any = await db.query(
-      `SELECT id, message, created_at
-       FROM \`broadcast\`
-       WHERE is_delete = 0
-       ORDER BY COALESCE(created_at, '1970-01-01') DESC, id DESC
-       LIMIT 1`
-    );
-    return rows?.[0] ?? null;
-  } catch (error: unknown) {
-    logServiceError("broadcast.service", "getLatestBroadcast", error);
-    throw error;
-  }
-};
 
 /**
  * Fetches the N most recent broadcast rows, ordered oldest → newest (newest last in the array).

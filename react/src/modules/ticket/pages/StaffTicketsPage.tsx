@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '../../../shared/components/PageShell';
 import { showError, showSuccess } from '../../../shared/utils/toast';
@@ -16,12 +16,20 @@ import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
-
+import { connectSocket, onSocket, SOCKET_EVENTS } from '../../../shared/socket';
+import { useTicketUnread } from '../../../context/TicketUnreadContext';
+import { mergeTicketMessage } from '../utils/mergeTicketMessages';
+import {
+  applyTicketListOnMessage,
+  isOwnSocketMessage,
+  prependNewTicket,
+} from '../utils/applySocketTicketMessage';
 
 const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
 const StaffTicketsPage = () => {
   const { user } = useAuth();
+  const { dropTicketUnread, bumpTicketUnread } = useTicketUnread();
   const [searchParams, setSearchParams] = useSearchParams();
   const { getModulePerm } = usePermissions();
   const ticketPerm = getModulePerm(PERMISSION_MODULE_KEYS.TICKET);
@@ -55,10 +63,12 @@ const StaffTicketsPage = () => {
   const [messageLoading, setMessageLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const loadTickets = async (options?: { silent?: boolean }) => {
+  const activeIdRef = useRef<number | null>(null);
+  activeIdRef.current = activeTicket?.id ?? null;
+
+  const loadTickets = useCallback(async () => {
     if (!canView) return;
-    const silent = options?.silent ?? false;
-    if (!silent) setLoading(true);
+    setLoading(true);
     try {
       const res = await getAllTicketsApi({
         page: currentPage,
@@ -68,22 +78,60 @@ const StaffTicketsPage = () => {
       setTickets(res.data?.items ?? []);
       setTotal(res.data?.pagination?.total ?? 0);
       setTotalPages(Math.max(1, res.data?.pagination?.totalPages ?? 1));
-      if (res.data?.pagination?.limit) setRowsPerPage(res.data.pagination.limit);
+      const limit = res.data?.pagination?.limit;
+      if (limit && limit !== rowsPerPage) setRowsPerPage(limit);
       if (res.data?.pagination?.limitOptions?.length) {
         setLimitOptions(res.data.pagination.limitOptions);
       }
     } catch (err: unknown) {
-      if (!silent) {
-        showError((err as { message?: string })?.message || 'Failed to load tickets');
-      }
+      showError((err as { message?: string })?.message || 'Failed to load tickets');
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
-  };
+  }, [canView, currentPage, rowsPerPage, appliedSearchTerm]);
 
   useEffect(() => {
     void loadTickets();
-  }, [canView, currentPage, rowsPerPage, appliedSearchTerm]);
+  }, [loadTickets]);
+
+  useEffect(() => {
+    if (!user?.is_main_admin) return;
+    connectSocket();
+
+    const offMsg = onSocket(SOCKET_EVENTS.TICKET_MSG, (p) => {
+      const { ticketId, message } = p as { ticketId: number; message: TicketMessageItem };
+      const id = Number(ticketId);
+      if (activeIdRef.current === id) {
+        setMessages((prev) => mergeTicketMessage(prev, message));
+      }
+      if (user && isOwnSocketMessage(message, user.id, true)) return;
+      setTickets((prev) => {
+        const row = prev.find((t) => t.id === id);
+        const hadUnread = Number(row?.unread_from_user_count ?? 0) > 0;
+        bumpTicketUnread(message, 'staff', hadUnread);
+        return applyTicketListOnMessage(prev, id, message, 'staff');
+      });
+    });
+
+    const offStatus = onSocket(SOCKET_EVENTS.TICKET_STATUS, (p) => {
+      const { ticketId, status } = p as { ticketId: number; status: TicketStatus };
+      const id = Number(ticketId);
+      setTickets((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+      setActiveTicket((t) => (t?.id === id ? { ...t, status } : t));
+    });
+
+    const offNew = onSocket(SOCKET_EVENTS.TICKET_NEW, (p) => {
+      const data = p as { ticketId: number; userId: number; subject: string };
+      setTickets((prev) => prependNewTicket(prev, data));
+      setTotal((n) => n + 1);
+    });
+
+    return () => {
+      offMsg();
+      offStatus();
+      offNew();
+    };
+  }, [user?.is_main_admin, user?.id, bumpTicketUnread]);
 
   useEffect(() => {
     const raw = searchParams.get('openTicket');
@@ -155,6 +203,9 @@ const StaffTicketsPage = () => {
       setBusyId(ticketId);
       await updateTicketStatusApi(ticketId, status);
       setTickets((prev) => prev.map((row) => (row.id === ticketId ? { ...row, status } : row)));
+      if (activeTicket?.id === ticketId) {
+        setActiveTicket((t) => (t ? { ...t, status } : null));
+      }
       showSuccess('Ticket status updated');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to update status');
@@ -193,7 +244,9 @@ const StaffTicketsPage = () => {
       return;
     }
     try {
+      const cleared = Number(activeTicket.unread_from_user_count ?? 0);
       await addTicketMessageApi(activeTicket.id, message, image);
+      if (cleared > 0) dropTicketUnread(cleared);
       const optimisticId = Date.now();
       setMessages((prev) => [
         ...prev,

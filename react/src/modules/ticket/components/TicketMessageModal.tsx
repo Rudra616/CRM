@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { TicketItem, TicketMessageItem } from '../types/ticket.types';
 import { TicketChatBubble } from './TicketChatBubble';
 import { TicketChatComposer } from './TicketChatComposer';
@@ -30,6 +30,22 @@ export const TicketMessageModal = ({
     return `${ticket.subject}`;
   }, [ticket]);
 
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (open) scrollToBottom();
+  }, [messages, open]);
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+    }
+  }, [open]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -69,16 +85,20 @@ export const TicketMessageModal = ({
           }}
         >
           <div>
-                <div className="small mb-0" style={{ opacity: 0.85 }}>
-                  Ticket thread
-                </div>
+            <div className="small mb-0" style={{ opacity: 0.85 }}>
+              Ticket thread
+            </div>
             <strong className="d-block" style={{ fontSize: '0.95rem' }}>
               {title}
             </strong>
           </div>
-          <button type="button" className="btn btn-sm btn-light" onClick={onClose}>
-            Close
-          </button>
+
+          <button
+            type="button"
+            className="btn-close"
+            aria-label="Close"
+            onClick={onClose}
+          />
         </div>
 
         <div
@@ -113,15 +133,25 @@ export const TicketMessageModal = ({
             }}
           >
             {loading ? (
-              <p className="small text-muted mb-0 align-self-center my-auto">Loading messages…</p>
+              <p className="small text-muted mb-0 align-self-center my-auto">
+                Loading messages…
+              </p>
             ) : messages.length === 0 ? (
               <p className="small text-muted mb-0 align-self-center my-auto">
                 No messages yet — say hello below.
               </p>
             ) : (
-              messages.map((msg) => (
-                <TicketChatBubble key={msg.id} msg={msg} viewerIsStaff={viewerIsStaff} />
-              ))
+              <>
+                {messages.map((msg) => (
+                  <TicketChatBubble
+                    key={msg.id}
+                    msg={msg}
+                    viewerIsStaff={viewerIsStaff}
+                  />
+                ))}
+
+                <div ref={messagesEndRef} />
+              </>
             )}
           </div>
 

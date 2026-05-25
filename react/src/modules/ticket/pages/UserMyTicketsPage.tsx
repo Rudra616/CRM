@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../../../shared/components/PageShell';
 import { showError, showSuccess } from '../../../shared/utils/toast';
@@ -12,19 +12,25 @@ import {
 import type { TicketItem, TicketMessageItem, TicketStatus } from '../types/ticket.types';
 import { STATUS_OPTIONS } from '../utils/ticketDisplay';
 import { TicketMessageModal } from '../components/TicketMessageModal';
-import { useTicketUnread } from '../../../context/TicketUnreadContext';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
 import { useAuth } from '../../../context/AuthContext';
+import { useTicketUnread } from '../../../context/TicketUnreadContext';
+import { connectSocket, onSocket, SOCKET_EVENTS } from '../../../shared/socket';
+import { mergeTicketMessage } from '../utils/mergeTicketMessages';
+import {
+  applyTicketListOnMessage,
+  isOwnSocketMessage,
+} from '../utils/applySocketTicketMessage';
 
 const editableStatus = (status: TicketItem['status']) =>
   status === 'open';
 const PAGE_SIZE_OPTIONS = [...LIST_PAGE_SIZE_OPTIONS];
 
 const UserMyTicketsPage = () => {
-  const { refreshTicketUnread } = useTicketUnread();
   const { user } = useAuth();
+  const { dropTicketUnread, bumpTicketUnread } = useTicketUnread();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
@@ -65,7 +71,6 @@ const UserMyTicketsPage = () => {
       if (res.data?.pagination?.limitOptions?.length) {
         setLimitOptions(res.data.pagination.limitOptions);
       }
-      void refreshTicketUnread();
     } catch (err: unknown) {
       if (!silent) {
         showError((err as { message?: string })?.message || 'Failed to load tickets');
@@ -78,6 +83,35 @@ const UserMyTicketsPage = () => {
   useEffect(() => {
     void loadTickets();
   }, [currentPage, rowsPerPage, appliedSearchTerm]);
+
+  const activeIdRef = useRef<number | null>(null);
+  activeIdRef.current = activeTicket?.id ?? null;
+
+  useEffect(() => {
+    connectSocket();
+    const offMsg = onSocket(SOCKET_EVENTS.TICKET_MSG, (p) => {
+      const { ticketId, message } = p as { ticketId: number; message: TicketMessageItem };
+      const id = Number(ticketId);
+      if (activeIdRef.current === id) setMessages((prev) => mergeTicketMessage(prev, message));
+      if (user && isOwnSocketMessage(message, user.id, false)) return;
+      setTickets((prev) => {
+        const row = prev.find((t) => t.id === id);
+        const hadUnread = Number(row?.unread_from_admin_count ?? 0) > 0;
+        bumpTicketUnread(message, 'member', hadUnread);
+        return applyTicketListOnMessage(prev, id, message, 'member');
+      });
+    });
+    const offStatus = onSocket(SOCKET_EVENTS.TICKET_STATUS, (p) => {
+      const { ticketId, status } = p as { ticketId: number; status: TicketStatus };
+      const id = Number(ticketId);
+      setTickets((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+      setActiveTicket((t) => (t?.id === id ? { ...t, status } : t));
+    });
+    return () => {
+      offMsg();
+      offStatus();
+    };
+  }, [user?.id, bumpTicketUnread]);
 
   useEffect(() => {
     const raw = searchParams.get('openTicket');
@@ -155,7 +189,9 @@ const UserMyTicketsPage = () => {
       return;
     }
     try {
+      const cleared = Number(activeTicket.unread_from_admin_count ?? 0);
       await addTicketMessageApi(activeTicket.id, message, image);
+      if (cleared > 0) dropTicketUnread(cleared);
       const optimisticId = Date.now();
       setMessages((prev) => [
         ...prev,
@@ -176,9 +212,6 @@ const UserMyTicketsPage = () => {
           row.id === activeTicket.id ? { ...row, unread_from_admin_count: 0 } : row
         )
       );
-      if (refreshTicketUnread) {
-        void refreshTicketUnread();
-      }
       showSuccess('Message sent');
     } catch (err: unknown) {
       showError((err as { message?: string })?.message || 'Failed to send message');

@@ -15,7 +15,11 @@ import {
 import { usePermissions } from './PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../shared/utils/permissionModules';
 
-import { useAuth } from './AuthContext';
+import type { TicketMessageItem } from '../modules/ticket/types/ticket.types';
+import {
+  bumpUnreadSummary,
+  dropUnreadSummary,
+} from '../modules/ticket/utils/applySocketTicketMessage';
 
 export interface TicketUnreadSummary {
   ticketsWithUnread: number;
@@ -25,6 +29,13 @@ export interface TicketUnreadSummary {
 interface TicketUnreadContextValue {
   summary: TicketUnreadSummary;
   refreshTicketUnread: () => Promise<void>;
+  /** Decrease sidebar counts when unread on a ticket was cleared (no API). */
+  dropTicketUnread: (clearedMessages: number) => void;
+  bumpTicketUnread: (
+    message: TicketMessageItem,
+    viewer: 'member' | 'staff',
+    ticketHadUnreadBefore: boolean
+  ) => void;
 }
 
 const TicketUnreadContext = createContext<TicketUnreadContextValue | null>(null);
@@ -37,7 +48,6 @@ export const TicketUnreadProvider = ({
   children: ReactNode;
 }) => {
   const { getModulePerm, permLoading } = usePermissions();
-  const { user } = useAuth();
   /** Same rule as `GET /ticket/staff-unread-summary` — backend uses ticket → can_add; do not call without it. */
   const ticketCanAdd = getModulePerm(PERMISSION_MODULE_KEYS.TICKET).can_add;
 
@@ -74,6 +84,17 @@ export const TicketUnreadProvider = ({
     }
   }, []);
 
+  const dropTicketUnread = useCallback((clearedMessages: number) => {
+    setSummary((prev) => dropUnreadSummary(prev, clearedMessages));
+  }, []);
+
+  const bumpTicketUnread = useCallback(
+    (message: TicketMessageItem, viewer: 'member' | 'staff', ticketHadUnreadBefore: boolean) => {
+      setSummary((prev) => bumpUnreadSummary(prev, message, viewer, ticketHadUnreadBefore));
+    },
+    []
+  );
+
   const refreshTicketUnread = useCallback(async () => {
     if (gate === 'member') {
       await loadMemberSummary();
@@ -103,13 +124,9 @@ export const TicketUnreadProvider = ({
     void loadStaffSummary();
   }, [gate, permLoading, ticketCanAdd, loadStaffSummary]);
 
-  //  Members get notified of new admin messages; staff get notified of new user messages and ticket updates. Both must ignore their own messages.
-
-
-
   const value = useMemo(
-    () => ({ summary, refreshTicketUnread }),
-    [summary, refreshTicketUnread]
+    () => ({ summary, refreshTicketUnread, dropTicketUnread, bumpTicketUnread }),
+    [summary, refreshTicketUnread, dropTicketUnread, bumpTicketUnread]
   );
 
   return <TicketUnreadContext.Provider value={value}>{children}</TicketUnreadContext.Provider>;
@@ -121,6 +138,8 @@ export const useTicketUnread = (): TicketUnreadContextValue => {
     return {
       summary: { ticketsWithUnread: 0, unreadMessageCount: 0 },
       refreshTicketUnread: async () => {},
+      dropTicketUnread: () => {},
+      bumpTicketUnread: () => {},
     };
   }
   return ctx;

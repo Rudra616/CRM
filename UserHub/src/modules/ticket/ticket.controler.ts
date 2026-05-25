@@ -23,6 +23,7 @@ import { buildStoredImagePath } from "../../config/uploads";
 import { getPermissionByRoleAndModule } from "../../common/permission.service";
 import { TicketStatus } from "./ticket.types";
 import { USERS_PAGE_SIZE_OPTIONS, normalizeListPageLimit } from "../admin/service/user.service";
+import { emitSocket, SOCKET_EVENTS } from "../../socket";
 
 /** Parses and validates query parameters for ticket listing endpoints. */
 const parseTicketListQuery = (q: Record<string, unknown>) => {
@@ -72,7 +73,7 @@ export const createTicket: RequestHandler = async (req, res) => {
       image_url: imageUrl,
     });
 
-
+    emitSocket(SOCKET_EVENTS.TICKET_NEW, { ticketId, userId, subject });
 
     return successResponse(res, "Ticket created successfully", { ticketId }, 201);
   } catch (err: any) {
@@ -296,6 +297,11 @@ export const updateTicketStatus: RequestHandler = async (req, res) => {
       return errorResponse(res, "Ticket not found or not updated", 400);
     }
 
+    emitSocket(SOCKET_EVENTS.TICKET_STATUS, {
+      ticketId,
+      ownerUserId: ticket.user_id,
+      status,
+    });
 
     return successResponse(res, "Ticket status updated successfully");
   } catch (err: any) {
@@ -367,18 +373,32 @@ export const addTicketMessage: RequestHandler = async (req, res) => {
       await markUserMessagesReadByStaff(Number(ticket_id));
     }
 
-    let senderDisplayName: string | undefined;
-    if (isStaff) {
-      const adm = await findAdminById(senderId);
-      const u = adm?.username?.trim();
-      senderDisplayName = u || undefined;
-    } else {
-      const mem = await findUserById(senderId);
-      const u = mem?.username?.trim();
-      senderDisplayName = u || undefined;
+    const rows = await getTicketMessagesByTicketId(Number(ticket_id));
+    const row = rows.find((m) => m.id === messageId);
+    if (row) {
+      const created_at =
+        row.created_at instanceof Date
+          ? row.created_at.toISOString()
+          : row.created_at
+            ? String(row.created_at)
+            : undefined;
+      emitSocket(SOCKET_EVENTS.TICKET_MSG, {
+        ticketId: Number(ticket_id),
+        ownerUserId: ticket.user_id,
+        message: {
+          id: row.id,
+          ticket_id: row.ticket_id,
+          sender_id: row.sender_id,
+          sender_type: row.sender_type,
+          sender_username: row.sender_username ?? null,
+          message: row.message,
+          image: row.image ? buildImageUrl(authReq, row.image) : null,
+          created_at,
+          is_read_by_user: row.is_read_by_user,
+          is_read_by_admin: row.is_read_by_admin,
+        },
+      });
     }
-    const ticketSubjectRaw = String(ticket.subject ?? "").trim();
-    const ticketSubject = ticketSubjectRaw || undefined;
 
     return successResponse(res, "Message added to ticket successfully");
   } catch (err: any) {
