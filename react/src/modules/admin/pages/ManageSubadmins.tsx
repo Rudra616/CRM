@@ -17,6 +17,7 @@ import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 
 type SubadminRow = User & {
   first_name?: string;
@@ -228,17 +229,25 @@ const ManageSubadmins = () => {
                     <td>
                       <div className="d-flex flex-wrap gap-1">
                         {canEdit && (
-                          <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditUser(user)}>
-                            Edit
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => setEditUser(user)}
+                            title="Edit subadmin"
+                            aria-label="Edit subadmin"
+                          >
+                            <FaEdit size={13} aria-hidden />
                           </button>
                         )}
                         {canDelete && (
                           <button
                             type="button"
-                            className="btn btn-sm btn-danger"
+                            className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDelete(String(user.id))}
+                            title="Delete subadmin"
+                            aria-label="Delete subadmin"
                           >
-                            Delete
+                            <FaTrash size={13} aria-hidden />
                           </button>
                         )}
                         {!canEdit && !canDelete && <span className="text-muted small">—</span>}

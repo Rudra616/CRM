@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 
 const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
 
@@ -259,17 +260,21 @@ const ManageRolesPage = () => {
                               type="button"
                               className="btn btn-sm btn-primary"
                               onClick={() => openEdit(row)}
+                              title="Edit role"
+                              aria-label="Edit role"
                             >
-                              Edit
+                              <FaEdit size={13} aria-hidden />
                             </button>
                           )}
                           {canDelete && (
                             <button
                               type="button"
-                              className="btn btn-sm btn-danger"
+                              className="btn btn-sm btn-outline-danger"
                               onClick={() => void onDelete(row)}
+                              title="Delete role"
+                              aria-label="Delete role"
                             >
-                              Delete
+                              <FaTrash size={13} aria-hidden />
                             </button>
                           )}
                         </div>

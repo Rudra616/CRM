@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import axiosClient from "./axiosClient";
 import type { ApiResponse } from "../../modules/auth/types/auth.types";
 interface ApiError {
@@ -23,10 +24,11 @@ const getErrorMessage = (err: unknown): string => {
 export const apiRequest = async <T>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
-  data?: unknown
+  data?: unknown,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> => {
   try {
-    const response = await axiosClient({ method, url, data });
+    const response = await axiosClient({ method, url, data, ...config });
     return response.data;
   } catch (error) {
     const e = error as ApiError;

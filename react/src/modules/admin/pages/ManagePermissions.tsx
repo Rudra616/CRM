@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaSearch, FaTimes } from 'react-icons/fa';
 import {
   getModulesApi,
   getRolePermissionsApi,
@@ -16,6 +15,7 @@ import { showError, showSuccess } from '../../../shared/utils/toast';
 import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
 type PermFlags = {
   can_view: boolean;
@@ -251,83 +251,28 @@ const ManagePermissions = () => {
             </div>
 
             <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
-              <div className="d-flex flex-wrap align-items-end gap-2">
-                <div className="flex-shrink-0">
-                  <label htmlFor="perm-rows-limit" className="form-label small text-muted mb-1">
-                    Rows per page
-                  </label>
-                  <select
-                    id="perm-rows-limit"
-                    className="form-select form-select-sm"
-                    style={{ minWidth: 88 }}
-                    value={rowsPerPage}
-                    onChange={(e) => {
-                      setRowsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    {PAGE_SIZE_OPTIONS.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="text-muted small ms-lg-1">
-                  Total <span className="fw-semibold text-dark">{totalModules}</span>
-                </div>
-              </div>
-
-                <div style={{ width: 'min(340px, 100%)' }}>
-                  <label htmlFor="perm-search" className="form-label small text-muted mb-1">
-                    Search
-                  </label>
-                  <div className="input-group input-group-sm">
-                    <span className="input-group-text bg-white border-end-0 py-1" id="perm-search-addon">
-                      <FaSearch className="text-secondary" size={14} aria-hidden />
-                    </span>
-                    <input
-                      id="perm-search"
-                      type="search"
-                      className="form-control border-start-0"
-                      placeholder="Module name or id…"
-                      aria-describedby="perm-search-addon"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          setCurrentPage(1);
-                          setAppliedSearchTerm(searchTerm.trim());
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary px-2"
-                      title="Search"
-                      aria-label="Search"
-                      onClick={() => {
-                        setCurrentPage(1);
-                        setAppliedSearchTerm(searchTerm.trim());
-                      }}
-                    >
-                      <FaSearch size={14} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary px-2"
-                      title="Clear search"
-                      aria-label="Clear search"
-                      onClick={() => {
-                        setSearchTerm('');
-                        setCurrentPage(1);
-                        setAppliedSearchTerm('');
-                      }}
-                    >
-                      <FaTimes size={14} aria-hidden />
-                    </button>
-                  </div>
-              </div>
+              <ListTableToolbar
+                rowsPerPage={rowsPerPage}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                totalRows={totalModules}
+                searchTerm={searchTerm}
+                searchPlaceholder="Module name or id..."
+                searchId="perm-search"
+                onRowsPerPageChange={(next) => {
+                  setRowsPerPage(next);
+                  setCurrentPage(1);
+                }}
+                onSearchTermChange={setSearchTerm}
+                onApplySearch={() => {
+                  setCurrentPage(1);
+                  setAppliedSearchTerm(searchTerm.trim());
+                }}
+                onClearSearch={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                  setAppliedSearchTerm('');
+                }}
+              />
             </div>
 
             {modules.length === 0 ? (

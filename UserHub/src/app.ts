@@ -5,8 +5,9 @@ import userRoutes from "./modules/user/user.routes";
 import adminRoutes from "./modules/admin/admin.routes";
 import cookieParser from "cookie-parser";
 import { UPLOADS_ROOT } from "./config/uploads";
-import tickitRoutes from "./modules/ticket/ticket.route";
+import ticketRoutes from "./modules/ticket/ticket.route";
 import broadcastPublicRoutes from "./modules/broadcast/broadcast.public.routes";
+import bulkImportRoutes from "./modules/bulk_import/bulk_import.route";
 dotenv.config();
 
 const app = express();
@@ -23,6 +24,8 @@ app.use(cookieParser());
 app.use("/api/admin", adminRoutes);
 app.use("/api/broadcast", broadcastPublicRoutes);
 app.use("/api", userRoutes);
-app.use("/api/ticket", tickitRoutes);
+app.use("/api/ticket", ticketRoutes);
+app.use("/api/bulkimport", bulkImportRoutes);
+
 export default app;
 

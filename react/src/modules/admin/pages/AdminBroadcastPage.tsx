@@ -9,6 +9,8 @@ import {
   type BroadcastItem,
 } from '../api/admin.api';
 import { showError, showSuccess } from '../../../shared/utils/toast';
+import { FaPaperPlane, FaTrash } from 'react-icons/fa';
+import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 
 const sortBroadcastsChrono = (rows: BroadcastItem[]): BroadcastItem[] =>
   [...rows].sort((a, b) => {
@@ -25,6 +27,10 @@ const AdminBroadcastPage = () => {
   const [items, setItems] = useState<BroadcastItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+  const rowsPerPage = 10;
+  const pageSizeOptions = [10];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +106,12 @@ const AdminBroadcastPage = () => {
     }
   };
 
+  const filteredItems = items.filter((row) => {
+    const q = appliedSearchTerm.trim().toLowerCase();
+    if (!q) return true;
+    return row.message.toLowerCase().includes(q) || String(row.id).includes(q);
+  });
+
   return (
     <PageShell
       title="Broadcast messages"
@@ -122,7 +134,10 @@ const AdminBroadcastPage = () => {
           />
           <div className="d-flex justify-content-end mt-3">
             <button type="submit" className="btn btn-primary" disabled={sending || !message.trim()}>
-              {sending ? 'Sending…' : 'Send broadcast'}
+              <span className="d-inline-flex align-items-center gap-1">
+                <FaPaperPlane size={12} aria-hidden />
+                {sending ? 'Sending…' : 'Send broadcast'}
+              </span>
             </button>
           </div>
         </div>
@@ -130,6 +145,23 @@ const AdminBroadcastPage = () => {
 
       <div className="card shadow-sm border-0">
         <div className="card-header fw-semibold">Recent broadcasts</div>
+        <div className="px-3 pt-3 pb-1">
+          <ListTableToolbar
+            rowsPerPage={rowsPerPage}
+            pageSizeOptions={pageSizeOptions}
+            totalRows={filteredItems.length}
+            searchTerm={searchTerm}
+            searchPlaceholder="Message text or id..."
+            searchId="broadcast-search"
+            onRowsPerPageChange={() => undefined}
+            onSearchTermChange={setSearchTerm}
+            onApplySearch={() => setAppliedSearchTerm(searchTerm.trim())}
+            onClearSearch={() => {
+              setSearchTerm('');
+              setAppliedSearchTerm('');
+            }}
+          />
+        </div>
         <div className="table-responsive">
           <table className="table table-hover mb-0 align-middle">
             <thead>
@@ -140,14 +172,14 @@ const AdminBroadcastPage = () => {
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="text-muted small px-3 py-4">
                     No broadcasts yet.
                   </td>
                 </tr>
               ) : (
-                items.map((row) => (
+                filteredItems.map((row) => (
                   <tr key={row.id}>
                     <td className="small text-muted text-nowrap">
                       {new Date(row.created_at).toLocaleString()}
@@ -160,8 +192,10 @@ const AdminBroadcastPage = () => {
                         type="button"
                         className="btn btn-outline-danger btn-sm"
                         onClick={() => void onDelete(row.id)}
+                        title="Delete broadcast"
+                        aria-label="Delete broadcast"
                       >
-                        Delete
+                        <FaTrash size={13} aria-hidden />
                       </button>
                     </td>
                   </tr>

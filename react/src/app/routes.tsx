@@ -16,6 +16,7 @@ import ManageSubadmins from '../modules/admin/pages/ManageSubadmins';
 import ManagePermissions from '../modules/admin/pages/ManagePermissions';
 import ManageModulesPage from '../modules/admin/pages/ManageModulesPage';
 import ManageRolesPage from '../modules/admin/pages/ManageRolesPage';
+import CreateSubadminPage from '../modules/admin/pages/CreateSubadminPage';
 
 // Subadmin pages
 import SubadminDashboard from '../modules/subadmin/pages/SubadminDashboard';
@@ -28,6 +29,7 @@ import UserCreateTicketPage from '../modules/ticket/pages/UserCreateTicketPage';
 import UserMyTicketsPage from '../modules/ticket/pages/UserMyTicketsPage';
 import StaffTicketsPage from '../modules/ticket/pages/StaffTicketsPage';
 import AdminBroadcastPage from '../modules/admin/pages/AdminBroadcastPage';
+import AdminBulkImportPage from '../modules/admin/pages/AdminBulkImportPage';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
@@ -49,6 +51,7 @@ export const AppRoutes = () => (
       {/* Admin routes */}
       <Route path="/admin/dashboard" element={<ProtectedRoute gates={['staff']}><StaffDashboard /></ProtectedRoute>} />
       <Route path="/admin/broadcast" element={<ProtectedRoute gates={['staff']}><AdminBroadcastPage /></ProtectedRoute>} />
+      <Route path="/admin/bulk-import" element={<ProtectedRoute gates={['staff']}><AdminBulkImportPage /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute gates={['staff']}><ManageUsers /></ProtectedRoute>} />
       <Route path="/admin/subadmins" element={<ProtectedRoute gates={['staff']}><ManageSubadmins /></ProtectedRoute>} />
       <Route path="/admin/rbac/modules" element={<ProtectedRoute gates={['staff']}><ManageModulesPage /></ProtectedRoute>} />
@@ -58,7 +61,7 @@ export const AppRoutes = () => (
       <Route path="/admin/tickets" element={<ProtectedRoute gates={['staff']}><StaffTicketsPage /></ProtectedRoute>} />
       <Route path="/admin/profile" element={<ProtectedRoute gates={['staff']}><Profile /></ProtectedRoute>} />
       <Route path="/admin/change-password" element={<ProtectedRoute gates={['staff']}><ChangePassword /></ProtectedRoute>} />
-      <Route path="/admin/create-subadmin" element={<ProtectedRoute gates={['staff']}><Register /></ProtectedRoute>} />
+      <Route path="/admin/create-subadmin" element={<ProtectedRoute gates={['staff']}><CreateSubadminPage /></ProtectedRoute>} />
 
       {/* User routes */}
       <Route path="/user/dashboard" element={<ProtectedRoute gates={['member']}><UserDashboard /></ProtectedRoute>} />

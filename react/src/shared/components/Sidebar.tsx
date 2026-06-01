@@ -13,6 +13,7 @@ import {
   FaCube,
   FaUserTag,
   FaBullhorn,
+  FaFileUpload,
 } from 'react-icons/fa';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
@@ -135,6 +136,12 @@ const Sidebar = ({ gate }: Props) => {
               {user?.is_main_admin && (
                 <MenuItem icon={<FaBullhorn />} onClick={nav('/admin/broadcast')}>
                   Broadcast
+                </MenuItem>
+              )}
+
+              {user?.is_main_admin && (
+                <MenuItem icon={<FaFileUpload />} onClick={nav('/admin/bulk-import')}>
+                  Bulk Import
                 </MenuItem>
               )}
 

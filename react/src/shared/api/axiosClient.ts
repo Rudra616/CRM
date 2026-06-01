@@ -34,10 +34,12 @@ axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (!error.response) {
+      const isTimeout = error.code === 'ECONNABORTED';
       return Promise.reject({
         success: false,
-        message:
-          'Cannot connect to the server. Check that the API is running and try again.',
+        message: isTimeout
+          ? 'The request timed out. Large imports can take longer — wait a moment and refresh the user list.'
+          : 'Cannot connect to the server. Check that the API is running and try again.',
       });
     }
 

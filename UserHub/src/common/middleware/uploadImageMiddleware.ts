@@ -2,7 +2,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { UPLOADS_ROOT, uploadFolderForSession } from "../../config/uploads";
-
+import { CSV_MIMETYPE } from "../helpers/constant";
 /**
  * Multer disk storage configuration for uploaded images.
  *
@@ -18,22 +18,37 @@ const storage = multer.diskStorage({
  * @param req Incoming request containing authenticated user data
  * @param cb Multer callback used to return destination path
  */
-  destination: (req: any, _file, cb) => {
-    const userId = req.user?.id;
-    const user = req.user;
-
-    if (!userId || !user) {
-      return cb(new Error("Missing user or user ID"), "" as unknown as string);
-    }
-
-    const dir = path.join(UPLOADS_ROOT, uploadFolderForSession(user), String(userId));
+destination: (req: any, _file, cb) => {
+  /**
+   * IMPORT FILE (NO USER)
+   */
+  if (!req.user) {
+    const dir = path.join(UPLOADS_ROOT, "imports");
 
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    cb(null, dir);
-  },
+    return cb(null, dir);
+  }
+
+  /**
+   * NORMAL USER UPLOAD
+   */
+  const userId = req.user.id;
+
+  const dir = path.join(
+    UPLOADS_ROOT,
+    uploadFolderForSession(req.user),
+    String(userId)
+  );
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  cb(null, dir);
+},
   /**
  * Generates a unique and safe filename for uploaded files.
  *
@@ -58,14 +73,24 @@ filename: (_req, file, cb) => {
  * @param file Uploaded file metadata
  * @param cb Multer callback used to allow or reject file
  */
-const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+const imageFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   const allowed = ["image/jpeg", "image/png", "image/webp"];
+
   if (!allowed.includes(file.mimetype)) {
     return cb(new Error("Only JPG, PNG, WEBP images are allowed"));
   }
+
   cb(null, true);
 };
+const importFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
 
+
+  if (!CSV_MIMETYPE.includes(file.mimetype)) {
+    return cb(new Error("Only CSV or Excel files allowed"));
+  }
+
+  cb(null, true);
+};
 /**
  * Configured multer upload instance for image uploads.
  *
@@ -76,8 +101,14 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
  */
 export const uploadImage = multer({
   storage,
-  fileFilter,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 2 * 1024 * 1024 },
+});
+
+export const uploadImportFile = multer({
+  storage,
+  fileFilter: importFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // optional bigger limit for excel
 });
 
 /**

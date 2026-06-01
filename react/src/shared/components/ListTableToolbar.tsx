@@ -50,14 +50,14 @@ export const ListTableToolbar = ({
           ))}
         </select>
       </div>
-      <div className="text-muted small ms-lg-1">
-        Total <span className="fw-semibold text-dark">{totalRows}</span>
-      </div>
       {leftExtra}
     </div>
 
-    <div style={{ width: 'min(340px, 100%)' }}>
-      <label htmlFor={searchId} className="form-label small text-muted mb-1">
+    <div className="d-flex flex-column align-items-lg-end gap-1" style={{ width: 'min(340px, 100%)' }}>
+      <div className="text-muted small text-lg-end">
+        Total <span className="fw-semibold text-dark">{totalRows}</span>
+      </div>
+      <label htmlFor={searchId} className="form-label small text-muted mb-1 w-100">
         {searchLabel}
       </label>
       <div className="input-group input-group-sm">

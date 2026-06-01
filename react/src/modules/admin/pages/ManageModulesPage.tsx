@@ -17,6 +17,7 @@ import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules'
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
 import { validateModuleName } from '../../../shared/utils/validation';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
 
 const fmtWhen = (v?: string) => {
@@ -272,17 +273,21 @@ const onCreate = async (e: FormEvent) => {
                               type="button"
                               className="btn btn-sm btn-primary"
                               onClick={() => openEdit(row)}
+                              title="Edit module"
+                              aria-label="Edit module"
                             >
-                              Edit
+                              <FaEdit size={13} aria-hidden />
                             </button>
                           )}
                           {canDelete && (
                             <button
                               type="button"
-                              className="btn btn-sm btn-danger"
+                              className="btn btn-sm btn-outline-danger"
                               onClick={() => void onDelete(row)}
+                              title="Delete module"
+                              aria-label="Delete module"
                             >
-                              Delete
+                              <FaTrash size={13} aria-hidden />
                             </button>
                           )}
                         </div>

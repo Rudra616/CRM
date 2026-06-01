@@ -9,7 +9,7 @@ import {
   updateTicketStatus,
   addTicketMessage,
   getTicketMessages,
-} from "./ticket.controler";
+} from "./ticket.controller";
 import { authenticate } from "../../common/middleware/authMiddleware";
 import { uploadSingle } from "../../common/middleware/uploadImageMiddleware";
 import { validateSchema } from "../../common/middleware/joiValidationMiddleware";

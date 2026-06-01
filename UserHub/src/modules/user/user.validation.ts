@@ -4,33 +4,33 @@ const nameRegex     = /^[A-Za-z]+$/;
 const usernameRegex = /^[A-Za-z0-9]+$/;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 const phoneRegex    = /^[0-9]+$/;
-const genderOptions = ["male", "female", "other"] as const;
+export const genderOptions = ["male", "female", "other"] as const;
 
-const trimmedString = () => Joi.string().trim();
+export const trimmedString = () => Joi.string().trim();
 
-const usernameField = trimmedString().min(3).max(50).pattern(usernameRegex).required().messages({
+export const usernameField = trimmedString().min(3).max(50).pattern(usernameRegex).required().messages({
   "string.empty":        "Username is required",
   "string.min":          "Username must be at least 3 characters",
   "string.max":          "Username must be at most 50 characters",
   "string.pattern.base": "Username must contain only letters and numbers",
 });
 
-const firstNameField = trimmedString().min(1).max(50).pattern(nameRegex).required().messages({
+export const firstNameField = trimmedString().min(1).max(50).pattern(nameRegex).required().messages({
   "string.empty":        "First name is required",
   "string.pattern.base": "First name must contain only letters",
 });
 
-const lastNameField = trimmedString().min(1).max(50).pattern(nameRegex).required().messages({
+export const lastNameField = trimmedString().min(1).max(50).pattern(nameRegex).required().messages({
   "string.empty":        "Last name is required",
   "string.pattern.base": "Last name must contain only letters",
 });
 
-const phoneField = trimmedString().length(10).pattern(phoneRegex).required().messages({
+export const phoneField = trimmedString().length(10).pattern(phoneRegex).required().messages({
   "string.length":       "Phone must be exactly 10 digits",
   "string.pattern.base": "Phone must contain only numbers",
 });
 
-const emailField = trimmedString().min(5).max(100).email().required().messages({
+export const emailField = trimmedString().min(5).max(100).email().required().messages({
   "string.empty": "Email is required",
   "string.email": "Invalid email format",
 });
@@ -42,11 +42,11 @@ const passwordField = (maxLen = 256) =>
     "string.pattern.base": "Password must contain uppercase, lowercase, number and symbol (@$!%*?&)",
   });
 
-const genderOptional = trimmedString().valid(...genderOptions).optional().allow(null, "").messages({
+export const genderOptional = trimmedString().valid(...genderOptions).optional().allow(null, "").messages({
   "any.only": "Gender must be one of: male, female, other",
 });
 
-const genderRequired = trimmedString().valid(...genderOptions).required().messages({
+export const genderRequired = trimmedString().valid(...genderOptions).required().messages({
   "any.only":     "Gender must be one of: male, female, other",
   "string.empty": "Gender is required",
   "any.required": "Gender is required",
@@ -136,4 +136,36 @@ export const adminUpdateUserProfileSchema = Joi.object({
   email:      emailField,
   gender:     genderRequired,
 
+});
+
+// ─── Bulk import (same user fields + sheet status + profile picture URL) ─────
+
+export const bulkImportSheetStatusField = trimmedString()
+  .valid("active", "pending", "inactive", "deleted")
+  .required()
+  .messages({
+    "any.only": "Status must be one of: active, pending, inactive, deleted",
+    "string.empty": "Status is required",
+  });
+
+const bulkImportRowSchema = Joi.object({
+  username: usernameField,
+  first_name: firstNameField,
+  last_name: lastNameField,
+  phone: phoneField,
+  email: emailField,
+  gender: genderRequired,
+  sheet_status: bulkImportSheetStatusField,
+  row_no: Joi.number().integer().required().messages({
+    "number.base": "Row number must be a number",
+    "any.required": "Row number is required",
+  }),
+profile_picture: trimmedString().optional().allow(""),
+});
+
+export const bulkImportSchema = Joi.object({
+  rows: Joi.array().items(bulkImportRowSchema).min(1).required().messages({
+    "array.min": "No data found in file",
+    "any.required": "No data found in file",
+  }),
 });

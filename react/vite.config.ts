@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: BACKEND_URL,
           changeOrigin: true,
+          timeout: 5 * 60 * 1000,
+          proxyTimeout: 5 * 60 * 1000,
         },
         '/uploads': {
           target: BACKEND_URL,

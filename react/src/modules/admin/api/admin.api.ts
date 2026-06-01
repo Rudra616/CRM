@@ -334,3 +334,25 @@ export const listBroadcastsApi = (
 
 export const deleteBroadcastApi = (id: number): Promise<ApiResponse<null>> =>
   apiRequest<null>('DELETE', `/admin/broadcast/${id}`);
+
+export type BulkImportFailureRow = {
+  row: number;
+  message: string;
+};
+
+export type BulkImportResult = {
+  imported: number;
+  failed: number;
+  errors: BulkImportFailureRow[];
+};
+
+/** Bulk import can run for minutes on large spreadsheets — avoid the default 10s client timeout. */
+const BULK_IMPORT_TIMEOUT_MS = 5 * 60 * 1000;
+
+export const bulkImportUsersApi = (file: File): Promise<ApiResponse<BulkImportResult>> => {
+  const form = new FormData();
+  form.append('file', file);
+  return apiRequest<BulkImportResult>('POST', '/bulkimport/import', form, {
+    timeout: BULK_IMPORT_TIMEOUT_MS,
+  });
+};
