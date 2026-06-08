@@ -1,3 +1,20 @@
+/**
+ * Socket.IO server: auth middleware, per-user rooms, and event dispatch.
+ *
+ * Lifecycle events (reference):
+ *
+ * Server (`io.on` / `socket.on`):
+ * - `connection` — fired when a client connects and passes auth middleware
+ * - `disconnecting` — fired before the socket is torn down (rooms still available)
+ * - `disconnect` — fired when the connection is lost
+ *
+ * Client only (`socket.io-client`):
+ * - `connect` — fired when the connection is established
+ * - `connect_error` — connection or handshake auth failed
+ * - `disconnect` — fired when the connection is lost (client mirror of server event)
+ * - `disconnecting` — client is about to disconnect
+ * - `reconnect` — fired after a successful reconnect (manager / version dependent)
+ */
 import { createServer } from "http";
 import { Socket, Server } from "socket.io";
 import { verifyToken } from "../common/helpers/common.helper";
@@ -39,6 +56,11 @@ const USER_BROADCAST_ROOM = "broadcast:users";
 const emitOne = (userId: number, channel: string, payload: unknown): void => {
   if (!io) return;
   io.to(userRoom(userId)).emit(channel, payload);
+};
+
+/** Notify one connected client in `user:{id}` (e.g. main admin bulk import done). */
+export const emitToUser = (userId: number, channel: string, payload: unknown): void => {
+  emitOne(userId, channel, payload);
 };
 
 /**
@@ -181,43 +203,102 @@ export const initSocketServer = (server: ReturnType<typeof createServer>): Serve
   io.use(async (socket: Socket, next) => {
     try {
       const token = parseCookieToken(socket.handshake.headers.cookie);
-      if (!token) return next(new Error("Unauthorized"));
+      if (!token) {
+        onSocketConnectError(socket, new Error("Unauthorized"));
+        return next(new Error("Unauthorized"));
+      }
       const user = await resolveSocketUser(token);
-      if (!user) return next(new Error("Unauthorized"));
+      if (!user) {
+        onSocketConnectError(socket, new Error("Unauthorized"));
+        return next(new Error("Unauthorized"));
+      }
 
       if (user.is_staff) {
         try {
           await assertStaffSocketAllowed(user.id);
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Unauthorized";
+          onSocketConnectError(socket, new Error(msg));
           return next(new Error(msg));
         }
       }
 
       socket.data.user = user;
       next();
-    } catch {
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error("Unauthorized");
+      onSocketConnectError(socket, err);
       next(new Error("Unauthorized"));
     }
   });
-/**
- * Handles new socket connections.
- * Joins authenticated users into their personal room and broadcast room.
- */
+  /**
+   * Handles new socket connections.
+   * Joins authenticated users into their personal room and broadcast room.
+   */
   io.on("connection", (socket) => {
     const user = socket.data.user as SocketUser | undefined;
     if (!user) {
       socket.disconnect();
       return;
     }
-  socket.join(userRoom(user.id));
 
-  if (!user.is_staff) {
-    socket.join(USER_BROADCAST_ROOM);
-  }
+    socket.join(userRoom(user.id));
+
+    if (!user.is_staff) {
+      socket.join(USER_BROADCAST_ROOM);
+    }
+
+    onSocketConnect(socket, user);
+    attachServerSocketLifecycle(socket, user);
   });
 
   return io;
+};
+
+/**
+ * Server-side: handshake or auth failed before `connection` (client sees `connect_error`).
+ */
+const onSocketConnectError = (socket: Socket, error: Error): void => {
+  console.warn("[socket] connect_error", {
+    socketId: socket.id,
+    message: error.message,
+  });
+};
+
+/**
+ * Server-side: fired when a client connection is established and passes auth.
+ */
+const onSocketConnect = (socket: Socket, user: SocketUser): void => {
+  console.info("[socket] connect", {
+    socketId: socket.id,
+    userId: user.id,
+    isStaff: user.is_staff,
+  });
+};
+
+/**
+ * Server-side lifecycle hooks for an authenticated socket.
+ */
+const attachServerSocketLifecycle = (socket: Socket, user: SocketUser): void => {
+  /** Fired before disconnect — rooms are still available for cleanup. */
+  socket.on("disconnecting", (reason) => {
+    const rooms = [...socket.rooms].filter((room) => room !== socket.id);
+    console.info("[socket] disconnecting", {
+      socketId: socket.id,
+      userId: user.id,
+      reason,
+      rooms,
+    });
+  });
+
+  /** Fired when the connection is lost. */
+  socket.on("disconnect", (reason) => {
+    console.info("[socket] disconnect", {
+      socketId: socket.id,
+      userId: user.id,
+      reason,
+    });
+  });
 };
 
 /** Disconnects all active sockets belonging to a specific user.

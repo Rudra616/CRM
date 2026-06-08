@@ -335,24 +335,79 @@ export const listBroadcastsApi = (
 export const deleteBroadcastApi = (id: number): Promise<ApiResponse<null>> =>
   apiRequest<null>('DELETE', `/admin/broadcast/${id}`);
 
-export type BulkImportFailureRow = {
+export type BulkImportRowError = {
   row: number;
   message: string;
 };
 
-export type BulkImportResult = {
+export type BulkImportValidateSummary = {
+  total: number;
+  valid: number;
+  validationErrors: number;
+  toInsert: number;
+  toUpdate: number;
+};
+
+export type BulkImportPendingRow = {
+  row_no: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string;
+  gender: string;
+  image_url: string | null;
+  status: string;
+  is_delete: 0 | 1;
+  profile_picture: string;
+  action?: 'insert' | 'update';
+  existing_user_id?: number;
+};
+
+export type BulkImportValidateResult = {
+  summary: BulkImportValidateSummary;
+  errors: BulkImportRowError[];
+  rows: BulkImportPendingRow[];
+};
+
+export type BulkImportConfirmStarted = {
+  started: true;
+  submitted: number;
+};
+
+export type BulkImportConfirmResult = {
+  submitted: number;
+  inserted: number;
+  updated: number;
   imported: number;
-  failed: number;
-  errors: BulkImportFailureRow[];
+  notImported: number;
+  errors: BulkImportRowError[];
 };
 
 /** Bulk import can run for minutes on large spreadsheets — avoid the default 10s client timeout. */
 const BULK_IMPORT_TIMEOUT_MS = 5 * 60 * 1000;
 
-export const bulkImportUsersApi = (file: File): Promise<ApiResponse<BulkImportResult>> => {
+export const validateBulkImportApi = (
+  file: File
+): Promise<ApiResponse<BulkImportValidateResult>> => {
   const form = new FormData();
   form.append('file', file);
-  return apiRequest<BulkImportResult>('POST', '/bulkimport/import', form, {
+  return apiRequest<BulkImportValidateResult>('POST', '/bulkimport/validate', form, {
     timeout: BULK_IMPORT_TIMEOUT_MS,
   });
 };
+
+export const confirmBulkImportApi = (
+  rows: BulkImportPendingRow[],
+  summary: Pick<BulkImportValidateSummary, 'total' | 'validationErrors'>
+): Promise<ApiResponse<BulkImportConfirmStarted>> =>
+  apiRequest<BulkImportConfirmStarted>(
+    'POST',
+    '/bulkimport/confirm',
+    {
+      rows,
+      total: summary.total,
+      skippedValidation: summary.validationErrors,
+    },
+    { timeout: BULK_IMPORT_TIMEOUT_MS }
+  );

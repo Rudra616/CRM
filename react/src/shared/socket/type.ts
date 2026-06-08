@@ -54,3 +54,16 @@
   export type BroadcastRemovedEvent = {
     id: number;
   };
+
+  /** Main admin bulk import finished (counts only, no row errors). */
+  export type BulkImportFinishedEvent = {
+    success: boolean;
+    message: string;
+    total: number;
+    skippedValidation: number;
+    submitted: number;
+    inserted: number;
+    updated: number;
+    imported: number;
+    notImported: number;
+  };

@@ -6,12 +6,13 @@ import {
   type NewMessageSocketEvent,
   type StatusUpdatedSocketEvent,
   type TicketUpdatedSocketEvent,
+  type BulkImportFinishedSocketEvent,
 } from '../shared/socket/ticketSocket';
 import {
   buildSessionEndedLoginUrl,
   isPublicAuthPath,
 } from '../shared/utils/authSession';
-import { showSuccess, showSuccessClickable } from '../shared/utils/toast';
+import { showError, showSuccess, showSuccessClickable } from '../shared/utils/toast';
 import { PERMISSION_MODULE_KEYS } from '../shared/utils/permissionModules';
 import { useAuth } from './AuthContext';
 import { usePermissions } from './PermissionContext';
@@ -31,6 +32,7 @@ export const TicketSocketSession = () => {
   const userPerm = getModulePerm(PERMISSION_MODULE_KEYS.USER);
   const ticketCanAdd = ticketPerm.can_add;
   const staffSocketAllowed =
+    Boolean(user?.is_main_admin) ||
     ticketCanAdd ||
     userPerm.can_view ||
     userPerm.can_add ||
@@ -133,6 +135,22 @@ export const TicketSocketSession = () => {
       socket.off('force_logout', onForceLogout);
     };
   }, [user, logout, navigate, isLoading, pathname, permLoading, staffSocketAllowed, ticketCanAdd]);
+
+  useEffect(() => {
+    if (isLoading || !user?.is_main_admin || isPublicAuthPath(pathname)) return;
+
+    const socket = getTicketSocket();
+    const onBulkImportFinished = (payload: BulkImportFinishedSocketEvent) => {
+      if (pathname.startsWith('/admin/bulk-import')) return;
+      if (payload.success) showSuccess(payload.message);
+      else showError(payload.message);
+    };
+
+    socket.on('bulk_import_finished', onBulkImportFinished);
+    return () => {
+      socket.off('bulk_import_finished', onBulkImportFinished);
+    };
+  }, [user?.id, user?.is_main_admin, isLoading, pathname]);
 
   return null;
 };

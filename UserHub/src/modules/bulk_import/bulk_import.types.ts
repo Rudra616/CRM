@@ -94,3 +94,47 @@ export const DB_STATUSES = [
  */
 export const BULK_IMPORT_IMAGE_DIR =
   "uploads/user/bulk_import";
+
+/** Single validation or import failure tied to a sheet row number. */
+export type BulkImportRowError = {
+  row: number;
+  message: string;
+};
+
+/** Counts returned by POST /bulkimport/validate. */
+export type BulkImportValidateSummary = {
+  total: number;
+  valid: number;
+  /** Rows with validation errors (excluded from confirm). */
+  validationErrors: number;
+  toInsert: number;
+  toUpdate: number;
+};
+
+/** Full validate API response shape. */
+export type BulkImportValidateResult = {
+  summary: BulkImportValidateSummary;
+  errors: BulkImportRowError[];
+  rows: BulkImportPendingRow[];
+};
+
+/** Outcome after background import completes (also mirrored in socket payload). */
+export type BulkImportConfirmResult = {
+  /** Rows sent in confirm request (passed validation). */
+  submitted: number;
+  inserted: number;
+  updated: number;
+  /** inserted + updated */
+  imported: number;
+  /** Rows submitted on confirm but not saved (e.g. DB conflict). */
+  notImported: number;
+  errors: BulkImportRowError[];
+};
+
+/** Row sent in confirm body — includes sheet metadata and optional DB action fields. */
+export type BulkImportPendingRow = BulkImportUser & {
+  row_no: number;
+  profile_picture: string;
+  action?: "insert" | "update";
+  existing_user_id?: number;
+};

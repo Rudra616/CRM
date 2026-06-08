@@ -30,7 +30,7 @@ export const phoneField = trimmedString().length(10).pattern(phoneRegex).require
   "string.pattern.base": "Phone must contain only numbers",
 });
 
-export const emailField = trimmedString().min(5).max(100).email().required().messages({
+export const emailField = trimmedString().lowercase().min(5).max(100).email().required().messages({
   "string.empty": "Email is required",
   "string.email": "Invalid email format",
 });
@@ -149,11 +149,11 @@ export const bulkImportSheetStatusField = trimmedString()
   });
 
 const bulkImportRowSchema = Joi.object({
-  username: usernameField,
+  username: usernameField.lowercase(),
   first_name: firstNameField,
   last_name: lastNameField,
   phone: phoneField,
-  email: emailField,
+  email: emailField.lowercase(),
   gender: genderRequired,
   sheet_status: bulkImportSheetStatusField,
   row_no: Joi.number().integer().required().messages({

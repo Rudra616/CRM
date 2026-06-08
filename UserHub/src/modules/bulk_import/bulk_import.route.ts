@@ -1,10 +1,17 @@
 import { Router } from "express";
-import { uploadImportFile } from "../../common/middleware/uploadImageMiddleware";
-import { bulkimport } from "./bulk_import.controller";
-import { requireMainAdmin } from "../../common/middleware/authMiddleware";
+import { uploadImportSingle } from "../../common/middleware/uploadImageMiddleware";
+import { authenticate, requireMainAdmin } from "../../common/middleware/authMiddleware";
+import { confirmBulkImport, validateBulkImport } from "./bulk_import.controller";
 
 const router = Router();
 
-router.post("/import", uploadImportFile.single("file"),  bulkimport);
+/** All bulk import routes require an authenticated main admin. */
+router.use(authenticate, requireMainAdmin);
+
+/** POST /api/bulkimport/validate — upload CSV/Excel, return errors + valid rows (no DB writes). */
+router.post("/validate", uploadImportSingle("file"), validateBulkImport);
+
+/** POST /api/bulkimport/confirm — start background insert/update from validated rows. */
+router.post("/confirm", confirmBulkImport);
 
 export default router;

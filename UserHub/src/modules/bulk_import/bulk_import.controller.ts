@@ -1,43 +1,46 @@
 import { Request, Response } from "express";
 import fs from "fs";
+import { setImmediate } from "timers";
 import XLSX from "xlsx";
 import { errorResponse, successResponse } from "../../common/utils/apiResponse";
-import { bulkImportSchema } from "../user/user.validation";
-import { importUser } from "./bulk.import.service";
-import { resolveBulkImportImage } from "./bulk_import.image";
+import type { AuthRequest } from "../../common/types/AuthRequest";
+import { executeBulkImport } from "./bulk_import.service";
+import { emitBulkImportFinished } from "./bulk_import.socket";
+import { validateImportSheet } from "./bulk_import.validation";
 import { IMPORT_COLUMNS } from "./bulk_import.types";
-import type { BulkImportSheetRow, BulkImportUser } from "./bulk_import.types";
+import type { BulkImportPendingRow, BulkImportSheetRow } from "./bulk_import.types";
 
-const cell = (row: Record<string, unknown>, column: string): string =>
+/**
+ * Reads and trims a single cell value from a parsed sheet row.
+ *
+ * @param row Parsed row object keyed by column header
+ * @param column Column header name
+ * @returns Trimmed string value (empty string if missing)
+ */
+const cell = (row: Record<string, unknown>, column: string) =>
   String(row[column] ?? "").trim();
 
-const isEmptyRow = (row: Record<string, unknown>): boolean =>
-  Object.values(IMPORT_COLUMNS).every((col) => !cell(row, col));
-
-const normalizeRowKeys = (row: Record<string, unknown>) => {
-  const cleaned: Record<string, unknown> = {};
-
-  Object.keys(row).forEach((key) => {
-    const newKey = key.trim(); // <-- FIX HEADER SPACES
-    cleaned[newKey] = row[key];
-  });
-
-  return cleaned;
-};
 /**
- * Reads and parses rows from the uploaded Excel sheet.
+ * Parses the first worksheet of an uploaded CSV/Excel file into normalized sheet rows.
+ * Skips completely empty rows and maps columns via {@link IMPORT_COLUMNS}.
  *
- * @param filePath Absolute path of the uploaded file
- * @returns Array of formatted sheet rows
+ * @param filePath Absolute path to the uploaded file on disk
+ * @returns Normalized rows ready for Joi validation
  */
-const readSheetRows = (filePath: string) => {
+const readSheetRows = (filePath: string): BulkImportSheetRow[] => {
   const workbook = XLSX.readFile(filePath);
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(sheet, { defval: "" }) as Record<string, unknown>[];
 
   return raw
-    .map(normalizeRowKeys)
-    .filter((row) => !isEmptyRow(row))
+    .map((row) => {
+      const cleaned: Record<string, unknown> = {};
+      Object.keys(row).forEach((k) => {
+        cleaned[k.trim()] = row[k];
+      });
+      return cleaned;
+    })
+    .filter((row) => !Object.values(IMPORT_COLUMNS).every((col) => !cell(row, col)))
     .map((row) => ({
       row_no: Number(row["No"] ?? 0),
       first_name: cell(row, IMPORT_COLUMNS.FIRST_NAME),
@@ -48,110 +51,172 @@ const readSheetRows = (filePath: string) => {
       gender: cell(row, IMPORT_COLUMNS.GENDER).toLowerCase(),
       sheet_status: cell(row, IMPORT_COLUMNS.STATUS).toLowerCase(),
       profile_picture: cell(row, IMPORT_COLUMNS.PROFILE_PICTURE),
-    }));
+    })) as BulkImportSheetRow[];
 };
 
 /**
- * Converts validated sheet row data into database user format.
+ * Builds the human-readable summary message emitted when a background import finishes.
  *
- * @param row Validated sheet row data
- * @param image_url Resolved profile image URL
- * @returns Formatted user object for database import
+ * @param total Total rows in the original upload (including validation skips)
+ * @param skippedValidation Rows excluded during the validate step
+ * @param outcome Insert/update counts from {@link executeBulkImport}
+ * @returns Summary string for socket toast and logs
  */
-const toDbUser = (row: BulkImportSheetRow, image_url: string | null): BulkImportUser => ({
-  username: row.username,
-  first_name: row.first_name,
-  last_name: row.last_name,
-  phone: row.phone,
-  email: row.email,
-  gender: row.gender,
-  image_url,
-  status: row.sheet_status === "deleted" ? "inactive" : row.sheet_status,
-  is_delete: row.sheet_status === "deleted" ? 1 : 0,
-});
+const buildFinishMessage = (
+  total: number,
+  skippedValidation: number,
+  outcome: {
+    imported: number;
+    inserted: number;
+    updated: number;
+    notImported: number;
+  }
+): string => {
+  const base = `Total: ${total}, skipped (validation): ${skippedValidation}. Saved: ${outcome.imported} (${outcome.inserted} inserted, ${outcome.updated} updated).`;
+  if (outcome.notImported > 0) {
+    return `${base} Failed on import: ${outcome.notImported}.`;
+  }
+  return base;
+};
 
 /**
- * Imports users in bulk from an uploaded Excel file.
+ * Runs {@link executeBulkImport} on the next event-loop tick and notifies the admin via socket.
  *
- * Reads the uploaded sheet, validates row data, resolves profile images,
- * imports users into the database, and removes the temporary upload file.
- *
- * @param req Express request object containing uploaded file
- * @param res Express response object
- * @returns Success response with imported user count or error response
+ * @param adminId Main admin user ID (socket room `user:{id}`)
+ * @param rows Validated rows from the confirm request body
+ * @param total Total row count from the original upload
+ * @param skippedValidation Rows skipped during validation
  */
-export const bulkimport = async (req: Request, res: Response) => {
-  if (!req.file) {
-    return errorResponse(res, "Please upload a file", 400);
-  }
+const runImportInBackground = (
+  adminId: number,
+  rows: BulkImportPendingRow[],
+  total: number,
+  skippedValidation: number
+): void => {
+  setImmediate(() => {
+        console.log("[bulk import] background job started", {
+      adminId,
+      totalRows: rows.length,
+      skippedValidation,
+      time: new Date().toISOString(),
+    });
+
+    void (async () => {
+      try {
+        const outcome = await executeBulkImport(rows);
+        const message = buildFinishMessage(total, skippedValidation, outcome);
+
+        emitBulkImportFinished(adminId, {
+          success: true,
+          message,
+          total,
+          skippedValidation,
+          submitted: outcome.submitted,
+          inserted: outcome.inserted,
+          updated: outcome.updated,
+          imported: outcome.imported,
+          notImported: outcome.notImported,
+        });
+      } catch (err) {
+        console.error("[bulk import background]", err);
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Import failed";
+        emitBulkImportFinished(adminId, {
+          success: false,
+          message,
+          total,
+          skippedValidation,
+          submitted: rows.length,
+          inserted: 0,
+          updated: 0,
+          imported: 0,
+          notImported: 0,
+        });
+      }
+    })();
+  });
+};
+
+/**
+ * Validates an uploaded import file (CSV/Excel) without writing to the database.
+ * Parses the sheet, runs Joi + duplicate checks, and returns errors plus confirm-ready rows.
+ *
+ * @param req Multipart request with `file` field (multer) and authenticated main admin
+ * @param res Express response
+ * @returns Errors, summary, and `rows` payload for a later confirm call
+ */
+export const validateBulkImport = (req: Request, res: Response) => {
+  if (!req.file) return errorResponse(res, "Please upload a file", 400);
+
+  const authReq = req as AuthRequest;
+  const adminId = authReq.user?.id;
+  if (!adminId) return errorResponse(res, "Unauthorized", 401);
 
   const filePath = req.file.path;
 
   try {
-    let rows;
+    let sheetRows: BulkImportSheetRow[];
     try {
-      rows = readSheetRows(filePath);
+      sheetRows = readSheetRows(filePath);
     } catch {
       return errorResponse(res, "Could not read import file", 400);
     }
 
-    const errors: { row: number; message: string }[] = [];
-    let imported = 0;
-
-    for (let index = 0; index < rows.length; index++) {
-      const row = rows[index];
-      const { error, value } = bulkImportSchema.validate(
-        { rows: [row] },
-        { abortEarly: false }
-      );
-
-      if (error) {
-        errors.push({
-          row: row.row_no,
-          message: error.details.map((e) => e.message).join(", "),
-        });
-
-        continue;
-      }
-
-      try {
-        const validatedRow = value.rows[0] as BulkImportSheetRow;
-
-        const image_url = validatedRow.profile_picture
-          ? await resolveBulkImportImage(
-            validatedRow.profile_picture,
-            validatedRow.username
-          )
-          : null;
-
-        await importUser(toDbUser(validatedRow, image_url));
-
-        imported++;
-      } catch (err) {
-        errors.push({
-          row: row.row_no,
-          message: "Import failed",
-        });
-      }
+    if (sheetRows.length === 0) {
+      return errorResponse(res, "No data found in file", 400);
     }
-    return successResponse(
-      res,
-      "Bulk import completed",
-      {
-        imported,
-        failed: errors.length,
-        errors,
+
+    const { errors, rows, summary } = validateImportSheet(sheetRows);
+
+    const message =
+      errors.length > 0
+        ? "Validation completed with errors — review before confirming"
+        : "Validation successful — review and confirm";
+
+    return successResponse(res, message, {
+      summary: {
+        total: summary.total,
+        valid: summary.valid,
+        validationErrors: summary.validationErrors,
+        toInsert: 0,
+        toUpdate: 0,
       },
-      200
-    );
-
+      errors,
+      rows,
+    });
   } catch (err) {
-    console.error("[bulk import]", err);
-    return errorResponse(res, "Import failed", 500);
+    console.error("[bulk import validate]", err);
+    return errorResponse(res, "Validation failed", 500);
+  } finally {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
-  finally {
-    if (fs.existsSync(filePath)) { // check exist or not 
-      fs.unlinkSync(filePath); // remove file 
-    }
+};
+
+/**
+ * Accepts validated rows and starts the database import in the background.
+ * Responds immediately; completion is pushed via `bulk_import_finished` socket event.
+ *
+ * @param req JSON body with `rows`, optional `total` and `skippedValidation`
+ * @param res Express response
+ * @returns `{ started: true, submitted }` before background work begins
+ */
+export const confirmBulkImport = (req: Request, res: Response) => {
+  const adminId = (req as AuthRequest).user!.id;
+
+  const rows = req.body?.rows as BulkImportPendingRow[] | undefined;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return errorResponse(res, "No rows to import. Please validate the file again.", 400);
   }
+
+  const total = Number(req.body?.total ?? rows.length);
+  const skippedValidation = Number(req.body?.skippedValidation ?? 0);
+
+  const message =
+    "Import started. Processing in the background — you will be notified when it finishes.";
+
+  successResponse(res, message, { started: true, submitted: rows.length });
+
+  runImportInBackground(adminId, rows, total, skippedValidation);
 };
