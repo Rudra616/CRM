@@ -16,6 +16,7 @@ import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import { ListPagination } from '../../../shared/components/ListPagination';
 import {
   getTicketSocket,
   type NewMessageSocketEvent,
@@ -426,41 +427,14 @@ const StaffTicketsPage = () => {
             </tbody>
           </table>
         </div>
-        <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-          <div className="text-muted small">
-            {start}-{end} of {total}
-            <span className="ms-1">(page {currentPage} of {totalPages})</span>
-          </div>
-          <div className="d-flex align-items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-primary"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            >
-              Prev
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`btn btn-sm ${currentPage === i + 1 ? 'btn-primary' : 'btn-outline-primary'}`}
-                style={{ minWidth: 36 }}
-                onClick={() => setCurrentPage(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-primary"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        <ListPagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          start={start}
+          end={end}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       <TicketMessageModal

@@ -16,6 +16,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../context/PermissionContext';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import { ListPagination } from '../../../shared/components/ListPagination';
 
 type PermFlags = {
   can_view: boolean;
@@ -317,34 +318,14 @@ const ManagePermissions = () => {
                 </table>
               </div>
             )}
-            {totalModules > 0 && (
-              <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-                <div className="text-muted small">
-                  {start}–{end} of {totalModules}
-                </div>
-                <div className="d-flex align-items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary"
-                    disabled={safePage <= 1}
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  >
-                    Prev
-                  </button>
-                  <span className="small text-muted">
-                    Page {safePage} / {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            <ListPagination
+              page={safePage}
+              totalPages={totalPages}
+              total={totalModules}
+              start={start}
+              end={end}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </div>

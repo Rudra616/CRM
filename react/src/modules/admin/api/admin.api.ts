@@ -1,3 +1,4 @@
+import axiosClient from '../../../shared/api/axiosClient';
 import { apiRequest } from '../../../shared/api/apiWrapper';
 import type { ApiResponse, User, Admin } from '../../../shared/types/common.types';
 import type { UpdateUserRequest, UpdateAdminRequest } from '../types/admin.types';
@@ -340,52 +341,52 @@ export type BulkImportRowError = {
   message: string;
 };
 
+export type BulkImportListItem = {
+  id: number;
+  file_name: string;
+  file_path: string;
+  validation_file_path: string | null;
+  status: string;
+  total_rows: number;
+  valid_rows: number;
+  validation_error_rows: number;
+  created_at?: string;
+};
+
 export type BulkImportValidateSummary = {
   total: number;
   valid: number;
   validationErrors: number;
-  toInsert: number;
-  toUpdate: number;
-};
-
-export type BulkImportPendingRow = {
-  row_no: number;
-  username: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  email: string;
-  gender: string;
-  image_url: string | null;
-  status: string;
-  is_delete: 0 | 1;
-  profile_picture: string;
-  action?: 'insert' | 'update';
-  existing_user_id?: number;
 };
 
 export type BulkImportValidateResult = {
+  importId: number;
   summary: BulkImportValidateSummary;
-  errors: BulkImportRowError[];
-  rows: BulkImportPendingRow[];
 };
 
 export type BulkImportConfirmStarted = {
   started: true;
+  importId: number;
   submitted: number;
-};
-
-export type BulkImportConfirmResult = {
-  submitted: number;
-  inserted: number;
-  updated: number;
-  imported: number;
-  notImported: number;
-  errors: BulkImportRowError[];
 };
 
 /** Bulk import can run for minutes on large spreadsheets — avoid the default 10s client timeout. */
 const BULK_IMPORT_TIMEOUT_MS = 5 * 60 * 1000;
+
+const bulkImportOpenUrl = (importId: number, kind: 'file' | 'validation'): string => {
+  const base = (axiosClient.defaults.baseURL ?? '/api').replace(/\/$/, '');
+  const segment = kind === 'file' ? 'file' : 'validation';
+  return `${base}/bulkimport/${importId}/${segment}`;
+};
+
+export const openBulkImportFileUrl = (importId: number): string =>
+  bulkImportOpenUrl(importId, 'file');
+
+export const openBulkImportValidationUrl = (importId: number): string =>
+  bulkImportOpenUrl(importId, 'validation');
+
+export const listBulkImportsApi = (): Promise<ApiResponse<{ items: BulkImportListItem[] }>> =>
+  apiRequest<{ items: BulkImportListItem[] }>('GET', '/bulkimport');
 
 export const validateBulkImportApi = (
   file: File
@@ -397,17 +398,64 @@ export const validateBulkImportApi = (
   });
 };
 
-export const confirmBulkImportApi = (
-  rows: BulkImportPendingRow[],
-  summary: Pick<BulkImportValidateSummary, 'total' | 'validationErrors'>
+export const confirmBulkImportByIdApi = (
+  importId: number
 ): Promise<ApiResponse<BulkImportConfirmStarted>> =>
   apiRequest<BulkImportConfirmStarted>(
     'POST',
-    '/bulkimport/confirm',
-    {
-      rows,
-      total: summary.total,
-      skippedValidation: summary.validationErrors,
-    },
+    `/bulkimport/${importId}/confirm`,
+    undefined,
     { timeout: BULK_IMPORT_TIMEOUT_MS }
   );
+
+const parseCsvField = (line: string, start: number): { value: string; next: number } => {
+  if (line[start] === '"') {
+    let value = '';
+    let i = start + 1;
+    while (i < line.length) {
+      if (line[i] === '"' && line[i + 1] === '"') {
+        value += '"';
+        i += 2;
+        continue;
+      }
+      if (line[i] === '"') {
+        return { value, next: i + 1 };
+      }
+      value += line[i];
+      i += 1;
+    }
+    return { value, next: line.length };
+  }
+
+  const comma = line.indexOf(',', start);
+  if (comma === -1) {
+    return { value: line.slice(start), next: line.length };
+  }
+  return { value: line.slice(start, comma), next: comma };
+};
+
+/** Parses validation error CSV (Row,Error) into row errors for the modal. */
+export const parseBulkImportValidationCsv = (csv: string): BulkImportRowError[] => {
+  const lines = csv.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length <= 1) return [];
+
+  const errors: BulkImportRowError[] = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    const rowPart = parseCsvField(line, 0);
+    const messageStart = rowPart.next === line.length ? line.length : rowPart.next + 1;
+    const messagePart = parseCsvField(line, messageStart);
+    const row = Number(rowPart.value);
+    if (!Number.isFinite(row)) continue;
+    errors.push({ row, message: messagePart.value.trim() });
+  }
+  return errors;
+};
+
+export const fetchBulkImportValidationCsvApi = async (importId: number): Promise<string> => {
+  const res = await axiosClient.get(`/bulkimport/${importId}/validation`, {
+    responseType: 'text',
+    timeout: BULK_IMPORT_TIMEOUT_MS,
+  });
+  return String(res.data ?? '');
+};

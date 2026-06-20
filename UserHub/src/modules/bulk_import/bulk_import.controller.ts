@@ -1,35 +1,40 @@
 import { Request, Response } from "express";
 import fs from "fs";
+import path from "path";
 import { setImmediate } from "timers";
 import XLSX from "xlsx";
+
 import { errorResponse, successResponse } from "../../common/utils/apiResponse";
 import type { AuthRequest } from "../../common/types/AuthRequest";
+import { absoluteUploadFilePath } from "../../config/uploads";
+
 import { executeBulkImport } from "./bulk_import.service";
 import { emitBulkImportFinished } from "./bulk_import.socket";
+import {
+  bulkImportValidationStoredPath,
+  writeBulkImportValidationErrorsCsv,
+} from "./bulk_import.storage";
+import {
+  createBulkImportRecord,
+  findBulkImportForAdmin,
+  listBulkImportsByAdmin,
+  updateBulkImportStatus,
+} from "./bulk_import.repository";
 import { validateImportSheet } from "./bulk_import.validation";
 import { IMPORT_COLUMNS } from "./bulk_import.types";
-import type { BulkImportPendingRow, BulkImportSheetRow } from "./bulk_import.types";
 
-/**
- * Reads and trims a single cell value from a parsed sheet row.
- *
- * @param row Parsed row object keyed by column header
- * @param column Column header name
- * @returns Trimmed string value (empty string if missing)
- */
+import type {
+  BulkImportPendingRow,
+  BulkImportSheetRow,
+} from "./bulk_import.types";
+
 const cell = (row: Record<string, unknown>, column: string) =>
   String(row[column] ?? "").trim();
 
-/**
- * Parses the first worksheet of an uploaded CSV/Excel file into normalized sheet rows.
- * Skips completely empty rows and maps columns via {@link IMPORT_COLUMNS}.
- *
- * @param filePath Absolute path to the uploaded file on disk
- * @returns Normalized rows ready for Joi validation
- */
 const readSheetRows = (filePath: string): BulkImportSheetRow[] => {
   const workbook = XLSX.readFile(filePath);
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
   const raw = XLSX.utils.sheet_to_json(sheet, { defval: "" }) as Record<string, unknown>[];
 
   return raw
@@ -40,7 +45,9 @@ const readSheetRows = (filePath: string): BulkImportSheetRow[] => {
       });
       return cleaned;
     })
-    .filter((row) => !Object.values(IMPORT_COLUMNS).every((col) => !cell(row, col)))
+    .filter((row) =>
+      !Object.values(IMPORT_COLUMNS).every((col) => !cell(row, col))
+    )
     .map((row) => ({
       row_no: Number(row["No"] ?? 0),
       first_name: cell(row, IMPORT_COLUMNS.FIRST_NAME),
@@ -54,14 +61,6 @@ const readSheetRows = (filePath: string): BulkImportSheetRow[] => {
     })) as BulkImportSheetRow[];
 };
 
-/**
- * Builds the human-readable summary message emitted when a background import finishes.
- *
- * @param total Total rows in the original upload (including validation skips)
- * @param skippedValidation Rows excluded during the validate step
- * @param outcome Insert/update counts from {@link executeBulkImport}
- * @returns Summary string for socket toast and logs
- */
 const buildFinishMessage = (
   total: number,
   skippedValidation: number,
@@ -79,36 +78,25 @@ const buildFinishMessage = (
   return base;
 };
 
-/**
- * Runs {@link executeBulkImport} on the next event-loop tick and notifies the admin via socket.
- *
- * @param adminId Main admin user ID (socket room `user:{id}`)
- * @param rows Validated rows from the confirm request body
- * @param total Total row count from the original upload
- * @param skippedValidation Rows skipped during validation
- */
 const runImportInBackground = (
   adminId: number,
+  importId: number,
   rows: BulkImportPendingRow[],
   total: number,
   skippedValidation: number
 ): void => {
   setImmediate(() => {
-        console.log("[bulk import] background job started", {
-      adminId,
-      totalRows: rows.length,
-      skippedValidation,
-      time: new Date().toISOString(),
-    });
-
     void (async () => {
       try {
         const outcome = await executeBulkImport(rows);
         const message = buildFinishMessage(total, skippedValidation, outcome);
 
+        await updateBulkImportStatus(importId, "completed");
+
         emitBulkImportFinished(adminId, {
           success: true,
           message,
+          importId,
           total,
           skippedValidation,
           submitted: outcome.submitted,
@@ -118,14 +106,12 @@ const runImportInBackground = (
           notImported: outcome.notImported,
         });
       } catch (err) {
-        console.error("[bulk import background]", err);
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Import failed";
+        await updateBulkImportStatus(importId, "failed");
+
         emitBulkImportFinished(adminId, {
           success: false,
-          message,
+          message: err instanceof Error ? err.message : "Import failed",
+          importId,
           total,
           skippedValidation,
           submitted: rows.length,
@@ -139,84 +125,204 @@ const runImportInBackground = (
   });
 };
 
-/**
- * Validates an uploaded import file (CSV/Excel) without writing to the database.
- * Parses the sheet, runs Joi + duplicate checks, and returns errors plus confirm-ready rows.
- *
- * @param req Multipart request with `file` field (multer) and authenticated main admin
- * @param res Express response
- * @returns Errors, summary, and `rows` payload for a later confirm call
- */
-export const validateBulkImport = (req: Request, res: Response) => {
+const sendStoredFile = (
+  res: Response,
+  storedPath: string,
+  downloadName: string,
+  download: boolean
+): void => {
+  const abs = absoluteUploadFilePath(storedPath);
+  if (!fs.existsSync(abs)) {
+    errorResponse(res, "File not found", 404);
+    return;
+  }
+
+  const disposition = download ? "attachment" : "inline";
+  res.setHeader(
+    "Content-Disposition",
+    `${disposition}; filename="${path.basename(downloadName)}"`
+  );
+  res.sendFile(abs);
+};
+
+/** GET /api/bulkimport — list imports for the current main admin. */
+export const listBulkImports = async (req: Request, res: Response) => {
+  const adminId = (req as AuthRequest).user!.id;
+  const items = await listBulkImportsByAdmin(adminId);
+  return successResponse(res, "Bulk imports loaded", { items });
+};
+
+/** POST /api/bulkimport/validate — upload and validate CSV/Excel. */
+export const validateBulkImport = async (req: Request, res: Response) => {
   if (!req.file) return errorResponse(res, "Please upload a file", 400);
 
   const authReq = req as AuthRequest;
-  const adminId = authReq.user?.id;
-  if (!adminId) return errorResponse(res, "Unauthorized", 401);
+  const admin = authReq.user;
+
+  if (!admin?.id) return errorResponse(res, "Unauthorized", 401);
 
   const filePath = req.file.path;
+  const storedFilePath = bulkImportValidationStoredPath(admin, req.file.filename);
 
   try {
     let sheetRows: BulkImportSheetRow[];
+
     try {
       sheetRows = readSheetRows(filePath);
     } catch {
       return errorResponse(res, "Could not read import file", 400);
     }
 
-    if (sheetRows.length === 0) {
+    if (!sheetRows.length) {
       return errorResponse(res, "No data found in file", 400);
     }
 
     const { errors, rows, summary } = validateImportSheet(sheetRows);
 
+    let validationStoredPath: string | null = null;
+
+    if (errors.length > 0) {
+      validationStoredPath = writeBulkImportValidationErrorsCsv(admin, filePath, errors);
+    }
+
+    const importId = await createBulkImportRecord({
+      fileName: req.file.originalname,
+      filePath: storedFilePath,
+      validationFilePath: validationStoredPath,
+      createdBy: admin.id,
+      totalRows: summary.total,
+      validRows: summary.valid,
+      validationErrorRows: summary.validationErrors,
+    });
+
     const message =
       errors.length > 0
-        ? "Validation completed with errors — review before confirming"
-        : "Validation successful — review and confirm";
+        ? "Validation completed with errors — confirm from the table when ready"
+        : "Validation successful — confirm from the table when ready";
 
     return successResponse(res, message, {
+      importId,
       summary: {
         total: summary.total,
         valid: summary.valid,
         validationErrors: summary.validationErrors,
-        toInsert: 0,
-        toUpdate: 0,
       },
-      errors,
-      rows,
     });
   } catch (err) {
     console.error("[bulk import validate]", err);
     return errorResponse(res, "Validation failed", 500);
-  } finally {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 };
 
-/**
- * Accepts validated rows and starts the database import in the background.
- * Responds immediately; completion is pushed via `bulk_import_finished` socket event.
- *
- * @param req JSON body with `rows`, optional `total` and `skippedValidation`
- * @param res Express response
- * @returns `{ started: true, submitted }` before background work begins
- */
-export const confirmBulkImport = (req: Request, res: Response) => {
+/** POST /api/bulkimport/:id/confirm — confirm one import row from the table. */
+export const confirmBulkImportById = async (req: Request, res: Response) => {
   const adminId = (req as AuthRequest).user!.id;
+  const importId = Number(req.params.id);
 
-  const rows = req.body?.rows as BulkImportPendingRow[] | undefined;
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return errorResponse(res, "No rows to import. Please validate the file again.", 400);
+  if (!Number.isFinite(importId) || importId <= 0) {
+    return errorResponse(res, "Invalid import id", 400);
   }
 
-  const total = Number(req.body?.total ?? rows.length);
-  const skippedValidation = Number(req.body?.skippedValidation ?? 0);
+  const record = await findBulkImportForAdmin(importId, adminId);
+  if (!record) {
+    return errorResponse(res, "Import not found", 404);
+  }
 
-  const message =
-    "Import started. Processing in the background — you will be notified when it finishes.";
+  if (record.status === "processing") {
+    return errorResponse(res, "Import is already running", 400);
+  }
 
-  successResponse(res, message, { started: true, submitted: rows.length });
+  if (record.status === "completed") {
+    return errorResponse(res, "Import already completed", 400);
+  }
 
-  runImportInBackground(adminId, rows, total, skippedValidation);
+  if (record.status === "failed") {
+    await updateBulkImportStatus(importId, "pending");
+  }
+
+  const absPath = absoluteUploadFilePath(record.file_path);
+  if (!fs.existsSync(absPath)) {
+    return errorResponse(res, "Import file missing on server", 400);
+  }
+
+  let sheetRows: BulkImportSheetRow[];
+  try {
+    sheetRows = readSheetRows(absPath);
+  } catch {
+    return errorResponse(res, "Could not read import file", 400);
+  }
+
+  const { rows, summary } = validateImportSheet(sheetRows);
+
+  if (!rows.length) {
+    return errorResponse(res, "No valid rows to import. Fix validation errors first.", 400);
+  }
+
+  await updateBulkImportStatus(importId, "processing");
+
+  successResponse(res, "Import started", {
+    started: true,
+    importId,
+    submitted: rows.length,
+  });
+
+  runImportInBackground(
+    adminId,
+    importId,
+    rows,
+    summary.total,
+    summary.validationErrors
+  );
+};
+
+/** GET /api/bulkimport/:id/file — open uploaded import file. */
+export const openBulkImportFile = async (req: Request, res: Response) => {
+  const adminId = (req as AuthRequest).user!.id;
+  const importId = Number(req.params.id);
+  const record = await findBulkImportForAdmin(importId, adminId);
+
+  if (!record) return errorResponse(res, "Import not found", 404);
+
+  sendStoredFile(res, record.file_path, record.file_name, false);
+};
+
+/** GET /api/bulkimport/:id/file/download — download uploaded import file. */
+export const downloadBulkImportFile = async (req: Request, res: Response) => {
+  const adminId = (req as AuthRequest).user!.id;
+  const importId = Number(req.params.id);
+  const record = await findBulkImportForAdmin(importId, adminId);
+
+  if (!record) return errorResponse(res, "Import not found", 404);
+
+  sendStoredFile(res, record.file_path, record.file_name, true);
+};
+
+/** GET /api/bulkimport/:id/validation — open validation errors CSV. */
+export const openBulkImportValidationFile = async (req: Request, res: Response) => {
+  const adminId = (req as AuthRequest).user!.id;
+  const importId = Number(req.params.id);
+  const record = await findBulkImportForAdmin(importId, adminId);
+
+  if (!record) return errorResponse(res, "Import not found", 404);
+  if (!record.validation_file_path) {
+    return errorResponse(res, "No validation file for this import", 404);
+  }
+
+  const name = path.basename(record.validation_file_path);
+  sendStoredFile(res, record.validation_file_path, name, false);
+};
+
+/** GET /api/bulkimport/:id/validation/download — download validation errors CSV. */
+export const downloadBulkImportValidationFile = async (req: Request, res: Response) => {
+  const adminId = (req as AuthRequest).user!.id;
+  const importId = Number(req.params.id);
+  const record = await findBulkImportForAdmin(importId, adminId);
+
+  if (!record) return errorResponse(res, "Import not found", 404);
+  if (!record.validation_file_path) {
+    return errorResponse(res, "No validation file for this import", 404);
+  }
+
+  const name = path.basename(record.validation_file_path);
+  sendStoredFile(res, record.validation_file_path, name, true);
 };

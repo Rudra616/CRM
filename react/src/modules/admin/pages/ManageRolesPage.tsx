@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import { ListPagination } from '../../../shared/components/ListPagination';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 
 const DEFAULT_PAGE_SIZES = [...LIST_PAGE_SIZE_OPTIONS];
@@ -296,42 +297,14 @@ const ManageRolesPage = () => {
             </table>
           </div>
 
-          {totalRows > 0 && (
-            <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-              <div className="text-muted small">
-                {startIndex + 1}–{startIndex + rows.length} of {totalRows}
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-primary"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Prev
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`btn btn-sm ${currentPage === i + 1 ? 'btn-primary' : 'btn-outline-primary'}`}
-                    style={{ minWidth: 36 }}
-                    onClick={() => setCurrentPage(i + 1)}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-primary"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <ListPagination
+            page={currentPage}
+            totalPages={totalPages}
+            total={totalRows}
+            start={startIndex + 1}
+            end={startIndex + rows.length}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </PageShell>
 

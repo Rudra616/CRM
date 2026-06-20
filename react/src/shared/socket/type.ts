@@ -59,6 +59,7 @@
   export type BulkImportFinishedEvent = {
     success: boolean;
     message: string;
+    importId?: number;
     total: number;
     skippedValidation: number;
     submitted: number;

@@ -20,6 +20,7 @@ import { FaEdit, FaSignOutAlt, FaTrash } from 'react-icons/fa';
 import { PERMISSION_MODULE_KEYS } from '../../../shared/utils/permissionModules';
 import { LIST_PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { ListTableToolbar } from '../../../shared/components/ListTableToolbar';
+import { ListPagination } from '../../../shared/components/ListPagination';
 
 type StatusFilter = 'all' | 'active' | 'pending' | 'inactive' | 'deleted';
 type AccountStatus = 'active' | 'pending' | 'inactive';
@@ -450,44 +451,14 @@ const ManageUsers = () => {
         </div>
 
         {/* ── Pagination ───────────────────────────────────────────────────── */}
-        {pagination.total > 0 && (
-          <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-            <div className="text-muted small">
-              {startIndex + 1}–{endIndex} of {pagination.total}
-              <span className="ms-1">(page {pagination.page} of {pagination.totalPages})</span>
-            </div>
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-primary"
-                disabled={pagination.page <= 1}
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              >
-                Prev
-              </button>
-              {Array.from({ length: pagination.totalPages }, (_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`btn btn-sm ${pagination.page === i + 1 ? 'btn-primary' : 'btn-outline-primary'
-                    }`}
-                  style={{ minWidth: 36 }}
-                  onClick={() => setCurrentPage(i + 1)}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-primary"
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <ListPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          start={startIndex + 1}
+          end={endIndex}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/*

@@ -7,6 +7,7 @@ import { emitToUser } from "../../realtime/socket";
 export type BulkImportSocketPayload = {
   success: boolean;
   message: string;
+  importId?: number;
   total: number;
   skippedValidation: number;
   submitted: number;

@@ -141,9 +141,11 @@ export const TicketSocketSession = () => {
 
     const socket = getTicketSocket();
     const onBulkImportFinished = (payload: BulkImportFinishedSocketEvent) => {
-      if (pathname.startsWith('/admin/bulk-import')) return;
-      if (payload.success) showSuccess(payload.message);
-      else showError(payload.message);
+      if (payload.success) {
+        showSuccess(payload.message || 'Bulk import completed');
+      } else {
+        showError(payload.message || 'Bulk import failed');
+      }
     };
 
     socket.on('bulk_import_finished', onBulkImportFinished);

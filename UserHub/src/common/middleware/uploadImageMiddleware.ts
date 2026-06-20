@@ -9,6 +9,8 @@ import {
   IMAGE_MAX_FILE_BYTES,
   IMAGE_MIMETYPE,
 } from "../helpers/constant";
+import { ensureBulkImportValidationDir } from "../../modules/bulk_import/bulk_import.storage";
+import type { AuthRequest } from "../types/AuthRequest";
 /**
  * Multer disk storage configuration for uploaded images.
  *
@@ -109,13 +111,22 @@ export const uploadImage = multer({
   limits: { fileSize: IMAGE_MAX_FILE_BYTES },
 });
 
-const importStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const dir = path.join(UPLOADS_ROOT, BULK_IMPORT_UPLOADS_SUBDIR);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+/**
+ * Bulk import validate uploads — per authenticated admin:
+ * uploads/imports/validation/{admin|subadmin}/{userId}/
+ */
+const importValidationStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const user = (req as AuthRequest).user;
+    if (!user?.id) {
+      return cb(new Error("Authentication required for import upload"), "");
     }
-    cb(null, dir);
+    try {
+      const dir = ensureBulkImportValidationDir(user);
+      cb(null, dir);
+    } catch (err) {
+      cb(err instanceof Error ? err : new Error("Could not create upload folder"), "");
+    }
   },
   filename: (_req, file, cb) => {
     const timestamp = Date.now();
@@ -124,9 +135,9 @@ const importStorage = multer.diskStorage({
   },
 });
 
-/** Always stores under uploads/imports (even when admin is authenticated). */
-export const uploadImportFile = multer({
-  storage: importStorage,
+/** Stores validate-step spreadsheets under the uploading admin's folder. */
+export const uploadImportValidationFile = multer({
+  storage: importValidationStorage,
   fileFilter: importFileFilter,
   limits: { fileSize: BULK_IMPORT_MAX_FILE_BYTES },
 });
@@ -139,11 +150,11 @@ const multerErrorMessage = (err: { code?: string; message?: string }): string =>
   return err.message || "File upload failed";
 };
 
-/** Wraps bulk import upload — returns JSON instead of throwing MulterError. */
-export const uploadImportSingle =
+/** Wraps bulk import validate upload — returns JSON instead of throwing MulterError. */
+export const uploadImportValidationSingle =
   (fieldName = "file") =>
   (req: any, res: any, next: any) => {
-    uploadImportFile.single(fieldName)(req, res, (err: any) => {
+    uploadImportValidationFile.single(fieldName)(req, res, (err: any) => {
       if (err) {
         return res.status(400).json({ success: false, message: multerErrorMessage(err) });
       }

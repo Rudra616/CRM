@@ -178,35 +178,73 @@ export const bulkInsertUsers = async (rows: BulkImportPendingRow[]): Promise<voi
  * @param rows Rows marked `action: "update"` with `existing_user_id` set
  */
 export const bulkUpdateUsers = async (rows: BulkImportPendingRow[]): Promise<void> => {
-  if (rows.length === 0) return;
+  if (!rows.length) return;
 
-  const conn = await db.getConnection();
-  try {
-    await conn.beginTransaction();
+  const clean = (v: any, fallback = "") =>
+    v === undefined || v === null || v === "" ? fallback : v;
 
-    let processed = 0;
+  const ids = rows
+    .map(r => r.existing_user_id)
+    .filter((id): id is number => typeof id === "number");
+
+  if (!ids.length) return;
+
+  const buildCase = (field: keyof BulkImportPendingRow) => {
+    const cases: string[] = [];
+    const params: any[] = [];
+
     for (const row of rows) {
       const id = row.existing_user_id;
       if (!id) continue;
-      await conn.query(
-        `UPDATE user SET ${PROFILE_SET_SQL}, updated_at = NOW() WHERE id = ?`,
-        [...profileParams(row), id]
-      );
-      processed += 1;
-      if (processed % YIELD_EVERY === 0) {
-        await yieldEventLoop();
-      }
+
+      const value = clean(row[field]);
+
+      cases.push("WHEN ? THEN ?");
+      params.push(id, value);
     }
 
-    await conn.commit();
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-};
+    return {
+      sql: `CASE id ${cases.join(" ")} END`,
+      params,
+    };
+  };
 
+  const first = buildCase("first_name");
+  const last = buildCase("last_name");
+  const phone = buildCase("phone");
+  const gender = buildCase("gender");
+  const image = buildCase("image_url");
+  const status = buildCase("status");
+
+  const deleteCase = buildCase("is_delete");
+
+  const sql = `
+    UPDATE user
+    SET
+      first_name = ${first.sql},
+      last_name = ${last.sql},
+      phone = ${phone.sql},
+      gender = ${gender.sql},
+      image_url = ${image.sql},
+      status = ${status.sql},
+      is_delete = ${deleteCase.sql},
+      updated_at = NOW()
+    WHERE id IN (${ids.map(() => "?").join(",")})
+  `;
+
+  const params = [
+    ...first.params,
+    ...last.params,
+    ...phone.params,
+    ...gender.params,
+    ...image.params,
+    ...status.params,
+    ...deleteCase.params,
+    ...ids
+  ];
+
+  await db.query(sql, params);
+};
 /** Result counts returned after a confirm-step import run. */
 export type ExecuteBulkImportOutput = {
   submitted: number;

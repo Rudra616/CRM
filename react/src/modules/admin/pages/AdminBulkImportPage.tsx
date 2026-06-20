@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { PageShell } from '../../../shared/components/PageShell';
@@ -7,62 +7,85 @@ import {
   getTicketSocket,
   type BulkImportFinishedSocketEvent,
 } from '../../../shared/socket/ticketSocket';
+import { colors } from '../../../theme/colors';
 import { BulkImportErrorsModal } from '../components/BulkImportErrorsModal';
 import {
-  confirmBulkImportApi,
+  confirmBulkImportByIdApi,
+  fetchBulkImportValidationCsvApi,
+  listBulkImportsApi,
+  openBulkImportFileUrl,
+  openBulkImportValidationUrl,
+  parseBulkImportValidationCsv,
   validateBulkImportApi,
-  type BulkImportConfirmResult,
-  type BulkImportPendingRow,
+  type BulkImportListItem,
   type BulkImportRowError,
-  type BulkImportValidateResult,
 } from '../api/admin.api';
 
 const ACCEPTED_IMPORT_TYPES = '.csv,.xlsx,.xls';
 
-type Step = 'upload' | 'review' | 'importing' | 'done';
+const statusLabel = (status: string): string => {
+  switch (status) {
+    case 'processing':
+      return 'Processing';
+    case 'completed':
+      return 'Completed';
+    case 'failed':
+      return 'Failed';
+    default:
+      return 'Pending';
+  }
+};
 
-type ImportFeedback = {
-  message: string;
-  variant: 'success' | 'warning' | 'danger' | 'info';
+const statusBadgeClass = (status: string): string => {
+  switch (status) {
+    case 'completed':
+      return 'bg-success';
+    case 'processing':
+      return 'bg-info text-dark';
+    case 'failed':
+      return 'bg-danger';
+    default:
+      return 'bg-warning text-dark';
+  }
 };
 
 const AdminBulkImportPage = () => {
   const { user, isLoading } = useAuth();
   const [file, setFile] = useState<File | null>(null);
-  const [step, setStep] = useState<Step>('upload');
   const [busy, setBusy] = useState(false);
-  const [pendingRows, setPendingRows] = useState<BulkImportPendingRow[]>([]);
-  const [validateResult, setValidateResult] = useState<BulkImportValidateResult | null>(null);
-  const [confirmResult, setConfirmResult] = useState<BulkImportConfirmResult | null>(null);
-  const [feedback, setFeedback] = useState<ImportFeedback | null>(null);
-  const [errorsModalOpen, setErrorsModalOpen] = useState(false);
-  const [errorsModalSource, setErrorsModalSource] = useState<'validation' | 'confirm'>(
-    'validation'
-  );
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [items, setItems] = useState<BulkImportListItem[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [validationModalOpen, setValidationModalOpen] = useState(false);
+  const [validationModalLoading, setValidationModalLoading] = useState(false);
+  const [validationModalTitle, setValidationModalTitle] = useState('');
+  const [validationModalErrors, setValidationModalErrors] = useState<BulkImportRowError[]>([]);
+
+  const loadImports = useCallback(async () => {
+    setListLoading(true);
+    try {
+      const res = await listBulkImportsApi();
+      if (res.success && res.data?.items) {
+        setItems(res.data.items);
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to load imports');
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.is_main_admin) return;
+    void loadImports();
+  }, [user?.is_main_admin, loadImports]);
 
   useEffect(() => {
     if (!user?.is_main_admin) return;
 
-    const applyFinished = (payload: BulkImportFinishedSocketEvent) => {
-      setConfirmResult({
-        submitted: payload.submitted,
-        inserted: payload.inserted,
-        updated: payload.updated,
-        imported: payload.imported,
-        notImported: payload.notImported,
-        errors: [],
-      });
-      setStep('done');
-      setBusy(false);
-      setFeedback({
-        message: payload.message,
-        variant: payload.success ? 'success' : 'danger',
-      });
-      if (payload.success) {
-        showSuccess(payload.message);
-      } else {
-        showError(payload.message);
-      }
+    const applyFinished = (_payload: BulkImportFinishedSocketEvent) => {
+      setConfirmingId(null);
+      void loadImports();
     };
 
     const socket = getTicketSocket();
@@ -70,7 +93,7 @@ const AdminBulkImportPage = () => {
     return () => {
       socket.off('bulk_import_finished', applyFinished);
     };
-  }, [user?.is_main_admin]);
+  }, [user?.is_main_admin, loadImports]);
 
   if (isLoading) {
     return <PageShell title="Bulk Import Users" subtitle="Loading..." loading />;
@@ -80,309 +103,271 @@ const AdminBulkImportPage = () => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  const resetAll = () => {
-    setFile(null);
-    setStep('upload');
-    setPendingRows([]);
-    setValidateResult(null);
-    setConfirmResult(null);
-    setFeedback(null);
-    setErrorsModalOpen(false);
-    const input = document.getElementById('bulk-import-file') as HTMLInputElement | null;
-    if (input) input.value = '';
-  };
-
   const onValidate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file || busy) return;
 
     setBusy(true);
-    setValidateResult(null);
-    setConfirmResult(null);
-    setFeedback(null);
-    setPendingRows([]);
-
     try {
       const res = await validateBulkImportApi(file);
       if (!res.success || !res.data) {
-        const message = res.message || 'Validation failed';
-        setFeedback({ message, variant: 'danger' });
-        showError(message);
+        showError(res.message || 'Validation failed');
         return;
       }
 
-      const data = res.data;
-      setValidateResult(data);
-      setPendingRows(data.rows);
-      setStep('review');
-
-      const { validationErrors, valid } = data.summary;
-      const message = res.message || 'Validation complete';
-      const variant: ImportFeedback['variant'] =
-        validationErrors > 0 && valid > 0
-          ? 'warning'
-          : validationErrors > 0
-            ? 'danger'
-            : 'success';
-
-      setFeedback({ message, variant });
-      if (valid > 0) {
-        showSuccess(message);
+      const { summary } = res.data;
+      if (summary.validationErrors > 0 && summary.valid > 0) {
+        showInfo(res.message || 'Validation completed with some errors');
+      } else if (summary.validationErrors > 0) {
+        showError(res.message || 'Validation failed — fix errors and upload again');
       } else {
-        showError(message);
+        showSuccess(res.message || 'Validation successful');
       }
+
+      setFile(null);
+      const input = document.getElementById('bulk-import-file') as HTMLInputElement | null;
+      if (input) input.value = '';
+      await loadImports();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Validation failed';
-      setFeedback({ message, variant: 'danger' });
-      showError(message);
+      showError(err instanceof Error ? err.message : 'Validation failed');
     } finally {
       setBusy(false);
     }
   };
 
-  const onConfirm = () => {
-    if (!validateResult || pendingRows.length === 0 || busy || step === 'importing') return;
+  /** Pending (or failed retry) rows can be confirmed — server re-validates valid rows. */
+  const canImportRow = (row: BulkImportListItem): boolean =>
+    (row.status === 'pending' || row.status === 'failed') && confirmingId == null;
 
-    const message =
-      'Import started. Processing in the background — you will be notified when it finishes.';
-    setStep('importing');
-    setBusy(false);
-    setFeedback({ message, variant: 'info' });
-    showInfo(message);
+  const isRowImported = (row: BulkImportListItem): boolean => row.status === 'completed';
 
-    void confirmBulkImportApi(pendingRows, validateResult.summary)
-      .then((res) => {
-        if (!res.success || !res.data?.started) {
-          const errMsg = res.message || 'Could not start import';
-          setStep('review');
-          setFeedback({ message: errMsg, variant: 'danger' });
-          showError(errMsg);
-        }
-      })
-      .catch((err) => {
-        const errMsg = err instanceof Error ? err.message : 'Could not start import';
-        setStep('review');
-        setFeedback({ message: errMsg, variant: 'danger' });
-        showError(errMsg);
-      });
+  const onImportRow = async (row: BulkImportListItem) => {
+    if (!canImportRow(row)) return;
+
+    if (!window.confirm(`Confirm import for "${row.file_name}"?`)) return;
+
+    setConfirmingId(row.id);
+    try {
+      const res = await confirmBulkImportByIdApi(row.id);
+      if (!res.success || !res.data?.started) {
+        showError(res.message || 'Could not start import');
+        setConfirmingId(null);
+        return;
+      }
+      showInfo('Import started. You will be notified when it finishes.');
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === row.id ? { ...item, status: 'processing' } : item
+        )
+      );
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Could not start import');
+      setConfirmingId(null);
+    }
   };
 
-  const validationErrors: BulkImportRowError[] = validateResult?.errors ?? [];
-  const canConfirm = pendingRows.length > 0 && step === 'review';
+  const openFileInNewTab = (importId: number) => {
+    window.open(openBulkImportFileUrl(importId), '_blank', 'noopener,noreferrer');
+  };
+
+  const openValidationInNewTab = (importId: number) => {
+    window.open(openBulkImportValidationUrl(importId), '_blank', 'noopener,noreferrer');
+  };
+
+  const openValidationInModal = async (row: BulkImportListItem) => {
+    setValidationModalOpen(true);
+    setValidationModalLoading(true);
+    setValidationModalTitle(`Validation errors — ${row.file_name}`);
+    setValidationModalErrors([]);
+
+    try {
+      const csv = await fetchBulkImportValidationCsvApi(row.id);
+      setValidationModalErrors(parseBulkImportValidationCsv(csv));
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Could not load validation file');
+      setValidationModalOpen(false);
+    } finally {
+      setValidationModalLoading(false);
+    }
+  };
+
+  const closeValidationModal = () => {
+    setValidationModalOpen(false);
+    setValidationModalErrors([]);
+    setValidationModalTitle('');
+  };
+
+  const theadStyle = { backgroundColor: colors.cardPrimaryBg };
 
   return (
     <PageShell
       title="Bulk Import Users"
-      subtitle="Validate file (sheet only) → review errors → confirm to save (DB check runs on confirm)."
+      subtitle="Upload CSV → validate → import each file from the table below."
+      flush
     >
       <div className="p-3 p-md-4">
-        {step === 'upload' ? (
-          <form onSubmit={onValidate} className="card shadow-sm border-0 mb-4">
-            <div className="card-body">
-              <label htmlFor="bulk-import-file" className="form-label fw-semibold">
-                Import file
-              </label>
-              <input
-                id="bulk-import-file"
-                type="file"
-                className="form-control"
-                accept={ACCEPTED_IMPORT_TYPES}
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-              <div className="form-text">
-                CSV, XLSX, or XLS (max 50 MB). Required columns match the template. Cancel clears
-                validation without touching the database.
-              </div>
-              <div className="d-flex justify-content-end gap-2 mt-3">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={!file || busy}
-                >
-                  {busy ? 'Validating...' : 'Validate file'}
-                </button>
-              </div>
-            </div>
-          </form>
-        ) : null}
-
-        {feedback ? (
-          <div className={`alert alert-${feedback.variant} mb-4`} role="status">
-            {feedback.message}
-          </div>
-        ) : null}
-
-        {step === 'importing' ? (
-          <div className="card shadow-sm border-0 mb-4">
-            <div className="card-body text-center py-5">
-              <div className="spinner-border text-primary mb-3" role="status" />
-              <p className="mb-0 fw-semibold">Import in progress…</p>
-              <p className="text-muted small mb-0">
-                Processing {pendingRows.length} row(s). You can use other pages — a toast will appear when
-                the import finishes.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {step === 'review' && validateResult ? (
-          <>
-            <div className="card shadow-sm border-0 mb-4">
-              <div className="card-header fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Review import</span>
-                <div className="d-flex gap-2 flex-wrap">
-                  {validationErrors.length > 0 ? (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => {
-                        setErrorsModalSource('validation');
-                        setErrorsModalOpen(true);
-                      }}
-                    >
-                      View errors ({validateResult.summary.validationErrors})
-                    </button>
-                  ) : null}
-                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={resetAll}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary"
-                    disabled={!canConfirm}
-                    onClick={onConfirm}
-                  >
-                    Confirm import
-                  </button>
-                </div>
-              </div>
-              <div className="card-body">
-                <div className="d-flex gap-2 flex-wrap mb-3">
-                  <span className="badge bg-secondary">Total: {validateResult.summary.total}</span>
-                  <span className="badge bg-success">Ready: {validateResult.summary.valid}</span>
-                  <span className="badge bg-danger">
-                    Skipped (validation): {validateResult.summary.validationErrors}
-                  </span>
-                </div>
-
-                {validationErrors.length === 0 ? (
-                  <p className="text-muted small mb-0">No validation errors. You can confirm the import.</p>
-                ) : (
-                  <p className="text-muted small mb-0">
-                    {validateResult.summary.validationErrors} row(s) have errors. Use &quot;View errors&quot; to
-                    see details, or fix the file and validate again.
-                  </p>
-                )}
-
-                {pendingRows.length === 0 ? (
-                  <p className="text-muted small mb-0 mt-2">
-                    No valid rows to import. Fix errors and validate again.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <BulkImportErrorsModal
-              open={errorsModalOpen && errorsModalSource === 'validation'}
-              errors={validationErrors}
-              title={`Validation errors (${validateResult.summary.validationErrors})`}
-              onClose={() => setErrorsModalOpen(false)}
+        <form onSubmit={onValidate} className="card shadow-sm border-0 mb-4">
+          <div className="card-body">
+            <label htmlFor="bulk-import-file" className="form-label fw-semibold">
+              Import file
+            </label>
+            <input
+              id="bulk-import-file"
+              type="file"
+              className="form-control"
+              accept={ACCEPTED_IMPORT_TYPES}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-          </>
-        ) : null}
+            <div className="form-text">
+              CSV, XLSX, or XLS (max 50 MB). After validation the file appears in the table below.
+            </div>
+            <div className="d-flex justify-content-end gap-2 mt-3">
+              <button type="submit" className="btn btn-primary" disabled={!file || busy}>
+                {busy ? 'Validating...' : 'Validate file'}
+              </button>
+            </div>
+          </div>
+        </form>
 
-        {step === 'done' && confirmResult ? (
-          <div className="card shadow-sm border-0">
-            <div className="card-header fw-semibold">Import complete</div>
-            <div className="card-body">
-              <p className="mb-3">
-                {validateResult ? (
-                  <>
-                    <strong>{validateResult.summary.total}</strong> rows in file —{' '}
-                    <strong>{validateResult.summary.validationErrors}</strong> skipped at validation,{' '}
-                  </>
-                ) : null}
-                <strong>{confirmResult.imported}</strong> saved to database (
-                <strong>{confirmResult.inserted}</strong> inserted,{' '}
-                <strong>{confirmResult.updated}</strong> updated).
-                {confirmResult.notImported > 0 ? (
-                  <>
-                    {' '}
-                    <strong>{confirmResult.notImported}</strong> failed on confirm.
-                  </>
-                ) : null}
-              </p>
-              <div className="d-flex gap-2 flex-wrap mb-3">
-                {validateResult ? (
-                  <>
-                    <span className="badge bg-secondary">
-                      Total in file: {validateResult.summary.total}
-                    </span>
-                    <span className="badge bg-warning text-dark">
-                      Skipped (validation): {validateResult.summary.validationErrors}
-                    </span>
-                  </>
-                ) : null}
-                <span className="badge bg-info text-dark">
-                  Submitted: {confirmResult.submitted}
-                </span>
-                <span className="badge bg-success">Inserted: {confirmResult.inserted}</span>
-                <span className="badge bg-primary">Updated: {confirmResult.updated}</span>
-                <span className="badge bg-success">Imported: {confirmResult.imported}</span>
-                <span className="badge bg-danger">
-                  Not imported (confirm): {confirmResult.notImported}
-                </span>
-              </div>
-              {validateResult && validateResult.summary.validationErrors > 0 ? (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-warning mb-2 me-2"
-                  onClick={() => {
-                    setErrorsModalSource('validation');
-                    setErrorsModalOpen(true);
-                  }}
-                >
-                  View validation errors ({validateResult.summary.validationErrors} rows)
-                </button>
-              ) : null}
-              {confirmResult.errors.length > 0 ? (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-danger mb-3"
-                  onClick={() => {
-                    setErrorsModalSource('confirm');
-                    setErrorsModalOpen(true);
-                  }}
-                >
-                  View confirm failures ({confirmResult.notImported})
-                </button>
-              ) : null}
-              <div>
-                <button type="button" className="btn btn-primary" onClick={resetAll}>
-                  Import another file
-                </button>
+        <div className="card shadow-sm border-0">
+          <div className="card-header">
+            <div className="fw-semibold">Import history</div>
+            <p className="text-muted small mb-0 mt-1">
+              For a <strong>Pending</strong> row, click <strong>Confirm import</strong> in Action to
+              save users to the database. After import completes, the row shows Imported and cannot
+              be run again.
+            </p>
+          </div>
+          <div className="table-responsive">
+            <table className="table table-bordered table-striped align-middle mb-0">
+              <thead style={theadStyle}>
+                <tr className="fw-semibold small" style={{ color: colors.primary }}>
+                  <th>#</th>
+                  <th>File name</th>
+                  <th>Path</th>
+                  <th>Validation</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listLoading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center text-muted py-4">
+                      Loading imports…
+                    </td>
+                  </tr>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center text-muted py-4">
+                      No imports yet. Upload and validate a file above.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((row, index) => {
+                    const showImport = canImportRow(row);
+                    const isRowBusy = confirmingId === row.id || row.status === 'processing';
+
+                    return (
+                      <tr key={row.id}>
+                        <td>{index + 1}</td>
+                        <td className="text-break">{row.file_name}</td>
+                        <td className="small text-break">
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-start text-break"
+                            onClick={() => openFileInNewTab(row.id)}
+                          >
+                            {row.file_path}
+                          </button>
+                        </td>
+                        <td>
+                          {row.validation_file_path ? (
+                            <div className="d-flex flex-wrap gap-1">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => openValidationInNewTab(row.id)}
+                              >
+                                Open
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => void openValidationInModal(row)}
+                              >
+                                View
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-muted small">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`badge text-capitalize ${statusBadgeClass(row.status)}`}>
+                            {statusLabel(row.status)}
+                          </span>
+                        </td>
+                        <td>
+                          {isRowImported(row) ? (
+                            <span className="text-muted small">Imported</span>
+                          ) : row.status === 'processing' || confirmingId === row.id ? (
+                            <span className="text-muted small d-inline-flex align-items-center gap-1">
+                              <span className="spinner-border spinner-border-sm text-primary" />
+                              Importing…
+                            </span>
+                          ) : showImport ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              disabled={isRowBusy}
+                              onClick={() => void onImportRow(row)}
+                              title={
+                                row.valid_rows > 0
+                                  ? `Import ${row.valid_rows} ready row(s)`
+                                  : 'Server will check valid rows on confirm'
+                              }
+                            >
+                              Confirm import
+                            </button>
+                          ) : (
+                            <span className="text-muted small">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {validationModalLoading ? (
+        <div
+          className="modal fade show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-body text-center py-5">
+                <div className="spinner-border text-primary mb-3" role="status" />
+                <p className="text-muted small mb-0">Loading validation errors…</p>
               </div>
             </div>
           </div>
-        ) : null}
-
-        {step === 'done' ? (
-          <BulkImportErrorsModal
-            open={errorsModalOpen}
-            errors={
-              errorsModalSource === 'confirm'
-                ? (confirmResult?.errors ?? [])
-                : (validateResult?.errors ?? [])
-            }
-            title={
-              errorsModalSource === 'confirm'
-                ? `Not imported on confirm (${confirmResult?.notImported ?? 0})`
-                : `Skipped at validation (${validateResult?.summary.validationErrors ?? 0} rows)`
-            }
-            onClose={() => setErrorsModalOpen(false)}
-          />
-        ) : null}
-      </div>
+        </div>
+      ) : (
+        <BulkImportErrorsModal
+          open={validationModalOpen}
+          errors={validationModalErrors}
+          title={validationModalTitle}
+          onClose={closeValidationModal}
+        />
+      )}
     </PageShell>
   );
 };
